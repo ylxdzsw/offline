@@ -5,6 +5,7 @@ A mobile-first bilingual collection of classical board games that remains fully 
 - Chinese Xiangqi against an on-device AI
 - 15×15 Freestyle Wuziqi against an on-device AI
 - Uniquely solvable Sudoku puzzles in three difficulty levels
+- Hidden-rank Junqi (Luzhanqi) against an on-device AI
 
 Every game is compiled by [Nattoppet](https://github.com/ylxdzsw/nattoppet) into a self-contained HTML page. The PWA uses no gameplay server, CDN, remote font, analytics service, or downloadable AI model.
 

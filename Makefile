@@ -1,7 +1,7 @@
 NODE ?= node
 NATTOPPET := vendor/nattoppet/nattoppet.ts
 DIST := dist
-PAGES := index xiangqi wuziqi sudoku
+PAGES := index xiangqi wuziqi sudoku junqi
 SOURCES := $(shell find src -type f)
 
 .PHONY: all deps build serve test test-unit test-e2e clean
