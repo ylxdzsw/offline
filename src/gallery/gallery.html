@@ -19,6 +19,7 @@
             background: #8b463e;
         }
         article:nth-child(2) .preview { color: #423b34; background: #d7b77d; }
+        article:nth-child(3) .preview { color: #67463a; background: #e8ddc9; }
         .xiangqi-mark {
             display: grid;
             width: 78px;
@@ -46,6 +47,8 @@
         }
         .gomoku-mark::before { top: 11px; left: 11px; background: #252422; }
         .gomoku-mark::after { right: 10px; bottom: 10px; border: 1px solid #b9aa91; background: #faf8f1; }
+        .sudoku-mark { display: grid; width: 90px; height: 90px; grid-template-columns: repeat(3, 1fr); border: 3px solid currentColor; background: rgba(255,255,255,.35); }
+        .sudoku-mark i { display: grid; border: 1px solid currentColor; place-items: center; font-family: Georgia, serif; font-size: 1.1rem; font-style: normal; font-weight: 700; }
         .content { padding: 15px 16px 17px; }
         h2 { margin: 0 0 5px; color: #4d302b; font-family: Georgia, "Noto Serif SC", serif; font-size: 1.22rem; }
         p { min-height: 2.8em; margin: 0 0 14px; color: #746658; font-size: .88rem; line-height: 1.45; }
@@ -80,6 +83,7 @@ customElements.define('game-gallery', class extends HTMLElement {
         const games = [
             {id: 'xiangqi', mark: '<span class="xiangqi-mark">棋</span>'},
             {id: 'wuziqi', mark: '<span class="gomoku-mark"></span>'},
+            {id: 'sudoku', mark: '<span class="sudoku-mark"><i>8</i><i></i><i>2</i><i></i><i>5</i><i></i><i>1</i><i></i><i>9</i></span>'},
         ]
         this.shadowRoot.querySelector('.games').innerHTML = games.map(game => `
             <article>

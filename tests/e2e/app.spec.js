@@ -4,16 +4,16 @@ const path = require('node:path')
 
 test('build is self-contained and contains the complete PWA shell', async () => {
     const dist = path.resolve('dist')
-    for (const file of ['index.html', 'xiangqi.html', 'wuziqi.html', 'manifest.webmanifest', 'sw.js', 'icons/icon-192.png', 'icons/icon-512.png']) {
+    for (const file of ['index.html', 'xiangqi.html', 'wuziqi.html', 'sudoku.html', 'manifest.webmanifest', 'sw.js', 'icons/icon-192.png', 'icons/icon-512.png']) {
         expect(fs.existsSync(path.join(dist, file)), file).toBeTruthy()
     }
-    for (const page of ['index.html', 'xiangqi.html', 'wuziqi.html']) {
+    for (const page of ['index.html', 'xiangqi.html', 'wuziqi.html', 'sudoku.html']) {
         const html = fs.readFileSync(path.join(dist, page), 'utf8')
         expect(html).toContain('manifest.webmanifest')
         expect(html).not.toMatch(/<(?:script|link|img)[^>]+(?:src|href)=["']https?:\/\//i)
     }
     const sw = fs.readFileSync(path.join(dist, 'sw.js'), 'utf8')
-    for (const asset of ['./index.html', './xiangqi.html', './wuziqi.html', './manifest.webmanifest']) expect(sw).toContain(asset)
+    for (const asset of ['./index.html', './xiangqi.html', './wuziqi.html', './sudoku.html', './manifest.webmanifest']) expect(sw).toContain(asset)
 })
 
 test('gallery and sidebar localize from query and preserve the override', async ({page}) => {
@@ -58,10 +58,25 @@ test('Wuziqi plays an AI reply and undo removes the pair', async ({page}) => {
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:wuziqi')).history.length)).toBe(0)
 })
 
+test('Sudoku supports entries, notes, hints, undo, and persistence', async ({page}) => {
+    await page.goto('/sudoku.html?lang=en')
+    const editable = page.locator('sudoku-game .cell:not(.given)').first()
+    await editable.click()
+    await page.locator('sudoku-game .notes-toggle').click()
+    await page.locator('sudoku-game .digit[data-digit="3"]').click()
+    await expect(editable.locator('.notes')).toContainText('3')
+    await page.locator('sudoku-game .hint').click()
+    await expect(editable).not.toContainText(/^$/)
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:sudoku')).history.length)).toBe(2)
+    await page.reload()
+    await expect(page.locator('sudoku-game .undo')).toBeEnabled()
+    await page.locator('sudoku-game .undo').click()
+})
+
 for (const viewport of [{width: 320, height: 568}, {width: 390, height: 844}, {width: 430, height: 932}]) {
     test(`all pages fit a ${viewport.width}x${viewport.height} mobile viewport`, async ({page}) => {
         await page.setViewportSize(viewport)
-        for (const url of ['/index.html', '/xiangqi.html', '/wuziqi.html']) {
+        for (const url of ['/index.html', '/xiangqi.html', '/wuziqi.html', '/sudoku.html']) {
             await page.goto(url)
             expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy()
         }

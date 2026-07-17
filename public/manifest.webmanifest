@@ -2,7 +2,7 @@
   "id": "./",
   "name": "Offline Classical Games / 离线棋局",
   "short_name": "棋局 Games",
-  "description": "Offline Xiangqi and Wuziqi / 离线中国象棋与五子棋",
+  "description": "Offline classical board and puzzle games / 离线经典棋类与益智游戏",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
