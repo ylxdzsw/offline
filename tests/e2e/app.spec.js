@@ -4,16 +4,16 @@ const path = require('node:path')
 
 test('build is self-contained and contains the complete PWA shell', async () => {
     const dist = path.resolve('dist')
-    for (const file of ['index.html', 'xiangqi.html', 'wuziqi.html', 'sudoku.html', 'junqi.html', 'manifest.webmanifest', 'sw.js', 'icons/icon-192.png', 'icons/icon-512.png']) {
+    for (const file of ['index.html', 'xiangqi.html', 'wuziqi.html', 'sudoku.html', 'junqi.html', 'chess.html', 'manifest.webmanifest', 'sw.js', 'icons/icon-192.png', 'icons/icon-512.png']) {
         expect(fs.existsSync(path.join(dist, file)), file).toBeTruthy()
     }
-    for (const page of ['index.html', 'xiangqi.html', 'wuziqi.html', 'sudoku.html', 'junqi.html']) {
+    for (const page of ['index.html', 'xiangqi.html', 'wuziqi.html', 'sudoku.html', 'junqi.html', 'chess.html']) {
         const html = fs.readFileSync(path.join(dist, page), 'utf8')
         expect(html).toContain('manifest.webmanifest')
         expect(html).not.toMatch(/<(?:script|link|img)[^>]+(?:src|href)=["']https?:\/\//i)
     }
     const sw = fs.readFileSync(path.join(dist, 'sw.js'), 'utf8')
-    for (const asset of ['./index.html', './xiangqi.html', './wuziqi.html', './sudoku.html', './junqi.html', './manifest.webmanifest']) expect(sw).toContain(asset)
+    for (const asset of ['./index.html', './xiangqi.html', './wuziqi.html', './sudoku.html', './junqi.html', './chess.html', './manifest.webmanifest']) expect(sw).toContain(asset)
 })
 
 test('gallery and sidebar localize from query and preserve the override', async ({page}) => {
@@ -88,10 +88,34 @@ test('Junqi conceals the opponent, makes an AI reply, persists, and undoes', asy
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:junqi')).history.length)).toBe(0)
 })
 
+test('Chess makes a legal AI reply, persists, reloads, and undoes the turn',async({page})=>{
+    await page.goto('/chess.html?lang=en')
+    await page.locator('chess-game .square[data-index="52"]').click()
+    await page.locator('chess-game .square[data-index="36"]').click()
+    await expect(page.locator('chess-game .status')).toHaveText('Your turn',{timeout:6000})
+    expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('offline-games:v1:chess')).history.length)).toBe(2)
+    await page.reload();await page.locator('chess-game .undo').click()
+    expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('offline-games:v1:chess')).history.length)).toBe(0)
+})
+
+test('Chess promotion presents all choices and applies the selected piece',async({page})=>{
+    await page.goto('/chess.html?lang=en')
+    await page.locator('chess-game').evaluate(game=>{
+        const e=OfflineGames.Chess,board=Array(64).fill(null)
+        board[e.at(7,4)]='wK';board[e.at(0,4)]='bK';board[e.at(1,0)]='wP'
+        Object.assign(game.state,{board,turn:e.WHITE,castling:{wK:false,wQ:false,bK:false,bQ:false},enPassant:null,halfmove:0,fullmove:1,history:[],keys:[],outcome:null})
+        game.state.keys=[e.positionKey(game.position())];game.render()
+    })
+    await page.locator('chess-game .square[data-index="8"]').click();await page.locator('chess-game .square[data-index="0"]').click()
+    await expect(page.locator('chess-game .promotion')).toBeVisible();await expect(page.locator('chess-game .choice')).toHaveCount(4)
+    await page.locator('chess-game .choice[data-type="N"]').click()
+    expect(await page.locator('chess-game').evaluate(game=>game.state.board[0])).toBe('wN')
+})
+
 for (const viewport of [{width: 320, height: 568}, {width: 390, height: 844}, {width: 430, height: 932}]) {
     test(`all pages fit a ${viewport.width}x${viewport.height} mobile viewport`, async ({page}) => {
         await page.setViewportSize(viewport)
-        for (const url of ['/index.html', '/xiangqi.html', '/wuziqi.html', '/sudoku.html', '/junqi.html']) {
+        for (const url of ['/index.html', '/xiangqi.html', '/wuziqi.html', '/sudoku.html', '/junqi.html', '/chess.html']) {
             await page.goto(url)
             expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy()
         }
