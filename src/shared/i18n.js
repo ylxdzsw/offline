@@ -1,0 +1,143 @@
+(function (root) {
+    'use strict'
+
+    const messages = {
+        en: {
+            siteName: 'Offline Classical Games',
+            gallery: 'Game Gallery',
+            menu: 'Menu',
+            close: 'Close',
+            language: 'Language',
+            english: 'English',
+            chinese: '中文',
+            xiangqi: 'Xiangqi',
+            wuziqi: 'Wuziqi',
+            xiangqiDesc: 'Classic Chinese chess against an on-device opponent.',
+            wuziqiDesc: 'Freestyle five-in-a-row on a 15×15 board.',
+            play: 'Play',
+            continue: 'Continue',
+            newGame: 'New game',
+            undo: 'Undo',
+            difficulty: 'Difficulty',
+            easy: 'Easy',
+            medium: 'Medium',
+            hard: 'Hard',
+            yourTurn: 'Your turn',
+            aiThinking: 'Opponent is thinking…',
+            youWin: 'You win',
+            aiWins: 'Opponent wins',
+            draw: 'Draw',
+            check: 'Check — your turn',
+            aiInCheck: 'Opponent is in check',
+            confirmNew: 'Start a new game and discard this position?',
+            storageWarning: 'Progress cannot be saved on this device.',
+            source: 'Source code available under the MIT license',
+            copyright: '© 2026 ylxdzsw',
+            red: 'Red',
+            black: 'Black',
+            empty: 'empty',
+            row: 'row',
+            column: 'column',
+            selected: 'selected',
+            legalMove: 'legal move',
+            lastMove: 'last move',
+            xiangqiPieceKRed: 'red general',
+            xiangqiPieceARed: 'red advisor',
+            xiangqiPieceERed: 'red elephant',
+            xiangqiPieceHRed: 'red horse',
+            xiangqiPieceRRed: 'red chariot',
+            xiangqiPieceCRed: 'red cannon',
+            xiangqiPiecePRed: 'red soldier',
+            xiangqiPieceKBlack: 'black general',
+            xiangqiPieceABlack: 'black advisor',
+            xiangqiPieceEBlack: 'black elephant',
+            xiangqiPieceHBlack: 'black horse',
+            xiangqiPieceRBlack: 'black chariot',
+            xiangqiPieceCBlack: 'black cannon',
+            xiangqiPiecePBlack: 'black soldier',
+            blackStone: 'black stone',
+            whiteStone: 'white stone',
+            offlineReady: 'Ready for offline play',
+        },
+        zh: {
+            siteName: '离线棋局',
+            gallery: '经典棋类',
+            menu: '菜单',
+            close: '关闭',
+            language: '语言',
+            english: 'English',
+            chinese: '中文',
+            xiangqi: '中国象棋',
+            wuziqi: '五子棋',
+            xiangqiDesc: '与本地电脑对弈的经典中国象棋。',
+            wuziqiDesc: '十五路棋盘上的无禁手五子棋。',
+            play: '开始',
+            continue: '继续',
+            newGame: '新局',
+            undo: '悔棋',
+            difficulty: '难度',
+            easy: '简单',
+            medium: '中等',
+            hard: '困难',
+            yourTurn: '请走棋',
+            aiThinking: '对手思考中…',
+            youWin: '你赢了',
+            aiWins: '对手获胜',
+            draw: '和棋',
+            check: '将军——请应将',
+            aiInCheck: '已将军',
+            confirmNew: '开始新局并放弃当前棋局？',
+            storageWarning: '此设备无法保存进度。',
+            source: '源代码以 MIT 许可证发布',
+            copyright: '© 2026 ylxdzsw',
+            red: '红方',
+            black: '黑方',
+            empty: '空位',
+            row: '行',
+            column: '列',
+            selected: '已选中',
+            legalMove: '可落子',
+            lastMove: '上一步',
+            xiangqiPieceKRed: '红帅',
+            xiangqiPieceARed: '红仕',
+            xiangqiPieceERed: '红相',
+            xiangqiPieceHRed: '红马',
+            xiangqiPieceRRed: '红车',
+            xiangqiPieceCRed: '红炮',
+            xiangqiPiecePRed: '红兵',
+            xiangqiPieceKBlack: '黑将',
+            xiangqiPieceABlack: '黑士',
+            xiangqiPieceEBlack: '黑象',
+            xiangqiPieceHBlack: '黑马',
+            xiangqiPieceRBlack: '黑车',
+            xiangqiPieceCBlack: '黑砲',
+            xiangqiPiecePBlack: '黑卒',
+            blackStone: '黑子',
+            whiteStone: '白子',
+            offlineReady: '已可离线使用',
+        },
+    }
+
+    const params = new URLSearchParams(root.location ? root.location.search : '')
+    const explicit = params.get('lang')
+    const browserLanguages = root.navigator?.languages || [root.navigator?.language || 'en']
+    const locale = explicit === 'zh' || explicit === 'en'
+        ? explicit
+        : browserLanguages.some(language => String(language).toLowerCase().startsWith('zh')) ? 'zh' : 'en'
+
+    const t = key => messages[locale][key] || messages.en[key] || key
+    const href = path => {
+        if (explicit !== 'zh' && explicit !== 'en') return path
+        const url = new URL(path, root.location.href)
+        url.searchParams.set('lang', explicit)
+        return url.pathname.split('/').pop() + url.search
+    }
+    const setLocale = next => {
+        const url = new URL(root.location.href)
+        url.searchParams.set('lang', next)
+        root.location.href = url.href
+    }
+
+    if (root.document) root.document.documentElement.lang = locale === 'zh' ? 'zh-CN' : 'en'
+    root.OfflineGames = Object.assign(root.OfflineGames || {}, {i18n: {locale, explicit, t, href, setLocale}})
+})(globalThis)

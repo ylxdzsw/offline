@@ -1,0 +1,381 @@
+<template id="xiangqi-game-template">
+    <style>
+        :host { display: block; }
+        .toolbar {
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        label { display: grid; gap: 3px; color: #746658; font-size: .7rem; }
+        select, .action {
+            min-height: 42px;
+            border: 1px solid #cdbb9d;
+            border-radius: 9px;
+            color: #44372f;
+            background: #fffaf0;
+        }
+        select { min-width: 96px; padding: 0 28px 0 10px; }
+        .action { padding: 0 12px; font-weight: 650; }
+        .action:disabled { opacity: .42; }
+        .status {
+            display: flex;
+            min-height: 38px;
+            align-items: center;
+            justify-content: center;
+            margin: 0 0 9px;
+            border-radius: 9px;
+            color: #5a4037;
+            font-size: .93rem;
+            font-weight: 700;
+            background: #efe1c9;
+        }
+        .status.thinking::after {
+            width: 5px;
+            height: 5px;
+            margin-left: 7px;
+            border-radius: 50%;
+            content: "";
+            background: currentColor;
+            animation: pulse .8s ease-in-out infinite alternate;
+        }
+        @keyframes pulse { to { opacity: .2; transform: scale(.7); } }
+        .warning { margin: 0 0 9px; color: #8c3c35; font-size: .77rem; text-align: center; }
+        .warning[hidden] { display: none; }
+        .board {
+            --edge: clamp(16px, 5.4vw, 25px);
+            position: relative;
+            width: 100%;
+            aspect-ratio: 8 / 9.45;
+            overflow: hidden;
+            border: 2px solid #7f573a;
+            border-radius: 8px;
+            background: #d9b678;
+            box-shadow: inset 0 0 22px rgba(92, 56, 25, .18), 0 4px 12px rgba(69, 44, 28, .12);
+            touch-action: manipulation;
+            user-select: none;
+        }
+        .field { position: absolute; inset: var(--edge); }
+        svg { width: 100%; height: 100%; overflow: visible; }
+        svg line, svg path { fill: none; stroke: #6d4a31; stroke-width: .035; vector-effect: non-scaling-stroke; }
+        .river {
+            position: absolute;
+            top: 50%;
+            left: 17%;
+            right: 17%;
+            display: flex;
+            justify-content: space-between;
+            color: rgba(89, 52, 31, .8);
+            font-family: "Noto Serif SC", serif;
+            font-size: clamp(.7rem, 3vw, 1rem);
+            letter-spacing: .18em;
+            transform: translateY(-50%);
+            pointer-events: none;
+        }
+        .spot {
+            position: absolute;
+            display: grid;
+            width: clamp(28px, 9.7vw, 44px);
+            height: clamp(28px, 9.7vw, 44px);
+            padding: 0;
+            border: 0;
+            border-radius: 50%;
+            place-items: center;
+            color: transparent;
+            background: transparent;
+            transform: translate(-50%, -50%);
+        }
+        .spot.legal::after {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            content: "";
+            background: rgba(52, 104, 64, .72);
+            box-shadow: 0 0 0 4px rgba(255, 249, 229, .3);
+        }
+        .spot.last::before, .spot.selected::before {
+            position: absolute;
+            z-index: 2;
+            inset: -2px;
+            border: 3px solid #317040;
+            border-radius: 50%;
+            content: "";
+        }
+        .spot.last::before { border-width: 2px; border-color: #28658b; }
+        .piece {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            width: 91%;
+            height: 91%;
+            border: 2px solid currentColor;
+            border-radius: 50%;
+            place-items: center;
+            font-family: "Noto Serif SC", "Songti SC", serif;
+            font-size: clamp(1rem, 5.7vw, 1.7rem);
+            font-weight: 800;
+            line-height: 1;
+            background: #f4dfb2;
+            box-shadow: inset 0 0 0 2px #e8c98c, 0 2px 3px rgba(73, 43, 24, .35);
+        }
+        .piece.red { color: #a02d2a; }
+        .piece.black { color: #292c2b; }
+        .board[aria-disabled="true"] .spot { cursor: wait; }
+        @media (max-width: 340px) {
+            .toolbar { gap: 4px; }
+            .action { padding-inline: 8px; font-size: .82rem; }
+            select { min-width: 88px; }
+        }
+    </style>
+    <div class="toolbar">
+        <label><span class="difficulty-label"></span><select class="difficulty">
+            <option value="easy"></option>
+            <option value="medium"></option>
+            <option value="hard"></option>
+        </select></label>
+        <button class="action undo" type="button"></button>
+        <button class="action new" type="button"></button>
+    </div>
+    <p class="warning" hidden></p>
+    <div class="status" role="status" aria-live="polite"></div>
+    <div class="board" role="grid">
+        <div class="field">
+            <svg viewBox="0 0 8 9" preserveAspectRatio="none" aria-hidden="true">
+                <path d="M0 0H8V9H0Z M0 1H8 M0 2H8 M0 3H8 M0 4H8 M0 5H8 M0 6H8 M0 7H8 M0 8H8 M1 0V4 M1 5V9 M2 0V4 M2 5V9 M3 0V4 M3 5V9 M4 0V4 M4 5V9 M5 0V4 M5 5V9 M6 0V4 M6 5V9 M7 0V4 M7 5V9 M3 0L5 2 M5 0L3 2 M3 7L5 9 M5 7L3 9" />
+            </svg>
+            <div class="river"><span>楚 河</span><span>漢 界</span></div>
+            <div class="spots"></div>
+        </div>
+    </div>
+</template>
+
+<script>
+customElements.define('xiangqi-game', class extends HTMLElement {
+    constructor() {
+        super()
+        this.attachShadow({mode: 'open'}).append(document.getElementById('xiangqi-game-template').content.cloneNode(true))
+        this.selected = null
+        this.legal = []
+        this.thinking = false
+        this.worker = null
+        this.requestId = 0
+    }
+
+    connectedCallback() {
+        this.engine = OfflineGames.Xiangqi
+        this.i18n = OfflineGames.i18n
+        this.storage = OfflineGames.storage
+        this.load()
+        this.bind()
+        this.localize()
+        this.render()
+        if (this.state.turn === this.engine.BLACK && !this.state.outcome) this.requestAI()
+    }
+
+    disconnectedCallback() {
+        this.cancelAI()
+    }
+
+    fresh(difficulty = 'medium') {
+        const board = this.engine.initialBoard()
+        return {
+            schema: 1,
+            game: 'xiangqi',
+            board,
+            turn: this.engine.RED,
+            difficulty,
+            history: [],
+            keys: [this.engine.positionKey(board, this.engine.RED)],
+            outcome: null,
+        }
+    }
+
+    valid(saved) {
+        return saved && Array.isArray(saved.board) && saved.board.length === 90
+            && [this.engine.RED, this.engine.BLACK].includes(saved.turn)
+            && ['easy', 'medium', 'hard'].includes(saved.difficulty)
+            && Array.isArray(saved.history) && Array.isArray(saved.keys)
+    }
+
+    load() {
+        const saved = this.storage.read('xiangqi')
+        this.state = this.valid(saved) ? saved : this.fresh()
+    }
+
+    bind() {
+        const shadow = this.shadowRoot
+        shadow.querySelector('.spots').addEventListener('click', event => {
+            const button = event.target.closest('.spot')
+            if (button) this.tap(Number(button.dataset.index))
+        })
+        shadow.querySelector('.undo').addEventListener('click', () => this.undo())
+        shadow.querySelector('.new').addEventListener('click', () => this.newGame())
+        shadow.querySelector('.difficulty').addEventListener('change', event => {
+            this.state.difficulty = event.target.value
+            this.save()
+        })
+    }
+
+    localize() {
+        const shadow = this.shadowRoot
+        shadow.querySelector('.difficulty-label').textContent = this.i18n.t('difficulty')
+        for (const option of shadow.querySelectorAll('.difficulty option')) option.textContent = this.i18n.t(option.value)
+        shadow.querySelector('.undo').textContent = this.i18n.t('undo')
+        shadow.querySelector('.new').textContent = this.i18n.t('newGame')
+        shadow.querySelector('.warning').textContent = this.i18n.t('storageWarning')
+    }
+
+    repetitions() {
+        return this.state.keys.reduce((counts, key) => {
+            counts[key] = (counts[key] || 0) + 1
+            return counts
+        }, {})
+    }
+
+    save() {
+        if (!this.storage.write('xiangqi', this.state)) this.shadowRoot.querySelector('.warning').hidden = false
+    }
+
+    tap(index) {
+        if (this.thinking || this.state.outcome || this.state.turn !== this.engine.RED) return
+        const piece = this.state.board[index]
+        if (this.selected == null) {
+            if (this.engine.sideOf(piece) === this.engine.RED) this.select(index)
+            return
+        }
+        if (this.engine.sideOf(piece) === this.engine.RED) {
+            this.select(index)
+            return
+        }
+        const move = this.legal.find(candidate => candidate.to === index)
+        if (!move) {
+            this.selected = null
+            this.legal = []
+            this.render()
+            return
+        }
+        this.commit(move, this.engine.RED)
+        if (!this.state.outcome) this.requestAI()
+    }
+
+    select(index) {
+        this.selected = index
+        this.legal = this.engine.legalMoves(this.state.board, this.engine.RED).filter(move => move.from === index)
+        this.render()
+    }
+
+    commit(move, side) {
+        const recorded = {...move, side}
+        this.state.board = this.engine.applyMove(this.state.board, recorded)
+        this.state.history.push(recorded)
+        this.state.turn = this.engine.other(side)
+        this.state.keys.push(this.engine.positionKey(this.state.board, this.state.turn))
+        const result = this.engine.status(this.state.board, this.state.turn, this.repetitions())
+        this.state.outcome = result.ended ? result : null
+        this.selected = null
+        this.legal = []
+        this.save()
+        this.render()
+    }
+
+    requestAI() {
+        if (this.state.outcome || this.state.turn !== this.engine.BLACK) return
+        this.cancelAI()
+        this.thinking = true
+        const id = ++this.requestId
+        this.worker = OfflineGames.runtime.createWorker('xiangqi-worker-payload')
+        this.worker.onmessage = event => {
+            if (event.data.id !== id || !this.thinking) return
+            const legal = this.engine.legalMoves(this.state.board, this.engine.BLACK)
+            const move = legal.find(candidate => candidate.from === event.data.move?.from && candidate.to === event.data.move?.to)
+            this.cancelAI(false)
+            if (move) this.commit(move, this.engine.BLACK)
+        }
+        this.worker.onerror = error => {
+            console.error(error)
+            this.cancelAI(false)
+            this.render()
+        }
+        this.worker.postMessage({id, board: this.state.board, side: this.engine.BLACK, difficulty: this.state.difficulty})
+        this.render()
+    }
+
+    cancelAI(invalidate = true) {
+        if (invalidate) this.requestId++
+        if (this.worker) this.worker.terminate()
+        this.worker = null
+        this.thinking = false
+    }
+
+    undo() {
+        if (!this.state.history.length) return
+        const wasThinking = this.thinking
+        this.cancelAI()
+        let count = wasThinking || this.state.history.at(-1).side === this.engine.RED ? 1 : 2
+        while (count-- > 0 && this.state.history.length) {
+            const move = this.state.history.pop()
+            this.state.board = this.engine.undoMove(this.state.board, move)
+            this.state.keys.pop()
+        }
+        this.state.turn = this.engine.RED
+        this.state.outcome = null
+        this.selected = null
+        this.legal = []
+        this.save()
+        this.render()
+    }
+
+    newGame() {
+        if (this.state.history.length && !confirm(this.i18n.t('confirmNew'))) return
+        const difficulty = this.state.difficulty
+        this.cancelAI()
+        this.state = this.fresh(difficulty)
+        this.selected = null
+        this.legal = []
+        this.save()
+        this.render()
+    }
+
+    statusText() {
+        if (this.state.outcome) {
+            if (!this.state.outcome.winner) return this.i18n.t('draw')
+            return this.i18n.t(this.state.outcome.winner === this.engine.RED ? 'youWin' : 'aiWins')
+        }
+        if (this.thinking || this.state.turn === this.engine.BLACK) return this.i18n.t('aiThinking')
+        return this.i18n.t(this.engine.isInCheck(this.state.board, this.engine.RED) ? 'check' : 'yourTurn')
+    }
+
+    pieceName(piece) {
+        if (!piece) return this.i18n.t('empty')
+        const color = this.engine.sideOf(piece) === this.engine.RED ? 'Red' : 'Black'
+        return this.i18n.t('xiangqiPiece' + this.engine.typeOf(piece) + color)
+    }
+
+    render() {
+        const shadow = this.shadowRoot
+        const last = this.state.history.at(-1)
+        const legalTargets = new Set(this.legal.map(move => move.to))
+        const glyphs = {rK: '帥', rA: '仕', rE: '相', rH: '馬', rR: '車', rC: '炮', rP: '兵', bK: '將', bA: '士', bE: '象', bH: '馬', bR: '車', bC: '砲', bP: '卒'}
+        shadow.querySelector('.spots').innerHTML = this.state.board.map((piece, index) => {
+            const row = this.engine.rowOf(index)
+            const column = this.engine.columnOf(index)
+            const classes = ['spot']
+            if (this.selected === index) classes.push('selected')
+            if (legalTargets.has(index)) classes.push('legal')
+            if (last && (last.from === index || last.to === index)) classes.push('last')
+            const labels = [this.pieceName(piece), `${this.i18n.t('row')} ${row + 1}`, `${this.i18n.t('column')} ${column + 1}`]
+            if (this.selected === index) labels.push(this.i18n.t('selected'))
+            if (legalTargets.has(index)) labels.push(this.i18n.t('legalMove'))
+            const token = piece ? `<span class="piece ${this.engine.sideOf(piece) === this.engine.RED ? 'red' : 'black'}">${glyphs[piece]}</span>` : ''
+            return `<button type="button" role="gridcell" class="${classes.join(' ')}" data-index="${index}" aria-label="${labels.join(', ')}" style="left:${column / 8 * 100}%;top:${row / 9 * 100}%">${token}</button>`
+        }).join('')
+        const status = shadow.querySelector('.status')
+        status.textContent = this.statusText()
+        status.classList.toggle('thinking', this.thinking)
+        shadow.querySelector('.board').setAttribute('aria-disabled', String(this.thinking || Boolean(this.state.outcome)))
+        shadow.querySelector('.difficulty').value = this.state.difficulty
+        shadow.querySelector('.undo').disabled = !this.state.history.length
+    }
+})
+</script>

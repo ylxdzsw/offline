@@ -1,0 +1,96 @@
+<template id="game-gallery-template">
+    <style>
+        :host { display: block; }
+        .intro { margin: 4px 4px 18px; color: #746658; font-size: .93rem; line-height: 1.55; }
+        .games { display: grid; gap: 16px; }
+        article {
+            overflow: hidden;
+            border: 1px solid #dfcfb3;
+            border-radius: 18px;
+            background: #fffaf0;
+            box-shadow: 0 8px 22px rgba(72, 49, 31, .09);
+        }
+        .preview {
+            position: relative;
+            display: grid;
+            height: 128px;
+            place-items: center;
+            color: #f9ead1;
+            background: #8b463e;
+        }
+        article:nth-child(2) .preview { color: #423b34; background: #d7b77d; }
+        .xiangqi-mark {
+            display: grid;
+            width: 78px;
+            height: 78px;
+            border: 4px double currentColor;
+            border-radius: 50%;
+            place-items: center;
+            font-family: "Noto Serif SC", serif;
+            font-size: 2.4rem;
+            font-weight: 700;
+        }
+        .gomoku-mark {
+            position: relative;
+            width: 92px;
+            height: 92px;
+            background-image: linear-gradient(#76634a 1px, transparent 1px), linear-gradient(90deg, #76634a 1px, transparent 1px);
+            background-size: 23px 23px;
+        }
+        .gomoku-mark::before, .gomoku-mark::after {
+            position: absolute;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            content: "";
+        }
+        .gomoku-mark::before { top: 11px; left: 11px; background: #252422; }
+        .gomoku-mark::after { right: 10px; bottom: 10px; border: 1px solid #b9aa91; background: #faf8f1; }
+        .content { padding: 15px 16px 17px; }
+        h2 { margin: 0 0 5px; color: #4d302b; font-family: Georgia, "Noto Serif SC", serif; font-size: 1.22rem; }
+        p { min-height: 2.8em; margin: 0 0 14px; color: #746658; font-size: .88rem; line-height: 1.45; }
+        a {
+            display: flex;
+            min-height: 46px;
+            align-items: center;
+            justify-content: center;
+            border-radius: 11px;
+            color: #fffaf0;
+            font-weight: 700;
+            text-decoration: none;
+            background: #762f2b;
+        }
+    </style>
+    <p class="intro"></p>
+    <div class="games"></div>
+</template>
+
+<script>
+customElements.define('game-gallery', class extends HTMLElement {
+    constructor() {
+        super()
+        this.attachShadow({mode: 'open'}).append(document.getElementById('game-gallery-template').content.cloneNode(true))
+    }
+
+    connectedCallback() {
+        const {i18n, storage} = OfflineGames
+        this.shadowRoot.querySelector('.intro').textContent = i18n.locale === 'zh'
+            ? '不需要网络，随时与设备中的对手下一局。'
+            : 'No connection required. Choose a board and play against an opponent on your device.'
+        const games = [
+            {id: 'xiangqi', mark: '<span class="xiangqi-mark">棋</span>'},
+            {id: 'wuziqi', mark: '<span class="gomoku-mark"></span>'},
+        ]
+        this.shadowRoot.querySelector('.games').innerHTML = games.map(game => `
+            <article>
+                <div class="preview">${game.mark}</div>
+                <div class="content">
+                    <h2>${i18n.t(game.id)}</h2>
+                    <p>${i18n.t(game.id + 'Desc')}</p>
+                    <a href="${i18n.href('./' + game.id + '.html')}">${i18n.t(storage.hasProgress(game.id) ? 'continue' : 'play')}</a>
+                </div>
+            </article>
+        `).join('')
+    }
+})
+</script>

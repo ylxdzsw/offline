@@ -1,0 +1,48 @@
+:root {
+    color-scheme: light;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", "PingFang SC", sans-serif;
+    color: #332b26;
+    background: #d8c8aa;
+    font-synthesis: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html, body {
+    min-height: 100%;
+    margin: 0;
+}
+
+body {
+    min-width: 280px;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overscroll-behavior-y: contain;
+    background:
+        radial-gradient(circle at top, rgba(255, 255, 255, .5), transparent 45%),
+        #d8c8aa;
+}
+
+button, select {
+    font: inherit;
+}
+
+button {
+    touch-action: manipulation;
+}
+
+a {
+    color: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+    }
+}

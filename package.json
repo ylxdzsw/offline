@@ -1,0 +1,10 @@
+{
+  "name": "offline-classical-games",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bilingual mobile-first offline Xiangqi and Wuziqi PWA",
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "1.61.1"
+  }
+}

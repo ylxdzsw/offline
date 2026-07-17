@@ -1,0 +1,293 @@
+<template id="wuziqi-game-template">
+    <style>
+        :host { display: block; }
+        .toolbar {
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            gap: 8px;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        label { display: grid; gap: 3px; color: #746658; font-size: .7rem; }
+        select, .action {
+            min-height: 42px;
+            border: 1px solid #cdbb9d;
+            border-radius: 9px;
+            color: #44372f;
+            background: #fffaf0;
+        }
+        select { min-width: 96px; padding: 0 28px 0 10px; }
+        .action { padding: 0 12px; font-weight: 650; }
+        .action:disabled { opacity: .42; }
+        .status {
+            display: flex;
+            min-height: 38px;
+            align-items: center;
+            justify-content: center;
+            margin: 0 0 9px;
+            border-radius: 9px;
+            color: #5a4037;
+            font-size: .93rem;
+            font-weight: 700;
+            background: #efe1c9;
+        }
+        .status.thinking::after {
+            width: 5px;
+            height: 5px;
+            margin-left: 7px;
+            border-radius: 50%;
+            content: "";
+            background: currentColor;
+            animation: pulse .8s ease-in-out infinite alternate;
+        }
+        @keyframes pulse { to { opacity: .2; transform: scale(.7); } }
+        .warning { margin: 0 0 9px; color: #8c3c35; font-size: .77rem; text-align: center; }
+        .warning[hidden] { display: none; }
+        .board {
+            --edge: clamp(12px, 4.5vw, 22px);
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1;
+            overflow: hidden;
+            border: 2px solid #7f573a;
+            border-radius: 8px;
+            background: #d9b678;
+            box-shadow: inset 0 0 22px rgba(92, 56, 25, .18), 0 4px 12px rgba(69, 44, 28, .12);
+            touch-action: manipulation;
+            user-select: none;
+        }
+        .field {
+            position: absolute;
+            inset: var(--edge);
+            border-right: 1px solid #6d4a31;
+            border-bottom: 1px solid #6d4a31;
+            background-image: linear-gradient(#6d4a31 1px, transparent 1px), linear-gradient(90deg, #6d4a31 1px, transparent 1px);
+            background-size: calc(100% / 14) calc(100% / 14);
+        }
+        .star { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: #6d4a31; transform: translate(-50%, -50%); }
+        .spot {
+            position: absolute;
+            display: grid;
+            width: clamp(18px, 6.3vw, 30px);
+            height: clamp(18px, 6.3vw, 30px);
+            padding: 0;
+            border: 0;
+            border-radius: 50%;
+            place-items: center;
+            background: transparent;
+            transform: translate(-50%, -50%);
+        }
+        .spot.empty:active::after { width: 34%; height: 34%; border-radius: 50%; content: ""; background: rgba(53, 45, 39, .35); }
+        .stone { width: 88%; height: 88%; border-radius: 50%; box-shadow: 0 2px 3px rgba(54, 36, 24, .35); }
+        .stone.black { background: radial-gradient(circle at 35% 30%, #595855, #171716 68%); }
+        .stone.white { border: 1px solid #b3aa9c; background: radial-gradient(circle at 35% 30%, #fff, #e8e3da 72%); }
+        .spot.last::before {
+            position: absolute;
+            z-index: 2;
+            width: 30%;
+            height: 30%;
+            border: 2px solid #ba3b32;
+            border-radius: 50%;
+            content: "";
+        }
+        .board[aria-disabled="true"] .spot { cursor: wait; }
+        @media (max-width: 340px) {
+            .toolbar { gap: 4px; }
+            .action { padding-inline: 8px; font-size: .82rem; }
+            select { min-width: 88px; }
+        }
+    </style>
+    <div class="toolbar">
+        <label><span class="difficulty-label"></span><select class="difficulty">
+            <option value="easy"></option>
+            <option value="medium"></option>
+            <option value="hard"></option>
+        </select></label>
+        <button class="action undo" type="button"></button>
+        <button class="action new" type="button"></button>
+    </div>
+    <p class="warning" hidden></p>
+    <div class="status" role="status" aria-live="polite"></div>
+    <div class="board" role="grid">
+        <div class="field">
+            <i class="star" style="left:21.4286%;top:21.4286%"></i>
+            <i class="star" style="left:78.5714%;top:21.4286%"></i>
+            <i class="star" style="left:50%;top:50%"></i>
+            <i class="star" style="left:21.4286%;top:78.5714%"></i>
+            <i class="star" style="left:78.5714%;top:78.5714%"></i>
+            <div class="spots"></div>
+        </div>
+    </div>
+</template>
+
+<script>
+customElements.define('wuziqi-game', class extends HTMLElement {
+    constructor() {
+        super()
+        this.attachShadow({mode: 'open'}).append(document.getElementById('wuziqi-game-template').content.cloneNode(true))
+        this.thinking = false
+        this.worker = null
+        this.requestId = 0
+    }
+
+    connectedCallback() {
+        this.engine = OfflineGames.Wuziqi
+        this.i18n = OfflineGames.i18n
+        this.storage = OfflineGames.storage
+        this.load()
+        this.bind()
+        this.localize()
+        this.render()
+        if (this.state.turn === this.engine.WHITE && !this.state.outcome) this.requestAI()
+    }
+
+    disconnectedCallback() { this.cancelAI() }
+
+    fresh(difficulty = 'medium') {
+        return {
+            schema: 1,
+            game: 'wuziqi',
+            board: this.engine.initialBoard(),
+            turn: this.engine.BLACK,
+            difficulty,
+            history: [],
+            outcome: null,
+        }
+    }
+
+    valid(saved) {
+        return saved && Array.isArray(saved.board) && saved.board.length === 225
+            && [this.engine.BLACK, this.engine.WHITE].includes(saved.turn)
+            && ['easy', 'medium', 'hard'].includes(saved.difficulty)
+            && Array.isArray(saved.history)
+    }
+
+    load() {
+        const saved = this.storage.read('wuziqi')
+        this.state = this.valid(saved) ? saved : this.fresh()
+    }
+
+    bind() {
+        const shadow = this.shadowRoot
+        shadow.querySelector('.spots').addEventListener('click', event => {
+            const button = event.target.closest('.spot')
+            if (button) this.tap(Number(button.dataset.index))
+        })
+        shadow.querySelector('.undo').addEventListener('click', () => this.undo())
+        shadow.querySelector('.new').addEventListener('click', () => this.newGame())
+        shadow.querySelector('.difficulty').addEventListener('change', event => {
+            this.state.difficulty = event.target.value
+            this.save()
+        })
+    }
+
+    localize() {
+        const shadow = this.shadowRoot
+        shadow.querySelector('.difficulty-label').textContent = this.i18n.t('difficulty')
+        for (const option of shadow.querySelectorAll('.difficulty option')) option.textContent = this.i18n.t(option.value)
+        shadow.querySelector('.undo').textContent = this.i18n.t('undo')
+        shadow.querySelector('.new').textContent = this.i18n.t('newGame')
+        shadow.querySelector('.warning').textContent = this.i18n.t('storageWarning')
+    }
+
+    save() {
+        if (!this.storage.write('wuziqi', this.state)) this.shadowRoot.querySelector('.warning').hidden = false
+    }
+
+    tap(index) {
+        if (this.thinking || this.state.outcome || this.state.turn !== this.engine.BLACK || this.state.board[index] !== this.engine.EMPTY) return
+        this.commit(index, this.engine.BLACK)
+        if (!this.state.outcome) this.requestAI()
+    }
+
+    commit(index, side) {
+        this.state.board = this.engine.applyMove(this.state.board, index, side)
+        this.state.history.push({index, side})
+        this.state.turn = this.engine.other(side)
+        const result = this.engine.status(this.state.board, index)
+        this.state.outcome = result.ended ? result : null
+        this.save()
+        this.render()
+    }
+
+    requestAI() {
+        if (this.state.outcome || this.state.turn !== this.engine.WHITE) return
+        this.cancelAI()
+        this.thinking = true
+        const id = ++this.requestId
+        this.worker = OfflineGames.runtime.createWorker('wuziqi-worker-payload')
+        this.worker.onmessage = event => {
+            if (event.data.id !== id || !this.thinking) return
+            const move = event.data.move
+            this.cancelAI(false)
+            if (Number.isInteger(move) && this.state.board[move] === this.engine.EMPTY) this.commit(move, this.engine.WHITE)
+        }
+        this.worker.onerror = error => {
+            console.error(error)
+            this.cancelAI(false)
+            this.render()
+        }
+        this.worker.postMessage({id, board: this.state.board, side: this.engine.WHITE, difficulty: this.state.difficulty})
+        this.render()
+    }
+
+    cancelAI(invalidate = true) {
+        if (invalidate) this.requestId++
+        if (this.worker) this.worker.terminate()
+        this.worker = null
+        this.thinking = false
+    }
+
+    undo() {
+        if (!this.state.history.length) return
+        const wasThinking = this.thinking
+        this.cancelAI()
+        let count = wasThinking || this.state.history.at(-1).side === this.engine.BLACK ? 1 : 2
+        while (count-- > 0 && this.state.history.length) {
+            const move = this.state.history.pop()
+            this.state.board[move.index] = this.engine.EMPTY
+        }
+        this.state.turn = this.engine.BLACK
+        this.state.outcome = null
+        this.save()
+        this.render()
+    }
+
+    newGame() {
+        if (this.state.history.length && !confirm(this.i18n.t('confirmNew'))) return
+        const difficulty = this.state.difficulty
+        this.cancelAI()
+        this.state = this.fresh(difficulty)
+        this.save()
+        this.render()
+    }
+
+    statusText() {
+        if (this.state.outcome) {
+            if (!this.state.outcome.winner) return this.i18n.t('draw')
+            return this.i18n.t(this.state.outcome.winner === this.engine.BLACK ? 'youWin' : 'aiWins')
+        }
+        return this.thinking || this.state.turn === this.engine.WHITE ? this.i18n.t('aiThinking') : this.i18n.t('yourTurn')
+    }
+
+    render() {
+        const shadow = this.shadowRoot
+        const last = this.state.history.at(-1)?.index
+        shadow.querySelector('.spots').innerHTML = this.state.board.map((stone, index) => {
+            const row = this.engine.rowOf(index)
+            const column = this.engine.columnOf(index)
+            const classes = ['spot', stone === this.engine.EMPTY ? 'empty' : 'occupied']
+            if (index === last) classes.push('last')
+            const name = stone === this.engine.BLACK ? this.i18n.t('blackStone') : stone === this.engine.WHITE ? this.i18n.t('whiteStone') : this.i18n.t('empty')
+            const token = stone ? `<span class="stone ${stone === this.engine.BLACK ? 'black' : 'white'}"></span>` : ''
+            return `<button type="button" role="gridcell" class="${classes.join(' ')}" data-index="${index}" aria-label="${name}, ${this.i18n.t('row')} ${row + 1}, ${this.i18n.t('column')} ${column + 1}" style="left:${column / 14 * 100}%;top:${row / 14 * 100}%">${token}</button>`
+        }).join('')
+        const status = shadow.querySelector('.status')
+        status.textContent = this.statusText()
+        status.classList.toggle('thinking', this.thinking)
+        shadow.querySelector('.board').setAttribute('aria-disabled', String(this.thinking || Boolean(this.state.outcome)))
+        shadow.querySelector('.difficulty').value = this.state.difficulty
+        shadow.querySelector('.undo').disabled = !this.state.history.length
+    }
+})
+</script>
