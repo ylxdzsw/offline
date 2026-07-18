@@ -22,6 +22,7 @@
         article:nth-child(3) .preview { color: #67463a; background: #e8ddc9; }
         article:nth-child(4) .preview { color: #f4e4bd; background: #526a54; }
         article:nth-child(5) .preview { color: #f9edda; background: #665044; }
+        article:nth-child(6) .preview { color: #eff6e8; background: #39784b; }
         .xiangqi-mark {
             display: grid;
             width: 78px;
@@ -56,6 +57,10 @@
         .chess-mark { position: relative; display: grid; width: 90px; height: 90px; grid-template: repeat(2,1fr)/repeat(2,1fr); overflow: hidden; border: 3px solid currentColor; border-radius: 5px; background: currentColor; }
         .chess-mark i:nth-child(1), .chess-mark i:nth-child(4) { background: #9e7c65; }.chess-mark i:nth-child(2), .chess-mark i:nth-child(3) { background: #ead9b7; }
         .chess-mark::after { position: absolute; inset: 0; display: grid; place-items: center; color: #47372f; content: "N"; font-family: Georgia,serif; font-size: 3.8rem; font-weight: 800; text-shadow: 0 1px #fff4dc; }
+        .reversi-mark { display: grid; width: 94px; height: 94px; grid-template-columns: repeat(4, 1fr); gap: 5px; padding: 7px; border: 2px solid rgba(238,247,229,.55); border-radius: 8px; background: #2d673e; }
+        .reversi-mark i { border-radius: 50%; box-shadow: 0 2px 3px rgba(19,36,24,.4); }
+        .reversi-mark i:nth-child(1), .reversi-mark i:nth-child(4), .reversi-mark i:nth-child(6), .reversi-mark i:nth-child(11), .reversi-mark i:nth-child(13), .reversi-mark i:nth-child(16) { background: radial-gradient(circle at 35% 28%, #fff, #e2ded5 72%); }
+        .reversi-mark i:not(:nth-child(1)):not(:nth-child(4)):not(:nth-child(6)):not(:nth-child(11)):not(:nth-child(13)):not(:nth-child(16)) { background: radial-gradient(circle at 35% 28%, #5b5a57, #171716 70%); }
         .content { padding: 15px 16px 17px; }
         h2 { margin: 0 0 5px; color: #4d302b; font-family: Georgia, "Noto Serif SC", serif; font-size: 1.22rem; }
         p { min-height: 2.8em; margin: 0 0 14px; color: #746658; font-size: .88rem; line-height: 1.45; }
@@ -93,6 +98,7 @@ customElements.define('game-gallery', class extends HTMLElement {
             {id: 'sudoku', mark: '<span class="sudoku-mark"><i>8</i><i></i><i>2</i><i></i><i>5</i><i></i><i>1</i><i></i><i>9</i></span>'},
             {id: 'junqi', mark: '<span class="junqi-mark"><i>司令</i><i>军旗</i><i>工兵</i><i>炸弹</i><i>师长</i><i>地雷</i></span>'},
             {id: 'chess', mark: '<span class="chess-mark"><i></i><i></i><i></i><i></i></span>'},
+            {id: 'reversi', mark: '<span class="reversi-mark">' + '<i></i>'.repeat(16) + '</span>'},
         ]
         this.shadowRoot.querySelector('.games').innerHTML = games.map(game => `
             <article>

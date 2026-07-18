@@ -4,25 +4,28 @@ const path = require('node:path')
 
 test('build is self-contained and contains the complete PWA shell', async () => {
     const dist = path.resolve('dist')
-    for (const file of ['index.html', 'xiangqi.html', 'wuziqi.html', 'sudoku.html', 'junqi.html', 'chess.html', 'manifest.webmanifest', 'sw.js', 'icons/icon-192.png', 'icons/icon-512.png']) {
+    for (const file of ['index.html', 'xiangqi.html', 'wuziqi.html', 'sudoku.html', 'junqi.html', 'chess.html', 'reversi.html', 'manifest.webmanifest', 'sw.js', 'icons/icon-192.png', 'icons/icon-512.png']) {
         expect(fs.existsSync(path.join(dist, file)), file).toBeTruthy()
     }
-    for (const page of ['index.html', 'xiangqi.html', 'wuziqi.html', 'sudoku.html', 'junqi.html', 'chess.html']) {
+    for (const page of ['index.html', 'xiangqi.html', 'wuziqi.html', 'sudoku.html', 'junqi.html', 'chess.html', 'reversi.html']) {
         const html = fs.readFileSync(path.join(dist, page), 'utf8')
         expect(html).toContain('manifest.webmanifest')
         expect(html).not.toMatch(/<(?:script|link|img)[^>]+(?:src|href)=["']https?:\/\//i)
     }
     const sw = fs.readFileSync(path.join(dist, 'sw.js'), 'utf8')
-    for (const asset of ['./index.html', './xiangqi.html', './wuziqi.html', './sudoku.html', './junqi.html', './chess.html', './manifest.webmanifest']) expect(sw).toContain(asset)
+    for (const asset of ['./index.html', './xiangqi.html', './wuziqi.html', './sudoku.html', './junqi.html', './chess.html', './reversi.html', './manifest.webmanifest']) expect(sw).toContain(asset)
 })
 
 test('gallery and sidebar localize from query and preserve the override', async ({page}) => {
     await page.goto('/index.html?lang=zh')
     await expect(page.locator('offline-shell h1')).toHaveText('经典棋类')
     await expect(page.locator('game-gallery h2').first()).toHaveText('中国象棋')
+    await expect(page.locator('game-gallery article')).toHaveCount(6)
+    await expect(page.locator('game-gallery h2').last()).toHaveText('黑白棋')
     await page.locator('offline-shell .menu').click()
     await expect(page.locator('offline-shell aside')).toHaveAttribute('aria-hidden', 'false')
     await expect(page.locator('offline-shell a[data-page="xiangqi"]')).toHaveAttribute('href', /xiangqi\.html\?lang=zh$/)
+    await expect(page.locator('offline-shell a[data-page="reversi"]')).toHaveAttribute('href', /reversi\.html\?lang=zh$/)
     await page.locator('offline-shell .backdrop').click({position: {x: 380, y: 400}})
     await expect(page.locator('offline-shell aside')).toHaveAttribute('aria-hidden', 'true')
 })
@@ -141,12 +144,41 @@ test('Chess promotion presents all choices and applies the selected piece',async
     expect(await page.locator('chess-game').evaluate(game=>game.state.board[0])).toBe('wN')
 })
 
+test('Reversi flips discs, plays an AI reply, persists, and undoes the turn', async ({page}) => {
+    await page.goto('/reversi.html?lang=en')
+    await expect(page.locator('reversi-game .cell.legal')).toHaveCount(4)
+    await expect(page.locator('reversi-game .black-score')).toHaveText('2')
+    await page.locator('reversi-game .cell[data-index="19"]').click()
+    await expect(page.locator('reversi-game .status')).toHaveText('Your turn', {timeout: 6000})
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:reversi')).history.length)).toBe(2)
+    await page.reload()
+    await expect(page.locator('reversi-game .undo')).toBeEnabled()
+    await page.locator('reversi-game .undo').click()
+    await expect(page.locator('reversi-game .black-score')).toHaveText('2')
+    await expect(page.locator('reversi-game .white-score')).toHaveText('2')
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:reversi')).history.length)).toBe(0)
+
+    await page.locator('reversi-game').evaluate(game => {
+        const engine = OfflineGames.Reversi
+        const board = Array(64).fill(engine.BLACK)
+        board[0] = engine.EMPTY
+        board[1] = engine.WHITE
+        board[3] = engine.EMPTY
+        board[4] = engine.WHITE
+        Object.assign(game.state, {board, turn: engine.BLACK, history: [], outcome: null, passed: null})
+        game.render()
+    })
+    await page.locator('reversi-game .cell[data-index="0"]').click()
+    await expect(page.locator('reversi-game .status')).toHaveText('Opponent has no legal move — play again')
+    await expect(page.locator('reversi-game .cell[data-index="3"]')).toHaveClass(/legal/)
+})
+
 for (const viewport of [{width: 320, height: 568}, {width: 390, height: 844}, {width: 430, height: 932}]) {
     test(`all pages fit a ${viewport.width}x${viewport.height} mobile viewport`, async ({page}) => {
         await page.setViewportSize(viewport)
-        for (const url of ['/index.html', '/xiangqi.html', '/wuziqi.html', '/sudoku.html', '/junqi.html', '/chess.html']) {
+        for (const url of ['/index.html', '/xiangqi.html', '/wuziqi.html', '/sudoku.html', '/junqi.html', '/chess.html', '/reversi.html']) {
             await page.goto(url)
-            expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy()
+            expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), url).toBeTruthy()
         }
     })
 }
@@ -164,5 +196,8 @@ test('the installed app reloads and navigates completely offline', async ({brows
     await expect(page.locator('offline-shell h1')).toHaveText('Wuziqi')
     await page.locator('wuziqi-game .spot[data-index="112"]').click()
     await expect(page.locator('wuziqi-game .status')).toHaveText('Your turn', {timeout: 6000})
+    await page.goto('/reversi.html?lang=zh')
+    await expect(page.locator('offline-shell h1')).toHaveText('黑白棋')
+    await expect(page.locator('reversi-game .cell.legal')).toHaveCount(4)
     await context.close()
 })

@@ -1,0 +1,211 @@
+<template id="reversi-game-template">
+    <style>
+        :host { display: block; }
+        .toolbar { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; margin-bottom: 10px; }
+        label { display: grid; gap: 3px; color: #746658; font-size: .7rem; }
+        select, .action { min-height: 42px; border: 1px solid #cdbb9d; border-radius: 9px; color: #44372f; background: #fffaf0; }
+        select { min-width: 96px; padding: 0 28px 0 10px; }
+        .action { padding: 0 12px; font-weight: 650; }
+        .action:disabled { opacity: .42; }
+        .scoreboard { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; margin-bottom: 9px; overflow: hidden; border: 1px solid #dccbab; border-radius: 12px; color: #57483d; background: #fffaf0; box-shadow: 0 3px 10px rgba(73, 49, 30, .06); }
+        .score { display: flex; min-height: 48px; align-items: center; justify-content: center; gap: 8px; font-size: .78rem; }
+        .score strong { min-width: 1.3em; color: #382f2a; font-family: Georgia, serif; font-size: 1.35rem; font-variant-numeric: tabular-nums; text-align: center; }
+        .disc-mini { width: 25px; height: 25px; border-radius: 50%; box-shadow: 0 1px 3px rgba(34, 25, 20, .3); }
+        .disc-mini.black { background: radial-gradient(circle at 35% 28%, #5b5a57, #151514 70%); }
+        .disc-mini.white { border: 1px solid #b9b0a3; background: radial-gradient(circle at 35% 28%, #fff, #e8e3da 72%); }
+        .versus { color: #ad9e8e; font-size: .7rem; font-weight: 800; }
+        .status { display: flex; min-height: 38px; align-items: center; justify-content: center; margin: 0 0 9px; padding: 6px 10px; border-radius: 9px; color: #38513d; font-size: .9rem; font-weight: 700; text-align: center; background: #dce8d8; }
+        .status.thinking::after { width: 5px; height: 5px; margin-left: 7px; border-radius: 50%; content: ""; background: currentColor; animation: pulse .8s ease-in-out infinite alternate; }
+        @keyframes pulse { to { opacity: .2; transform: scale(.7); } }
+        .warning { margin: 0 0 9px; color: #8c3c35; font-size: .77rem; text-align: center; }
+        .warning[hidden] { display: none; }
+        .board { display: grid; box-sizing: border-box; width: 100%; aspect-ratio: 1; grid-template-columns: repeat(8, 1fr); overflow: hidden; border: 4px solid #315c3f; border-radius: 10px; background: #39784b; box-shadow: inset 0 0 24px rgba(17, 52, 30, .22), 0 5px 14px rgba(51, 44, 33, .16); touch-action: manipulation; user-select: none; }
+        .cells { display: contents; }
+        .cell { position: relative; display: grid; min-width: 0; padding: 8%; border: 0; border-right: 1px solid rgba(20, 63, 36, .72); border-bottom: 1px solid rgba(20, 63, 36, .72); place-items: center; background: transparent; }
+        .cell:nth-child(8n) { border-right: 0; }
+        .cell:nth-last-child(-n + 8) { border-bottom: 0; }
+        .cell.legal::before { width: 20%; aspect-ratio: 1; border-radius: 50%; content: ""; background: rgba(231, 239, 214, .68); box-shadow: 0 0 0 5px rgba(231, 239, 214, .09); }
+        .cell.legal:hover { background: rgba(255, 255, 255, .07); }
+        .cell:focus-visible { z-index: 2; outline: 3px solid #f4c45f; outline-offset: -4px; }
+        .cell.last::after { position: absolute; z-index: 3; width: 13%; aspect-ratio: 1; border: 1px solid rgba(255,255,255,.9); border-radius: 50%; content: ""; background: #c6473e; box-shadow: 0 1px 2px rgba(25, 30, 22, .4); }
+        .disc { width: 88%; aspect-ratio: 1; border-radius: 50%; box-shadow: 0 3px 4px rgba(20, 31, 22, .4); }
+        .disc.black { background: radial-gradient(circle at 35% 28%, #62615e, #151514 68%); }
+        .disc.white { border: 1px solid #b9b0a3; background: radial-gradient(circle at 35% 28%, #fff, #e7e2d9 72%); }
+        .cell.flipped .disc { animation: flip .34s ease-out; }
+        @keyframes flip { 0% { transform: scaleX(.08); filter: brightness(.7); } 60% { transform: scaleX(1.08); } 100% { transform: scaleX(1); } }
+        .board[aria-disabled="true"] .cell { cursor: wait; }
+        @media (max-width: 340px) { .toolbar { gap: 4px; } .action { padding-inline: 8px; font-size: .82rem; } select { min-width: 88px; } .score { gap: 5px; } }
+    </style>
+    <div class="toolbar">
+        <label><span class="difficulty-label"></span><select class="difficulty"><option value="easy"></option><option value="medium"></option><option value="hard"></option></select></label>
+        <button class="action undo" type="button"></button>
+        <button class="action new" type="button"></button>
+    </div>
+    <p class="warning" hidden></p>
+    <div class="scoreboard" aria-live="polite">
+        <div class="score"><span class="disc-mini black"></span><span class="you-label"></span><strong class="black-score">2</strong></div>
+        <span class="versus">VS</span>
+        <div class="score"><strong class="white-score">2</strong><span class="opponent-label"></span><span class="disc-mini white"></span></div>
+    </div>
+    <div class="status" role="status" aria-live="polite"></div>
+    <div class="board" role="grid"><div class="cells"></div></div>
+</template>
+
+<script>
+customElements.define('reversi-game', class extends HTMLElement {
+    constructor() {
+        super()
+        this.attachShadow({mode: 'open'}).append(document.getElementById('reversi-game-template').content.cloneNode(true))
+        this.thinking = false
+        this.worker = null
+        this.requestId = 0
+    }
+
+    connectedCallback() {
+        this.engine = OfflineGames.Reversi
+        this.i18n = OfflineGames.i18n
+        this.storage = OfflineGames.storage
+        this.load()
+        this.bind()
+        this.localize()
+        this.render()
+        if (this.state.turn === this.engine.WHITE && !this.state.outcome) this.requestAI()
+    }
+    disconnectedCallback() { this.cancelAI() }
+    fresh(difficulty = 'medium') {
+        return {schema: 1, game: 'reversi', board: this.engine.initialBoard(), turn: this.engine.BLACK, difficulty, history: [], outcome: null, passed: null}
+    }
+    valid(saved) {
+        return saved && Array.isArray(saved.board) && saved.board.length === 64
+            && saved.board.every(value => [this.engine.EMPTY, this.engine.BLACK, this.engine.WHITE].includes(value))
+            && [this.engine.BLACK, this.engine.WHITE].includes(saved.turn)
+            && ['easy', 'medium', 'hard'].includes(saved.difficulty) && Array.isArray(saved.history)
+    }
+    load() { const saved = this.storage.read('reversi'); this.state = this.valid(saved) ? saved : this.fresh() }
+    bind() {
+        const shadow = this.shadowRoot
+        shadow.querySelector('.cells').addEventListener('click', event => {
+            const button = event.target.closest('.cell')
+            if (button) this.tap(Number(button.dataset.index))
+        })
+        shadow.querySelector('.undo').addEventListener('click', () => this.undo())
+        shadow.querySelector('.new').addEventListener('click', () => this.newGame())
+        shadow.querySelector('.difficulty').addEventListener('change', event => { this.state.difficulty = event.target.value; this.save() })
+    }
+    localize() {
+        const shadow = this.shadowRoot
+        shadow.querySelector('.difficulty-label').textContent = this.i18n.t('difficulty')
+        for (const option of shadow.querySelectorAll('.difficulty option')) option.textContent = this.i18n.t(option.value)
+        shadow.querySelector('.undo').textContent = this.i18n.t('undo')
+        shadow.querySelector('.new').textContent = this.i18n.t('newGame')
+        shadow.querySelector('.warning').textContent = this.i18n.t('storageWarning')
+        shadow.querySelector('.you-label').textContent = this.i18n.t('you')
+        shadow.querySelector('.opponent-label').textContent = this.i18n.t('opponent')
+    }
+    save() { if (!this.storage.write('reversi', this.state)) this.shadowRoot.querySelector('.warning').hidden = false }
+    tap(index) {
+        if (this.thinking || this.state.outcome || this.state.turn !== this.engine.BLACK) return
+        if (!this.engine.flipsForMove(this.state.board, index, this.engine.BLACK).length) return
+        this.commit(index, this.engine.BLACK)
+        if (!this.state.outcome && this.state.turn === this.engine.WHITE) this.requestAI()
+    }
+    commit(index, side) {
+        const flips = this.engine.flipsForMove(this.state.board, index, side)
+        if (!flips.length) return
+        this.state.history.push({index, side, flips})
+        this.state.board = this.engine.applyMove(this.state.board, index, side)
+        const result = this.engine.status(this.state.board)
+        this.state.outcome = result.ended ? result : null
+        this.state.passed = null
+        if (!this.state.outcome) {
+            const next = this.engine.other(side)
+            if (this.engine.legalMoves(this.state.board, next).length) this.state.turn = next
+            else { this.state.turn = side; this.state.passed = next }
+        }
+        this.save()
+        this.render()
+    }
+    requestAI() {
+        if (this.state.outcome || this.state.turn !== this.engine.WHITE) return
+        this.cancelAI()
+        this.thinking = true
+        const id = ++this.requestId
+        this.worker = OfflineGames.runtime.createWorker('reversi-worker-payload')
+        this.worker.onmessage = event => {
+            if (event.data.id !== id || !this.thinking) return
+            const move = event.data.move
+            this.cancelAI(false)
+            if (Number.isInteger(move) && this.engine.flipsForMove(this.state.board, move, this.engine.WHITE).length) {
+                this.commit(move, this.engine.WHITE)
+                if (!this.state.outcome && this.state.turn === this.engine.WHITE) this.requestAI()
+            }
+        }
+        this.worker.onerror = error => { console.error(error); this.cancelAI(false); this.render() }
+        this.worker.postMessage({id, board: this.state.board, side: this.engine.WHITE, difficulty: this.state.difficulty})
+        this.render()
+    }
+    cancelAI(invalidate = true) {
+        if (invalidate) this.requestId++
+        if (this.worker) this.worker.terminate()
+        this.worker = null
+        this.thinking = false
+    }
+    undo() {
+        if (!this.state.history.length) return
+        this.cancelAI()
+        let move
+        do {
+            move = this.state.history.pop()
+            this.state.board[move.index] = this.engine.EMPTY
+            for (const index of move.flips) this.state.board[index] = this.engine.other(move.side)
+        } while (move.side !== this.engine.BLACK && this.state.history.length)
+        this.state.turn = this.engine.BLACK
+        this.state.outcome = null
+        this.state.passed = null
+        this.save()
+        this.render()
+    }
+    newGame() {
+        if (this.state.history.length && !confirm(this.i18n.t('confirmNew'))) return
+        const difficulty = this.state.difficulty
+        this.cancelAI()
+        this.state = this.fresh(difficulty)
+        this.save()
+        this.render()
+    }
+    statusText() {
+        if (this.state.outcome) {
+            if (!this.state.outcome.winner) return this.i18n.t('draw')
+            return this.i18n.t(this.state.outcome.winner === this.engine.BLACK ? 'youWin' : 'aiWins')
+        }
+        if (this.thinking || this.state.turn === this.engine.WHITE) return this.i18n.t(this.state.passed === this.engine.BLACK ? 'youPass' : 'aiThinking')
+        if (this.state.passed === this.engine.WHITE) return this.i18n.t('opponentPasses')
+        return this.i18n.t('yourTurn')
+    }
+    render() {
+        const shadow = this.shadowRoot
+        const lastMove = this.state.history.at(-1)
+        const legal = new Set(!this.thinking && !this.state.outcome && this.state.turn === this.engine.BLACK
+            ? this.engine.legalMoves(this.state.board, this.engine.BLACK).map(move => move.index) : [])
+        const flipped = new Set(lastMove?.flips || [])
+        shadow.querySelector('.cells').innerHTML = this.state.board.map((disc, index) => {
+            const classes = ['cell']
+            if (legal.has(index)) classes.push('legal')
+            if (lastMove?.index === index) classes.push('last')
+            if (flipped.has(index)) classes.push('flipped')
+            const name = disc === this.engine.BLACK ? this.i18n.t('blackStone') : disc === this.engine.WHITE ? this.i18n.t('whiteStone') : this.i18n.t('empty')
+            const hint = legal.has(index) ? `, ${this.i18n.t('legalMove')}` : ''
+            const token = disc ? `<span class="disc ${disc === this.engine.BLACK ? 'black' : 'white'}"></span>` : ''
+            return `<button type="button" role="gridcell" class="${classes.join(' ')}" data-index="${index}" aria-label="${name}, ${this.i18n.t('row')} ${this.engine.rowOf(index) + 1}, ${this.i18n.t('column')} ${this.engine.columnOf(index) + 1}${hint}">${token}</button>`
+        }).join('')
+        shadow.querySelector('.black-score').textContent = this.engine.count(this.state.board, this.engine.BLACK)
+        shadow.querySelector('.white-score').textContent = this.engine.count(this.state.board, this.engine.WHITE)
+        const status = shadow.querySelector('.status')
+        status.textContent = this.statusText()
+        status.classList.toggle('thinking', this.thinking)
+        shadow.querySelector('.board').setAttribute('aria-disabled', String(this.thinking || Boolean(this.state.outcome)))
+        shadow.querySelector('.difficulty').value = this.state.difficulty
+        shadow.querySelector('.undo').disabled = !this.state.history.length
+    }
+})
+</script>
