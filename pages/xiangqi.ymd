@@ -14,20 +14,19 @@
 [require](../src/shared/i18n.js)
 [require](../src/shared/storage.js)
 [require](../src/shared/runtime.js)
+[require](../src/shared/wasm.js)
+[offline-wasm](xiangqi)(../engine/target/wasm32-unknown-unknown/release/offline_xiangqi.wasm)
 [require](../src/xiangqi/engine.js)
 </head>
 <body>
 [require](../src/shared/components.html)
 [require](../src/xiangqi/component.html)
-[worker](xiangqi-worker-payload)(../src/xiangqi/engine.js)(../src/xiangqi/ai.js)
+[offline-worker](xiangqi-worker-payload)(xiangqi)(../src/shared/wasm.js)(../src/xiangqi/engine.js)(../src/xiangqi/ai.js)
 <offline-shell page="xiangqi">
 <xiangqi-game></xiangqi-game>
 </offline-shell>
 </body>
 </html>
 
-[worker]=
-const {args: [id, ...files]} = std_call()
-;`<script type="application/octet-stream" id="${id}">${files.map(file => read(file, 'base64')).join('.')}</script>`
-
+[mixin] ../../pages/offline.ymd
 [mixin] common.ymd

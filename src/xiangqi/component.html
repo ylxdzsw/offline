@@ -151,7 +151,7 @@
 </template>
 
 <script>
-customElements.define('xiangqi-game', class extends HTMLElement {
+OfflineGames.wasm.defineElement('xiangqi', 'xiangqi-game', class extends HTMLElement {
     constructor() {
         super()
         this.attachShadow({mode: 'open'}).append(document.getElementById('xiangqi-game-template').content.cloneNode(true))
@@ -182,6 +182,7 @@ customElements.define('xiangqi-game', class extends HTMLElement {
         return {
             schema: 1,
             game: 'xiangqi',
+            seed: OfflineGames.runtime.randomSeed(),
             board,
             turn: this.engine.RED,
             difficulty,
@@ -201,6 +202,7 @@ customElements.define('xiangqi-game', class extends HTMLElement {
     load() {
         const saved = this.storage.read('xiangqi')
         this.state = this.valid(saved) ? saved : this.fresh()
+        if (!Number.isInteger(this.state.seed)) this.state.seed = OfflineGames.runtime.randomSeed()
     }
 
     bind() {
@@ -297,7 +299,7 @@ customElements.define('xiangqi-game', class extends HTMLElement {
             this.cancelAI(false)
             this.render()
         }
-        this.worker.postMessage({id, board: this.state.board, side: this.engine.BLACK, difficulty: this.state.difficulty})
+        this.worker.postMessage({id, board: this.state.board, side: this.engine.BLACK, difficulty: this.state.difficulty, seed: OfflineGames.runtime.moveSeed(this.state.seed, this.state.history.length)})
         this.render()
     }
 

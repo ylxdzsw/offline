@@ -14,18 +14,17 @@
 [require](../src/shared/i18n.js)
 [require](../src/shared/storage.js)
 [require](../src/shared/runtime.js)
+[require](../src/shared/wasm.js)
+[offline-wasm](reversi)(../engine/target/wasm32-unknown-unknown/release/offline_reversi.wasm)
 [require](../src/reversi/engine.js)
 </head>
 <body>
 [require](../src/shared/components.html)
 [require](../src/reversi/component.html)
-[worker](reversi-worker-payload)(../src/reversi/engine.js)(../src/reversi/ai.js)
+[offline-worker](reversi-worker-payload)(reversi)(../src/shared/wasm.js)(../src/reversi/engine.js)(../src/reversi/ai.js)
 <offline-shell page="reversi"><reversi-game></reversi-game></offline-shell>
 </body>
 </html>
 
-[worker]=
-const {args: [id, ...files]} = std_call()
-;`<script type="application/octet-stream" id="${id}">${files.map(file => read(file, 'base64')).join('.')}</script>`
-
+[mixin] ../../pages/offline.ymd
 [mixin] common.ymd

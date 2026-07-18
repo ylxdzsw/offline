@@ -96,3 +96,20 @@ test('easy AI returns a legal move within a mobile-friendly bound', () => {
     assert(legal.some(move => move.from === result.move.from && move.to === result.move.to))
     assert(Date.now() - started < 1200)
 })
+
+test('seeded variation is reproducible, bounded, and forced king capture is invariant', () => {
+    const board = engine.initialBoard(), options = {nodeBudget:1200,maxDepth:1,rootBand:120}
+    const repeated = ai.search(board,engine.BLACK,'easy',{...options,seed:7})
+    assert.deepEqual(ai.search(board,engine.BLACK,'easy',{...options,seed:7}).move,repeated.move)
+    const choices = new Set([...Array(12).keys()].map(seed => {
+        const result = ai.search(board,engine.BLACK,'easy',{...options,seed})
+        assert(result.score-result.selectedScore<=options.rootBand)
+        return `${result.move.from}-${result.move.to}`
+    }))
+    assert(choices.size>1)
+
+    const forced = emptyBoard(); forced[engine.at(9,4)]='rK'; forced[engine.at(0,4)]='bK'
+    const moves = [1,2,99].map(seed=>ai.search(forced,engine.RED,'easy',{nodeBudget:1000,maxDepth:2,rootBand:500,seed}).move)
+    assert.deepEqual(moves,[moves[0],moves[0],moves[0]])
+    assert.deepEqual(moves[0],{from:engine.at(9,4),to:engine.at(0,4),piece:'rK',captured:'bK'})
+})

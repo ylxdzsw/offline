@@ -1,4 +1,5 @@
 node_modules/
+engine/target/
 dist/
 .playwright/
 test-results/

@@ -63,3 +63,19 @@ test('AI returns a legal move within the easy mobile budget',()=>{
     assert(engine.legalMoves(state).some(move=>move.from===result.move.from&&move.to===result.move.to))
     assert(Date.now()-started<1200)
 })
+
+test('seeded variation is reproducible, bounded, and never changes a forced mate',()=>{
+    const opening=engine.initialState(),options={nodeBudget:4000,maxDepth:2,rootBand:120}
+    const repeated=ai.search(opening,'easy',{...options,seed:7})
+    assert.deepEqual(ai.search(opening,'easy',{...options,seed:7}).move,repeated.move)
+    const choices=new Set([...Array(12).keys()].map(seed=>{
+        const result=ai.search(opening,'easy',{...options,seed})
+        assert(result.score-result.selectedScore<=options.rootBand)
+        return `${result.move.from}-${result.move.to}`
+    }))
+    assert(choices.size>1)
+
+    const mate=bare();mate.board[square('a8')]='bK';mate.board[square('b6')]='wK';mate.board[square('c7')]='wQ'
+    const forced=[1,2,99].map(seed=>ai.search(mate,'easy',{nodeBudget:5000,maxDepth:3,rootBand:500,seed}).move)
+    assert.deepEqual(forced,[forced[0],forced[0],forced[0]])
+})

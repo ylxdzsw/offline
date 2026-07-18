@@ -47,7 +47,7 @@
 </template>
 
 <script>
-customElements.define('sudoku-game', class extends HTMLElement {
+OfflineGames.wasm.defineElement('sudoku', 'sudoku-game', class extends HTMLElement {
     constructor() {
         super()
         this.attachShadow({mode: 'open'}).append(document.getElementById('sudoku-game-template').content.cloneNode(true))
@@ -64,13 +64,13 @@ customElements.define('sudoku-game', class extends HTMLElement {
         this.render()
     }
     fresh(difficulty = 'medium') {
-        const generated = this.engine.generate(difficulty)
-        return {schema: 1, game: 'sudoku', difficulty, puzzle: generated.puzzle, solution: generated.solution, board: generated.puzzle.slice(), notes: Array(81).fill(0), history: [], hints: 0, outcome: null}
+        const seed = OfflineGames.runtime.randomSeed(), generated = this.engine.generate(difficulty, seed)
+        return {schema: 1, game: 'sudoku', seed, difficulty, puzzle: generated.puzzle, solution: generated.solution, board: generated.puzzle.slice(), notes: Array(81).fill(0), history: [], hints: 0, outcome: null}
     }
     valid(saved) {
         return saved && ['easy', 'medium', 'hard'].includes(saved.difficulty) && [saved.puzzle, saved.solution, saved.board, saved.notes].every(value => Array.isArray(value) && value.length === 81) && Array.isArray(saved.history)
     }
-    load() { const saved = this.storage.read('sudoku'); this.state = this.valid(saved) ? saved : this.fresh() }
+    load() { const saved = this.storage.read('sudoku'); this.state = this.valid(saved) ? saved : this.fresh(); if (!Number.isInteger(this.state.seed)) this.state.seed = OfflineGames.runtime.randomSeed() }
     bind() {
         const shadow = this.shadowRoot
         shadow.querySelector('.board').addEventListener('click', event => { const cell = event.target.closest('.cell'); if (cell) { this.selected = Number(cell.dataset.index); this.render() } })

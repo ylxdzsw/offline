@@ -25,6 +25,9 @@ jobs:
         with:
           node-version: 22.18.0
           cache: npm
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
       - name: Install dependencies
         run: make deps
       - name: Install Chromium

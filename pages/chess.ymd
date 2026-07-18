@@ -3,16 +3,15 @@
 [require](../src/shared/i18n.js)
 [require](../src/shared/storage.js)
 [require](../src/shared/runtime.js)
+[require](../src/shared/wasm.js)
+[offline-wasm](chess)(../engine/target/wasm32-unknown-unknown/release/offline_chess.wasm)
 [require](../src/chess/engine.js)
 </head><body>
 [require](../src/shared/components.html)
 [require](../src/chess/component.html)
-[worker](chess-worker-payload)(../src/chess/engine.js)(../src/chess/ai.js)
+[offline-worker](chess-worker-payload)(chess)(../src/shared/wasm.js)(../src/chess/engine.js)(../src/chess/ai.js)
 <offline-shell page="chess"><chess-game></chess-game></offline-shell>
 </body></html>
 
-[worker]=
-const {args: [id, ...files]} = std_call()
-;`<script type="application/octet-stream" id="${id}">${files.map(file => read(file, 'base64')).join('.')}</script>`
-
+[mixin] ../../pages/offline.ymd
 [mixin] common.ymd

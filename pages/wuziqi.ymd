@@ -14,20 +14,19 @@
 [require](../src/shared/i18n.js)
 [require](../src/shared/storage.js)
 [require](../src/shared/runtime.js)
+[require](../src/shared/wasm.js)
+[offline-wasm](wuziqi)(../engine/target/wasm32-unknown-unknown/release/offline_wuziqi.wasm)
 [require](../src/wuziqi/engine.js)
 </head>
 <body>
 [require](../src/shared/components.html)
 [require](../src/wuziqi/component.html)
-[worker](wuziqi-worker-payload)(../src/wuziqi/engine.js)(../src/wuziqi/ai.js)
+[offline-worker](wuziqi-worker-payload)(wuziqi)(../src/shared/wasm.js)(../src/wuziqi/engine.js)(../src/wuziqi/ai.js)
 <offline-shell page="wuziqi">
 <wuziqi-game></wuziqi-game>
 </offline-shell>
 </body>
 </html>
 
-[worker]=
-const {args: [id, ...files]} = std_call()
-;`<script type="application/octet-stream" id="${id}">${files.map(file => read(file, 'base64')).join('.')}</script>`
-
+[mixin] ../../pages/offline.ymd
 [mixin] common.ymd

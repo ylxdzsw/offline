@@ -121,7 +121,7 @@
 </template>
 
 <script>
-customElements.define('wuziqi-game', class extends HTMLElement {
+OfflineGames.wasm.defineElement('wuziqi', 'wuziqi-game', class extends HTMLElement {
     constructor() {
         super()
         this.attachShadow({mode: 'open'}).append(document.getElementById('wuziqi-game-template').content.cloneNode(true))
@@ -147,6 +147,7 @@ customElements.define('wuziqi-game', class extends HTMLElement {
         return {
             schema: 1,
             game: 'wuziqi',
+            seed: OfflineGames.runtime.randomSeed(),
             board: this.engine.initialBoard(),
             turn: this.engine.BLACK,
             difficulty,
@@ -165,6 +166,7 @@ customElements.define('wuziqi-game', class extends HTMLElement {
     load() {
         const saved = this.storage.read('wuziqi')
         this.state = this.valid(saved) ? saved : this.fresh()
+        if (!Number.isInteger(this.state.seed)) this.state.seed = OfflineGames.runtime.randomSeed()
     }
 
     bind() {
@@ -227,7 +229,7 @@ customElements.define('wuziqi-game', class extends HTMLElement {
             this.cancelAI(false)
             this.render()
         }
-        this.worker.postMessage({id, board: this.state.board, side: this.engine.WHITE, difficulty: this.state.difficulty})
+        this.worker.postMessage({id, board: this.state.board, side: this.engine.WHITE, difficulty: this.state.difficulty, seed: OfflineGames.runtime.moveSeed(this.state.seed, this.state.history.length)})
         this.render()
     }
 

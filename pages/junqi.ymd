@@ -7,17 +7,16 @@
 [require](../src/shared/i18n.js)
 [require](../src/shared/storage.js)
 [require](../src/shared/runtime.js)
+[require](../src/shared/wasm.js)
+[offline-wasm](junqi)(../engine/target/wasm32-unknown-unknown/release/offline_junqi.wasm)
 [require](../src/junqi/engine.js)
 </head>
 <body>
 [require](../src/shared/components.html)
 [require](../src/junqi/component.html)
-[worker](junqi-worker-payload)(../src/junqi/engine.js)(../src/junqi/ai.js)
+[offline-worker](junqi-worker-payload)(junqi)(../src/shared/wasm.js)(../src/junqi/engine.js)(../src/junqi/ai.js)
 <offline-shell page="junqi"><junqi-game></junqi-game></offline-shell>
 </body></html>
 
-[worker]=
-const {args: [id, ...files]} = std_call()
-;`<script type="application/octet-stream" id="${id}">${files.map(file => read(file, 'base64')).join('.')}</script>`
-
+[mixin] ../../pages/offline.ymd
 [mixin] common.ymd
