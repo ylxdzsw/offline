@@ -48,6 +48,7 @@
             color: inherit;
             background: transparent;
         }
+        .icon-button[hidden] { display: none; }
         .icon-button:active { background: rgba(255, 255, 255, .14); }
         .menu-lines, .menu-lines::before, .menu-lines::after {
             width: 20px;
@@ -122,16 +123,65 @@
             background: #fff;
         }
         .language button[aria-pressed="true"] { border-color: #762f2b; color: #762f2b; background: #f7e8e3; }
-        .header-spacer { width: 44px; }
+        .info-mark {
+            display: grid;
+            width: 19px;
+            height: 19px;
+            border: 1.5px solid currentColor;
+            border-radius: 50%;
+            place-items: center;
+            font-family: Georgia, serif;
+            font-size: .78rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+        .guide-dialog {
+            width: min(calc(100vw - 28px), 420px);
+            max-height: min(calc(100dvh - 40px), 620px);
+            overflow: auto;
+            padding: 0;
+            border: 0;
+            border-radius: 16px;
+            color: #332b26;
+            background: #fffaf0;
+            box-shadow: 0 18px 55px rgba(35, 24, 19, .36);
+        }
+        .guide-dialog::backdrop { background: rgba(28, 20, 17, .58); backdrop-filter: blur(2px); }
+        .guide-content { padding: 18px 18px max(18px, env(safe-area-inset-bottom)); }
+        .guide-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .guide-head h2 {
+            margin: 0;
+            color: #762f2b;
+            font-family: Georgia, "Noto Serif SC", serif;
+            font-size: 1.22rem;
+        }
+        .guide-close { flex: 0 0 auto; color: #6d5e52; }
+        .guide-intro { margin: 10px 0 16px; color: #625448; font-size: .91rem; line-height: 1.5; }
+        .guide-dialog section { margin-top: 14px; }
+        .guide-dialog h3 { margin: 0 0 7px; color: #493a31; font-size: .84rem; letter-spacing: .02em; }
+        .guide-dialog ul { display: grid; gap: 7px; margin: 0; padding-left: 20px; color: #55483f; font-size: .84rem; line-height: 1.46; }
+        .guide-dialog li::marker { color: #a14a3e; }
+        .guide-done {
+            width: 100%;
+            min-height: 44px;
+            margin-top: 18px;
+            border: 0;
+            border-radius: 10px;
+            color: #fffaf0;
+            font-weight: 700;
+            background: #762f2b;
+        }
+        .guide-done:active { background: #612522; }
         @media (max-width: 340px) {
             main { padding-inline: 7px; }
+            .guide-content { padding: 15px; }
         }
     </style>
     <div class="layout">
         <header>
             <button class="icon-button menu" type="button"><span class="menu-lines"></span></button>
             <h1></h1>
-            <span class="header-spacer"></span>
+            <button class="icon-button guide-trigger" type="button" hidden><span class="info-mark" aria-hidden="true">i</span></button>
         </header>
         <main><slot></slot></main>
         <footer>
@@ -161,6 +211,24 @@
             </div>
         </section>
     </aside>
+    <dialog class="guide-dialog" aria-labelledby="guide-title">
+        <div class="guide-content">
+            <div class="guide-head">
+                <h2 id="guide-title"></h2>
+                <button class="icon-button guide-close" type="button">✕</button>
+            </div>
+            <p class="guide-intro"></p>
+            <section>
+                <h3 class="rules-title"></h3>
+                <ul class="guide-rules"></ul>
+            </section>
+            <section>
+                <h3 class="tips-title"></h3>
+                <ul class="guide-tips"></ul>
+            </section>
+            <button class="guide-done" type="button"></button>
+        </div>
+    </dialog>
 </template>
 
 <script>
@@ -175,6 +243,7 @@ customElements.define('offline-shell', class extends HTMLElement {
         const page = this.getAttribute('page') || 'gallery'
         const titleKey = page === 'gallery' ? 'gallery' : page
         const shadow = this.shadowRoot
+        const guide = i18n.guide(page)
         const open = () => {
             this.setAttribute('drawer-open', '')
             shadow.querySelector('aside').setAttribute('aria-hidden', 'false')
@@ -194,6 +263,26 @@ customElements.define('offline-shell', class extends HTMLElement {
         shadow.querySelector('.copyright').textContent = i18n.t('copyright')
         shadow.querySelector('footer a').textContent = i18n.t('source')
         document.title = `${i18n.t(titleKey)} · ${i18n.t('siteName')}`
+
+        const introButton = shadow.querySelector('.guide-trigger')
+        const guideDialog = shadow.querySelector('.guide-dialog')
+        if (guide) {
+            introButton.hidden = false
+            introButton.setAttribute('aria-label', i18n.t('openGuide'))
+            shadow.querySelector('#guide-title').textContent = i18n.t('howToPlay')
+            shadow.querySelector('.guide-close').setAttribute('aria-label', i18n.t('close'))
+            shadow.querySelector('.guide-intro').textContent = guide.intro
+            shadow.querySelector('.rules-title').textContent = i18n.t('rules')
+            shadow.querySelector('.tips-title').textContent = i18n.t('basicTips')
+            shadow.querySelector('.guide-rules').replaceChildren(...guide.rules.map(item => Object.assign(document.createElement('li'), {textContent: item})))
+            shadow.querySelector('.guide-tips').replaceChildren(...guide.tips.map(item => Object.assign(document.createElement('li'), {textContent: item})))
+            shadow.querySelector('.guide-done').textContent = i18n.t('gotIt')
+            introButton.addEventListener('click', () => guideDialog.showModal())
+            shadow.querySelector('.guide-close').addEventListener('click', () => guideDialog.close())
+            shadow.querySelector('.guide-done').addEventListener('click', () => guideDialog.close())
+            guideDialog.addEventListener('click', event => { if (event.target === guideDialog) guideDialog.close() })
+            guideDialog.addEventListener('close', () => introButton.focus())
+        }
 
         for (const link of shadow.querySelectorAll('nav a')) {
             const key = link.dataset.page

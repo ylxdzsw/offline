@@ -7,6 +7,11 @@
             gallery: 'Game Gallery',
             menu: 'Menu',
             close: 'Close',
+            openGuide: 'How to play',
+            howToPlay: 'How to play',
+            rules: 'Rules',
+            basicTips: 'Basic tips',
+            gotIt: 'Got it',
             language: 'Language',
             english: 'English',
             chinese: '中文',
@@ -106,6 +111,11 @@
             gallery: '经典棋类',
             menu: '菜单',
             close: '关闭',
+            openGuide: '玩法介绍',
+            howToPlay: '怎么玩',
+            rules: '基本规则',
+            basicTips: '入门技巧',
+            gotIt: '知道了',
             language: '语言',
             english: 'English',
             chinese: '中文',
@@ -202,6 +212,143 @@
         },
     }
 
+    const guides = {
+        en: {
+            xiangqi: {
+                intro: 'You play Red and move first against the on-device opponent.',
+                rules: [
+                    'Tap a red piece, then a highlighted destination. Checkmate the opposing general, or leave it with no legal move, to win.',
+                    'The general and advisors stay in the palace. Elephants stay on their side of the river; soldiers can also move sideways after crossing it.',
+                    'Chariots move along clear lines. A horse can be blocked at its first step, while a cannon needs exactly one piece between it and a capture.',
+                ],
+                tips: [
+                    'Bring out horses and chariots early, and keep your general well guarded.',
+                    'Green marks show legal moves; blue marks show the previous move.',
+                    'Undo takes back your move and the opponent\'s reply.',
+                ],
+            },
+            wuziqi: {
+                intro: 'You place Black stones and move first on a 15×15 board.',
+                rules: [
+                    'Tap any empty intersection to place one stone; the opponent then places a white stone.',
+                    'The first player to connect five or more stones horizontally, vertically, or diagonally wins.',
+                    'This is freestyle Wuziqi: overlines count as a win and there are no forbidden moves.',
+                ],
+                tips: [
+                    'Block a line of four immediately; an open-ended line of three also deserves attention.',
+                    'Try to make two threats at once so one move cannot stop both.',
+                    'The red ring marks the most recent stone. Undo takes back a full turn.',
+                ],
+            },
+            sudoku: {
+                intro: 'Complete the grid using the digits 1 through 9.',
+                rules: [
+                    'Each row, column, and outlined 3×3 box must contain every digit once, with no repeats.',
+                    'Printed numbers are fixed. Tap an empty cell, then choose a number below the board.',
+                    'The puzzle is complete when every cell is filled correctly.',
+                ],
+                tips: [
+                    'Start with rows, columns, or boxes that have only a few missing numbers.',
+                    'Use Notes to keep possible digits; placing a number clears that note from its peers.',
+                    'Red entries conflict with the solution. Hint fills one useful cell if you get stuck.',
+                ],
+            },
+            junqi: {
+                intro: 'You command the red army; enemy ranks stay hidden until they fight.',
+                rules: [
+                    'Capture the enemy flag, or leave the enemy with no legal move, to win. Flags, mines, and pieces inside headquarters cannot move.',
+                    'Most pieces move one road step. On railways they can travel straight until blocked; engineers may also turn along connected rails.',
+                    'Higher rank wins a battle. Equal ranks and bombs remove both pieces; only an engineer defeats a mine. Occupied camps cannot be attacked.',
+                ],
+                tips: [
+                    'Keep engineers available for mines and their flexible railway movement.',
+                    'Use bombs against likely high-ranking pieces, and keep railway routes open.',
+                    'When a commander is lost, that side\'s flag is revealed.',
+                ],
+            },
+            chess: {
+                intro: 'You play White and move first against the on-device opponent.',
+                rules: [
+                    'Tap a white piece, then a highlighted square. Win by checkmating the black king; you must answer any check on your own king.',
+                    'Rooks move straight, bishops diagonally, queens both ways, knights in an L, and kings one square. Pawns move forward but capture diagonally.',
+                    'Castling, en passant, pawn promotion, stalemate, repetition, and the fifty-move rule are supported.',
+                ],
+                tips: [
+                    'Develop knights and bishops, fight for the center, and castle early when it is safe.',
+                    'Before moving, check whether the destination leaves a piece undefended.',
+                    'Dots mark quiet moves and rings mark captures. Undo takes back a full turn.',
+                ],
+            },
+        },
+        zh: {
+            xiangqi: {
+                intro: '你执红先行，与本地电脑对弈。',
+                rules: [
+                    '点选红方棋子，再点可走的位置。将死对方将帅，或使对方无子可走即获胜。',
+                    '将帅和士只能在九宫内活动，象不能过河，兵卒过河后可左右移动。',
+                    '车走直线；马腿被挡时不能走；炮吃子时中间必须恰好隔一枚棋子。',
+                ],
+                tips: [
+                    '尽早出马、出车，同时保护好将帅。',
+                    '绿色标记表示可走位置，蓝色标记表示上一步。',
+                    '“悔棋”会撤销你和对手的一个完整回合。',
+                ],
+            },
+            wuziqi: {
+                intro: '你执黑先行，在 15×15 棋盘上对弈。',
+                rules: [
+                    '点击任意空交叉点落下一枚黑子，之后对手落一枚白子。',
+                    '横、竖或斜线上率先连成五枚或更多同色棋子即获胜。',
+                    '本游戏采用无禁手规则：长连也算胜利，没有禁手。',
+                ],
+                tips: [
+                    '对手形成四连时要立即阻挡；两端均空的三连也需要特别留意。',
+                    '尝试一步同时制造两个威胁，让对手无法全部防住。',
+                    '红圈标出最新落子；“悔棋”会撤销一个完整回合。',
+                ],
+            },
+            sudoku: {
+                intro: '用 1 至 9 的数字填完棋盘。',
+                rules: [
+                    '每一行、每一列和每个粗线 3×3 宫内都要恰好包含 1 至 9，不能重复。',
+                    '题目给出的数字不能修改。点选空格，再从棋盘下方选择数字。',
+                    '所有格子都正确填满后，谜题即完成。',
+                ],
+                tips: [
+                    '从只缺少数数字的行、列或宫开始排查。',
+                    '用“笔记”记录候选数；正式填入数字后，相关格的同数笔记会自动清除。',
+                    '红色数字表示有错误。卡住时，“提示”可帮你填入一格。',
+                ],
+            },
+            junqi: {
+                intro: '你指挥红方部队；敌方棋子的等级在交战前保密。',
+                rules: [
+                    '夺取敌方军旗，或使敌方无子可走即获胜。军旗、地雷和进入大本营的棋子不能移动。',
+                    '大多数棋子每次沿公路走一步；在铁路上可沿直线走到被阻挡为止，工兵还可沿相连铁路转弯。',
+                    '战斗时等级高者胜；同级或炸弹交战时同归于尽；只有工兵能排除地雷。行营内有棋时不能被攻击。',
+                ],
+                tips: [
+                    '留住工兵用来排雷，并利用它们灵活的铁路移动。',
+                    '用炸弹对付可能的高级棋子，同时尽量保持铁路畅通。',
+                    '一方的司令被消灭后，该方军旗位置会显示出来。',
+                ],
+            },
+            chess: {
+                intro: '你执白先行，与本地电脑对弈。',
+                rules: [
+                    '点选白方棋子，再点高亮格子。将死黑王即获胜；自己的王被将军时必须立即应将。',
+                    '车走直线，象走斜线，后兼有两者走法，马走 L 形，王每次一格。兵向前走、斜向吃子。',
+                    '游戏支持王车易位、吃过路兵、兵升变，以及逼和、三次重复和五十回合规则。',
+                ],
+                tips: [
+                    '尽早出马和象、争夺中心，并在安全时尽早王车易位。',
+                    '落子前先看一眼：目标格上的棋子会不会失去保护？',
+                    '小圆点表示普通走法，圆环表示吃子。“悔棋”会撤销一个完整回合。',
+                ],
+            },
+        },
+    }
+
     const params = new URLSearchParams(root.location ? root.location.search : '')
     const explicit = params.get('lang')
     const browserLanguages = root.navigator?.languages || [root.navigator?.language || 'en']
@@ -210,6 +357,7 @@
         : browserLanguages.some(language => String(language).toLowerCase().startsWith('zh')) ? 'zh' : 'en'
 
     const t = key => messages[locale][key] || messages.en[key] || key
+    const guide = game => guides[locale][game] || guides.en[game] || null
     const href = path => {
         if (explicit !== 'zh' && explicit !== 'en') return path
         const url = new URL(path, root.location.href)
@@ -223,5 +371,5 @@
     }
 
     if (root.document) root.document.documentElement.lang = locale === 'zh' ? 'zh-CN' : 'en'
-    root.OfflineGames = Object.assign(root.OfflineGames || {}, {i18n: {locale, explicit, t, href, setLocale}})
+    root.OfflineGames = Object.assign(root.OfflineGames || {}, {i18n: {locale, explicit, t, guide, href, setLocale}})
 })(globalThis)

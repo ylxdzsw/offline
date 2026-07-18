@@ -36,6 +36,35 @@ test('navigator language auto-detects Chinese without a query override', async (
     await context.close()
 })
 
+test('game intro opens localized rules and tips without appearing in the gallery', async ({page}) => {
+    await page.goto('/index.html?lang=en')
+    await expect(page.locator('offline-shell .guide-trigger')).toBeHidden()
+
+    await page.setViewportSize({width: 320, height: 568})
+    await page.goto('/wuziqi.html?lang=en')
+    const intro = page.locator('offline-shell .guide-trigger')
+    await expect(intro).toHaveAttribute('aria-label', 'How to play')
+    await intro.click()
+    const dialog = page.locator('offline-shell .guide-dialog')
+    await expect(dialog).toBeVisible()
+    await expect(dialog.locator('.guide-intro')).toContainText('Black stones')
+    await expect(dialog.locator('.guide-rules li')).toHaveCount(3)
+    await expect(dialog.locator('.guide-tips li')).toHaveCount(3)
+    expect(await dialog.evaluate(element => {
+        const rect = element.getBoundingClientRect()
+        return rect.left >= 0 && rect.right <= innerWidth && rect.top >= 0 && rect.bottom <= innerHeight
+    })).toBeTruthy()
+    await page.keyboard.press('Escape')
+    await expect(dialog).toBeHidden()
+    await expect(intro).toBeFocused()
+
+    await page.goto('/sudoku.html?lang=zh')
+    await page.locator('offline-shell .guide-trigger').click()
+    await expect(page.locator('offline-shell #guide-title')).toHaveText('怎么玩')
+    await expect(page.locator('offline-shell .rules-title')).toHaveText('基本规则')
+    await expect(page.locator('offline-shell .guide-done')).toHaveText('知道了')
+})
+
 test('Xiangqi plays an AI reply, persists, reloads, and undoes a full turn', async ({page}) => {
     await page.goto('/xiangqi.html?lang=en')
     await expect(page.locator('xiangqi-game .status')).toHaveText('Your turn')
