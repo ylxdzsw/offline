@@ -1,9 +1,10 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#762f2b"><meta name="author" content="ylxdzsw"><meta name="license" content="MIT"><meta name="github" content="https://github.com/ylxdzsw/offline">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#f7f6f2"><meta name="author" content="ylxdzsw"><meta name="license" content="MIT"><meta name="github" content="https://github.com/ylxdzsw/offline">
 <link rel="manifest" href="./manifest.webmanifest"><link rel="apple-touch-icon" href="./icons/apple-touch-icon.png"><title>Junqi / 陆战棋</title>
 [require](../../app/styles.less)
+[require](../../app/theme.js)
 [require](../../app/i18n.js)
 [require](../../app/storage.js)
 [require](../../app/runtime.js)

@@ -1,94 +1,59 @@
 <template id="wuziqi-game-template">
     <style>
-        :host { display: block; }
-        .toolbar {
-            display: grid;
-            grid-template-columns: 1fr auto auto;
-            gap: 8px;
-            align-items: center;
-            margin-bottom: 10px;
-        }
-        label { display: grid; gap: 3px; color: #746658; font-size: .7rem; }
+        :host { display: block; color: var(--ink); }
+        .toolbar { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: end; margin-bottom: 10px; }
+        label { display: grid; gap: 3px; color: var(--ink-muted); font-size: .7rem; font-weight: 600; letter-spacing: .02em; }
         select, .action {
-            min-height: 42px;
-            border: 1px solid #cdbb9d;
-            border-radius: 9px;
-            color: #44372f;
-            background: #fffaf0;
+            min-height: var(--control-h, 42px); border: 1px solid var(--border-strong);
+            border-radius: var(--radius-sm); color: var(--ink); background: var(--bg-surface);
         }
         select { min-width: 96px; padding: 0 28px 0 10px; }
         .action { padding: 0 12px; font-weight: 650; }
         .action:disabled { opacity: .42; }
         .status {
-            display: flex;
-            min-height: 38px;
-            align-items: center;
-            justify-content: center;
-            margin: 0 0 9px;
-            border-radius: 9px;
-            color: #5a4037;
-            font-size: .93rem;
-            font-weight: 700;
-            background: #efe1c9;
+            display: flex; min-height: 38px; align-items: center; justify-content: center;
+            margin: 0 0 9px; border-radius: var(--radius-sm);
+            color: var(--status-ink); font-size: .92rem; font-weight: 700; background: var(--status-bg);
         }
         .status.thinking::after {
-            width: 5px;
-            height: 5px;
-            margin-left: 7px;
-            border-radius: 50%;
-            content: "";
-            background: currentColor;
-            animation: pulse .8s ease-in-out infinite alternate;
+            width: 5px; height: 5px; margin-left: 7px; border-radius: 50%;
+            content: ""; background: currentColor; animation: pulse .8s ease-in-out infinite alternate;
         }
         @keyframes pulse { to { opacity: .2; transform: scale(.7); } }
-        .warning { margin: 0 0 9px; color: #8c3c35; font-size: .77rem; text-align: center; }
+        .warning { margin: 0 0 9px; color: var(--danger); font-size: .77rem; text-align: center; }
         .warning[hidden] { display: none; }
         .board {
             --edge: clamp(12px, 4.5vw, 22px);
-            position: relative;
-            width: 100%;
-            aspect-ratio: 1;
-            overflow: hidden;
-            border: 2px solid #7f573a;
-            border-radius: 8px;
-            background: #d9b678;
-            box-shadow: inset 0 0 22px rgba(92, 56, 25, .18), 0 4px 12px rgba(69, 44, 28, .12);
-            touch-action: manipulation;
-            user-select: none;
+            position: relative; width: 100%; aspect-ratio: 1; overflow: hidden;
+            border: 2px solid var(--board-wood-edge); border-radius: var(--radius-sm);
+            background:
+                radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--board-wood-deep) 35%, transparent), transparent 55%),
+                var(--board-wood);
+            box-shadow: inset 0 0 22px color-mix(in srgb, var(--board-wood-line) 18%, transparent), var(--shadow-soft);
+            touch-action: manipulation; user-select: none;
         }
         .field {
-            position: absolute;
-            inset: var(--edge);
-            border-right: 1px solid #6d4a31;
-            border-bottom: 1px solid #6d4a31;
-            background-image: linear-gradient(#6d4a31 1px, transparent 1px), linear-gradient(90deg, #6d4a31 1px, transparent 1px);
+            position: absolute; inset: var(--edge);
+            border-right: 1px solid var(--board-wood-line); border-bottom: 1px solid var(--board-wood-line);
+            background-image:
+                linear-gradient(var(--board-wood-line) 1px, transparent 1px),
+                linear-gradient(90deg, var(--board-wood-line) 1px, transparent 1px);
             background-size: calc(100% / 14) calc(100% / 14);
         }
-        .star { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: #6d4a31; transform: translate(-50%, -50%); }
+        .star { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: var(--board-wood-line); transform: translate(-50%, -50%); }
         .spot {
-            position: absolute;
-            display: grid;
-            width: clamp(18px, 6.3vw, 30px);
-            height: clamp(18px, 6.3vw, 30px);
-            padding: 0;
-            border: 0;
-            border-radius: 50%;
-            place-items: center;
-            background: transparent;
-            transform: translate(-50%, -50%);
+            position: absolute; display: grid;
+            width: clamp(18px, 6.3vw, 30px); height: clamp(18px, 6.3vw, 30px);
+            padding: 0; border: 0; border-radius: 50%; place-items: center;
+            background: transparent; transform: translate(-50%, -50%);
         }
-        .spot.empty:active::after { width: 34%; height: 34%; border-radius: 50%; content: ""; background: rgba(53, 45, 39, .35); }
-        .stone { width: 88%; height: 88%; border-radius: 50%; box-shadow: 0 2px 3px rgba(54, 36, 24, .35); }
-        .stone.black { background: radial-gradient(circle at 35% 30%, #595855, #171716 68%); }
-        .stone.white { border: 1px solid #b3aa9c; background: radial-gradient(circle at 35% 30%, #fff, #e8e3da 72%); }
+        .spot.empty:active::after { width: 34%; height: 34%; border-radius: 50%; content: ""; background: color-mix(in srgb, var(--ink) 30%, transparent); }
+        .stone { width: 88%; height: 88%; border-radius: 50%; box-shadow: 0 2px 3px rgba(0, 0, 0, .28); }
+        .stone.black { background: radial-gradient(circle at 35% 30%, #4a4a48, var(--stone-black) 68%); }
+        .stone.white { border: 1px solid var(--stone-white-edge); background: radial-gradient(circle at 35% 30%, #fff, var(--stone-white) 72%); }
         .spot.last::before {
-            position: absolute;
-            z-index: 2;
-            width: 30%;
-            height: 30%;
-            border: 2px solid #ba3b32;
-            border-radius: 50%;
-            content: "";
+            position: absolute; z-index: 2; width: 30%; height: 30%;
+            border: 2px solid var(--hint); border-radius: 50%; content: "";
         }
         .board[aria-disabled="true"] .spot { cursor: wait; }
         @media (max-width: 340px) {

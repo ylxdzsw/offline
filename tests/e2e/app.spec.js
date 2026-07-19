@@ -37,6 +37,48 @@ test('gallery and sidebar localize from query and preserve the override', async 
     await expect(page.locator('offline-shell aside')).toHaveAttribute('aria-hidden', 'true')
 })
 
+test('theme preference switches and persists across pages', async ({page}) => {
+    await page.goto('/index.html?lang=en')
+    await expect(page.locator('html')).toHaveAttribute('data-theme', /light|dark/)
+    await page.locator('offline-shell .menu').click()
+    await page.locator('offline-shell [data-theme="dark"]').click()
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+    await expect(page.locator('offline-shell [data-theme="dark"]')).toHaveAttribute('aria-pressed', 'true')
+    await page.goto('/chess.html?lang=en')
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+    await page.locator('offline-shell .menu').click()
+    await page.locator('offline-shell [data-theme="system"]').click()
+    await expect(page.locator('offline-shell [data-theme="system"]')).toHaveAttribute('aria-pressed', 'true')
+})
+
+test('drawer controls remain reachable on a short phone viewport', async ({page}) => {
+    await page.setViewportSize({width: 320, height: 568})
+    await page.goto('/index.html?lang=en')
+    const menu = page.locator('offline-shell .menu')
+    const layout = page.locator('offline-shell .layout')
+    const drawer = page.locator('offline-shell aside')
+    const darkTheme = page.locator('offline-shell [data-theme="dark"]')
+
+    await expect(drawer).toHaveAttribute('inert', '')
+    await expect(menu).toHaveAttribute('aria-expanded', 'false')
+    await menu.click()
+    await expect(drawer).not.toHaveAttribute('inert', '')
+    await expect(layout).toHaveAttribute('inert', '')
+    await expect(menu).toHaveAttribute('aria-expanded', 'true')
+    await expect(drawer).toHaveCSS('overflow-y', 'auto')
+
+    await darkTheme.scrollIntoViewIfNeeded()
+    await expect(darkTheme).toBeInViewport()
+    await darkTheme.click()
+    await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+
+    await page.locator('offline-shell .close').click()
+    await expect(drawer).toHaveAttribute('inert', '')
+    await expect(layout).not.toHaveAttribute('inert', '')
+    await expect(menu).toHaveAttribute('aria-expanded', 'false')
+    await expect(menu).toBeFocused()
+})
+
 test('navigator language auto-detects Chinese without a query override', async ({browser}) => {
     const context = await browser.newContext({locale: 'zh-CN', viewport: {width: 390, height: 844}})
     const page = await context.newPage()

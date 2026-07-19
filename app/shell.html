@@ -2,12 +2,13 @@
     <style>
         :host {
             display: block;
-            width: min(100%, 480px);
+            width: min(100%, var(--shell-max, 480px));
             min-height: 100vh;
             min-height: 100dvh;
             margin: 0 auto;
-            background: #f8f1e3;
-            box-shadow: 0 0 28px rgba(66, 46, 31, .18);
+            color: var(--ink);
+            background: var(--bg-shell);
+            box-shadow: var(--shadow);
         }
         .layout {
             display: grid;
@@ -22,18 +23,21 @@
             display: grid;
             grid-template-columns: 48px 1fr 48px;
             align-items: center;
-            min-height: calc(52px + env(safe-area-inset-top));
-            padding: env(safe-area-inset-top) 4px 0;
-            color: #fffaf0;
-            background: #762f2b;
-            box-shadow: 0 1px 4px rgba(39, 20, 16, .3);
+            min-height: calc(52px + var(--safe-top, 0px));
+            padding: var(--safe-top, 0px) 4px 0;
+            color: var(--header-ink);
+            background: color-mix(in srgb, var(--header-bg) 92%, transparent);
+            border-bottom: 1px solid var(--header-border);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
         }
         h1 {
             overflow: hidden;
             margin: 0;
-            font-family: Georgia, "Noto Serif SC", serif;
-            font-size: 1.08rem;
+            font-family: var(--font-display);
+            font-size: 1.05rem;
             font-weight: 650;
+            letter-spacing: -.01em;
             text-align: center;
             text-overflow: ellipsis;
             white-space: nowrap;
@@ -49,10 +53,10 @@
             background: transparent;
         }
         .icon-button[hidden] { display: none; }
-        .icon-button:active { background: rgba(255, 255, 255, .14); }
+        .icon-button:active { background: var(--bg-muted); }
         .menu-lines, .menu-lines::before, .menu-lines::after {
-            width: 20px;
-            height: 2px;
+            width: 18px;
+            height: 1.5px;
             border-radius: 1px;
             background: currentColor;
         }
@@ -62,16 +66,17 @@
         .menu-lines::after { top: 6px; }
         main {
             min-width: 0;
-            padding: 14px max(12px, env(safe-area-inset-right)) 18px max(12px, env(safe-area-inset-left));
+            padding: 16px max(14px, var(--safe-right, 0px)) 20px max(14px, var(--safe-left, 0px));
         }
         footer {
-            padding: 6px 12px calc(8px + env(safe-area-inset-bottom));
-            color: #9b8d7d;
+            padding: 8px 14px calc(10px + var(--safe-bottom, 0px));
+            color: var(--ink-faint);
             font-size: .62rem;
-            line-height: 1.45;
+            line-height: 1.5;
             text-align: center;
+            border-top: 1px solid var(--border);
         }
-        footer a { color: inherit; }
+        footer a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
         .backdrop {
             position: fixed;
             z-index: 40;
@@ -79,7 +84,7 @@
             border: 0;
             opacity: 0;
             pointer-events: none;
-            background: rgba(28, 20, 17, .48);
+            background: var(--drawer-scrim);
             transition: opacity .18s ease;
         }
         aside {
@@ -87,51 +92,98 @@
             z-index: 41;
             top: 0;
             bottom: 0;
-            left: max(0px, calc((100vw - 480px) / 2));
-            width: min(82vw, 320px);
-            padding: calc(10px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom));
-            color: #332b26;
-            background: #fffaf0;
-            box-shadow: 10px 0 28px rgba(35, 24, 19, .24);
+            left: max(0px, calc((100vw - var(--shell-max, 480px)) / 2));
+            width: min(84vw, 320px);
+            overflow-y: auto;
+            padding: calc(12px + var(--safe-top, 0px)) 14px calc(14px + var(--safe-bottom, 0px));
+            color: var(--ink);
+            background: var(--bg-surface);
+            border-right: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            overscroll-behavior: contain;
             transform: translateX(-110%);
             transition: transform .2s ease;
         }
         :host([drawer-open]) .backdrop { opacity: 1; pointer-events: auto; }
         :host([drawer-open]) aside { transform: translateX(0); }
-        .drawer-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
-        .brand { font-family: Georgia, "Noto Serif SC", serif; font-size: 1.15rem; font-weight: 700; color: #762f2b; }
-        nav { display: grid; gap: 8px; }
+        .drawer-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .brand {
+            font-family: var(--font-display);
+            font-size: 1.12rem;
+            font-weight: 700;
+            letter-spacing: -.02em;
+            color: var(--ink);
+        }
+        nav { display: grid; gap: 6px; }
         nav a {
             display: flex;
-            min-height: 48px;
+            min-height: 46px;
             align-items: center;
             padding: 0 14px;
-            border-radius: 10px;
+            border-radius: var(--radius-sm);
             font-weight: 600;
             text-decoration: none;
-            background: #f3e8d2;
+            color: var(--ink);
+            background: transparent;
+            border: 1px solid transparent;
         }
-        nav a[aria-current="page"] { color: #fffaf0; background: #762f2b; }
-        .language { margin-top: 24px; border-top: 1px solid #dfd0b9; padding-top: 16px; }
-        .language-label { margin: 0 0 9px; color: #73675b; font-size: .82rem; }
-        .language-buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-        .language button {
-            min-height: 44px;
-            border: 1px solid #cdbb9d;
-            border-radius: 9px;
-            color: #463b33;
-            background: #fff;
+        nav a:hover { background: var(--bg-elevated); }
+        nav a[aria-current="page"] {
+            color: var(--accent-ink);
+            background: var(--accent);
+            border-color: transparent;
         }
-        .language button[aria-pressed="true"] { border-color: #762f2b; color: #762f2b; background: #f7e8e3; }
+        .section {
+            margin-top: 22px;
+            border-top: 1px solid var(--border);
+            padding-top: 16px;
+        }
+        .section-label {
+            margin: 0 0 9px;
+            color: var(--ink-muted);
+            font-size: .78rem;
+            font-weight: 600;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+        }
+        .segmented {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+            padding: 4px;
+            border-radius: var(--radius-md);
+            background: var(--bg-elevated);
+            border: 1px solid var(--border);
+        }
+        .segmented.triple { grid-template-columns: 1fr 1fr 1fr; }
+        .segmented button {
+            min-height: 40px;
+            border: 0;
+            border-radius: calc(var(--radius-md) - 3px);
+            color: var(--ink-muted);
+            font-weight: 600;
+            font-size: .86rem;
+            background: transparent;
+        }
+        .segmented button[aria-pressed="true"] {
+            color: var(--ink);
+            background: var(--bg-surface);
+            box-shadow: var(--shadow-soft);
+        }
         .info-mark {
             display: grid;
-            width: 19px;
-            height: 19px;
+            width: 18px;
+            height: 18px;
             border: 1.5px solid currentColor;
             border-radius: 50%;
             place-items: center;
-            font-family: Georgia, serif;
-            font-size: .78rem;
+            font-family: var(--font-display);
+            font-size: .74rem;
             font-weight: 700;
             line-height: 1;
         }
@@ -140,46 +192,76 @@
             max-height: min(calc(100dvh - 40px), 620px);
             overflow: auto;
             padding: 0;
-            border: 0;
-            border-radius: 16px;
-            color: #332b26;
-            background: #fffaf0;
-            box-shadow: 0 18px 55px rgba(35, 24, 19, .36);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            color: var(--ink);
+            background: var(--bg-surface);
+            box-shadow: var(--shadow);
         }
-        .guide-dialog::backdrop { background: rgba(28, 20, 17, .58); backdrop-filter: blur(2px); }
-        .guide-content { padding: 18px 18px max(18px, env(safe-area-inset-bottom)); }
-        .guide-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .guide-dialog::backdrop {
+            background: var(--drawer-scrim);
+            backdrop-filter: blur(2px);
+        }
+        .guide-content { padding: 18px 18px max(18px, var(--safe-bottom, 0px)); }
+        .guide-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
         .guide-head h2 {
             margin: 0;
-            color: #762f2b;
-            font-family: Georgia, "Noto Serif SC", serif;
-            font-size: 1.22rem;
+            color: var(--ink);
+            font-family: var(--font-display);
+            font-size: 1.2rem;
+            letter-spacing: -.01em;
         }
-        .guide-close { flex: 0 0 auto; color: #6d5e52; }
-        .guide-intro { margin: 10px 0 16px; color: #625448; font-size: .91rem; line-height: 1.5; }
+        .guide-close { flex: 0 0 auto; color: var(--ink-muted); }
+        .guide-intro {
+            margin: 10px 0 16px;
+            color: var(--ink-muted);
+            font-size: .91rem;
+            line-height: 1.55;
+        }
         .guide-dialog section { margin-top: 14px; }
-        .guide-dialog h3 { margin: 0 0 7px; color: #493a31; font-size: .84rem; letter-spacing: .02em; }
-        .guide-dialog ul { display: grid; gap: 7px; margin: 0; padding-left: 20px; color: #55483f; font-size: .84rem; line-height: 1.46; }
-        .guide-dialog li::marker { color: #a14a3e; }
+        .guide-dialog h3 {
+            margin: 0 0 7px;
+            color: var(--ink);
+            font-size: .78rem;
+            font-weight: 700;
+            letter-spacing: .05em;
+            text-transform: uppercase;
+        }
+        .guide-dialog ul {
+            display: grid;
+            gap: 7px;
+            margin: 0;
+            padding-left: 18px;
+            color: var(--ink-muted);
+            font-size: .86rem;
+            line-height: 1.5;
+        }
+        .guide-dialog li::marker { color: var(--accent); }
         .guide-done {
             width: 100%;
             min-height: 44px;
             margin-top: 18px;
             border: 0;
-            border-radius: 10px;
-            color: #fffaf0;
+            border-radius: var(--radius-sm);
+            color: var(--accent-ink);
             font-weight: 700;
-            background: #762f2b;
+            background: var(--accent);
         }
-        .guide-done:active { background: #612522; }
+        .guide-done:active { filter: brightness(.95); }
         @media (max-width: 340px) {
-            main { padding-inline: 7px; }
+            main { padding-inline: 8px; }
             .guide-content { padding: 15px; }
+            .segmented button { font-size: .78rem; }
         }
     </style>
     <div class="layout">
         <header>
-            <button class="icon-button menu" type="button"><span class="menu-lines"></span></button>
+            <button class="icon-button menu" type="button" aria-controls="offline-shell-drawer" aria-expanded="false"><span class="menu-lines"></span></button>
             <h1></h1>
             <button class="icon-button guide-trigger" type="button" hidden><span class="info-mark" aria-hidden="true">i</span></button>
         </header>
@@ -190,17 +272,25 @@
         </footer>
     </div>
     <button class="backdrop" type="button" tabindex="-1"></button>
-    <aside aria-hidden="true">
+    <aside id="offline-shell-drawer" aria-hidden="true" inert>
         <div class="drawer-head">
             <span class="brand"></span>
             <button class="icon-button close" type="button" aria-label="Close">✕</button>
         </div>
         <nav></nav>
-        <section class="language">
-            <p class="language-label"></p>
-            <div class="language-buttons">
+        <section class="section language">
+            <p class="section-label language-label"></p>
+            <div class="segmented language-buttons">
                 <button type="button" data-lang="zh">中文</button>
                 <button type="button" data-lang="en">English</button>
+            </div>
+        </section>
+        <section class="section appearance">
+            <p class="section-label appearance-label"></p>
+            <div class="segmented triple theme-buttons">
+                <button type="button" data-theme="system"></button>
+                <button type="button" data-theme="light"></button>
+                <button type="button" data-theme="dark"></button>
             </div>
         </section>
     </aside>
@@ -232,20 +322,29 @@ customElements.define('offline-shell', class extends HTMLElement {
     }
 
     connectedCallback() {
-        const {i18n} = OfflineGames
+        const {i18n, theme} = OfflineGames
         const page = this.getAttribute('page') || 'gallery'
         const titleKey = page === 'gallery' ? 'gallery' : page
         const shadow = this.shadowRoot
         const guide = i18n.guide(page)
+        const layout = shadow.querySelector('.layout')
+        const aside = shadow.querySelector('aside')
+        const menu = shadow.querySelector('.menu')
         const open = () => {
             this.setAttribute('drawer-open', '')
-            shadow.querySelector('aside').setAttribute('aria-hidden', 'false')
+            layout.setAttribute('inert', '')
+            aside.removeAttribute('inert')
+            aside.setAttribute('aria-hidden', 'false')
+            menu.setAttribute('aria-expanded', 'true')
             shadow.querySelector('.close').focus()
         }
         const close = () => {
             this.removeAttribute('drawer-open')
-            shadow.querySelector('aside').setAttribute('aria-hidden', 'true')
-            shadow.querySelector('.menu').focus()
+            aside.setAttribute('inert', '')
+            aside.setAttribute('aria-hidden', 'true')
+            layout.removeAttribute('inert')
+            menu.setAttribute('aria-expanded', 'false')
+            menu.focus()
         }
 
         shadow.querySelector('h1').textContent = i18n.t(titleKey)
@@ -253,9 +352,27 @@ customElements.define('offline-shell', class extends HTMLElement {
         shadow.querySelector('.menu').setAttribute('aria-label', i18n.t('menu'))
         shadow.querySelector('.close').setAttribute('aria-label', i18n.t('close'))
         shadow.querySelector('.language-label').textContent = i18n.t('language')
+        shadow.querySelector('.appearance-label').textContent = i18n.t('appearance')
         shadow.querySelector('.copyright').textContent = i18n.t('copyright')
         shadow.querySelector('footer a').textContent = i18n.t('source')
         document.title = `${i18n.t(titleKey)} · ${i18n.t('siteName')}`
+
+        const themeLabels = {
+            system: i18n.t('themeSystem'),
+            light: i18n.t('themeLight'),
+            dark: i18n.t('themeDark'),
+        }
+        for (const button of shadow.querySelectorAll('[data-theme]')) {
+            button.textContent = themeLabels[button.dataset.theme]
+        }
+        const paintTheme = () => {
+            const preference = theme.getPreference()
+            for (const button of shadow.querySelectorAll('[data-theme]')) {
+                button.setAttribute('aria-pressed', String(button.dataset.theme === preference))
+            }
+        }
+        paintTheme()
+        this._unsubTheme = theme.subscribe(paintTheme)
 
         const navigation = [{id: 'gallery', page: 'index.html'}, ...(OfflineGames.catalog || []).map(game => ({id: game.id, page: game.id + '.html'}))]
         shadow.querySelector('nav').replaceChildren(...navigation.map(item => {
@@ -295,12 +412,19 @@ customElements.define('offline-shell', class extends HTMLElement {
             button.setAttribute('aria-pressed', String(button.dataset.lang === i18n.locale))
             button.addEventListener('click', () => i18n.setLocale(button.dataset.lang))
         }
+        for (const button of shadow.querySelectorAll('[data-theme]')) {
+            button.addEventListener('click', () => theme.setPreference(button.dataset.theme))
+        }
         shadow.querySelector('.menu').addEventListener('click', open)
         shadow.querySelector('.close').addEventListener('click', close)
         shadow.querySelector('.backdrop').addEventListener('click', close)
         this.addEventListener('keydown', event => {
             if (event.key === 'Escape' && this.hasAttribute('drawer-open')) close()
         })
+    }
+
+    disconnectedCallback() {
+        if (this._unsubTheme) this._unsubTheme()
     }
 })
 </script>

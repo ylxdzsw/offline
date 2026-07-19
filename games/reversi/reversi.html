@@ -1,36 +1,71 @@
 <template id="reversi-game-template">
     <style>
-        :host { display: block; }
-        .toolbar { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: center; margin-bottom: 10px; }
-        label { display: grid; gap: 3px; color: #746658; font-size: .7rem; }
-        select, .action { min-height: 42px; border: 1px solid #cdbb9d; border-radius: 9px; color: #44372f; background: #fffaf0; }
+        :host { display: block; color: var(--ink); }
+        .toolbar { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: end; margin-bottom: 10px; }
+        label { display: grid; gap: 3px; color: var(--ink-muted); font-size: .7rem; font-weight: 600; letter-spacing: .02em; }
+        select, .action {
+            min-height: var(--control-h, 42px); border: 1px solid var(--border-strong);
+            border-radius: var(--radius-sm); color: var(--ink); background: var(--bg-surface);
+        }
         select { min-width: 96px; padding: 0 28px 0 10px; }
         .action { padding: 0 12px; font-weight: 650; }
         .action:disabled { opacity: .42; }
-        .scoreboard { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; margin-bottom: 9px; overflow: hidden; border: 1px solid #dccbab; border-radius: 12px; color: #57483d; background: #fffaf0; box-shadow: 0 3px 10px rgba(73, 49, 30, .06); }
+        .scoreboard {
+            display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; margin-bottom: 9px;
+            overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-md);
+            color: var(--ink-muted); background: var(--bg-surface); box-shadow: var(--shadow-soft);
+        }
         .score { display: flex; min-height: 48px; align-items: center; justify-content: center; gap: 8px; font-size: .78rem; }
-        .score strong { min-width: 1.3em; color: #382f2a; font-family: Georgia, serif; font-size: 1.35rem; font-variant-numeric: tabular-nums; text-align: center; }
-        .disc-mini { width: 25px; height: 25px; border-radius: 50%; box-shadow: 0 1px 3px rgba(34, 25, 20, .3); }
-        .disc-mini.black { background: radial-gradient(circle at 35% 28%, #5b5a57, #151514 70%); }
-        .disc-mini.white { border: 1px solid #b9b0a3; background: radial-gradient(circle at 35% 28%, #fff, #e8e3da 72%); }
-        .versus { color: #ad9e8e; font-size: .7rem; font-weight: 800; }
-        .status { display: flex; min-height: 38px; align-items: center; justify-content: center; margin: 0 0 9px; padding: 6px 10px; border-radius: 9px; color: #38513d; font-size: .9rem; font-weight: 700; text-align: center; background: #dce8d8; }
-        .status.thinking::after { width: 5px; height: 5px; margin-left: 7px; border-radius: 50%; content: ""; background: currentColor; animation: pulse .8s ease-in-out infinite alternate; }
+        .score strong {
+            min-width: 1.3em; color: var(--ink); font-family: var(--font-display);
+            font-size: 1.35rem; font-variant-numeric: tabular-nums; text-align: center;
+        }
+        .disc-mini { width: 25px; height: 25px; border-radius: 50%; box-shadow: 0 1px 3px rgba(0, 0, 0, .28); }
+        .disc-mini.black { background: radial-gradient(circle at 35% 28%, #555, var(--stone-black) 70%); }
+        .disc-mini.white { border: 1px solid var(--stone-white-edge); background: radial-gradient(circle at 35% 28%, #fff, var(--stone-white) 72%); }
+        .versus { color: var(--ink-faint); font-size: .7rem; font-weight: 800; }
+        .status {
+            display: flex; min-height: 38px; align-items: center; justify-content: center;
+            margin: 0 0 9px; padding: 6px 10px; border-radius: var(--radius-sm);
+            color: var(--status-ink); font-size: .9rem; font-weight: 700; text-align: center; background: var(--status-bg);
+        }
+        .status.thinking::after {
+            width: 5px; height: 5px; margin-left: 7px; border-radius: 50%; content: "";
+            background: currentColor; animation: pulse .8s ease-in-out infinite alternate;
+        }
         @keyframes pulse { to { opacity: .2; transform: scale(.7); } }
-        .warning { margin: 0 0 9px; color: #8c3c35; font-size: .77rem; text-align: center; }
+        .warning { margin: 0 0 9px; color: var(--danger); font-size: .77rem; text-align: center; }
         .warning[hidden] { display: none; }
-        .board { display: grid; box-sizing: border-box; width: 100%; aspect-ratio: 1; grid-template-columns: repeat(8, 1fr); overflow: hidden; border: 4px solid #315c3f; border-radius: 10px; background: #39784b; box-shadow: inset 0 0 24px rgba(17, 52, 30, .22), 0 5px 14px rgba(51, 44, 33, .16); touch-action: manipulation; user-select: none; }
+        .board {
+            display: grid; box-sizing: border-box; width: 100%; aspect-ratio: 1; grid-template-columns: repeat(8, 1fr);
+            overflow: hidden; border: 3px solid var(--board-felt-edge); border-radius: var(--radius-md);
+            background: var(--board-felt);
+            box-shadow: inset 0 0 24px rgba(0, 0, 0, .18), var(--shadow-soft);
+            touch-action: manipulation; user-select: none;
+        }
         .cells { display: contents; }
-        .cell { position: relative; display: grid; min-width: 0; padding: 8%; border: 0; border-right: 1px solid rgba(20, 63, 36, .72); border-bottom: 1px solid rgba(20, 63, 36, .72); place-items: center; background: transparent; }
+        .cell {
+            position: relative; display: grid; min-width: 0; padding: 8%; border: 0;
+            border-right: 1px solid var(--board-felt-line); border-bottom: 1px solid var(--board-felt-line);
+            place-items: center; background: transparent;
+        }
         .cell:nth-child(8n) { border-right: 0; }
         .cell:nth-last-child(-n + 8) { border-bottom: 0; }
-        .cell.legal::before { width: 20%; aspect-ratio: 1; border-radius: 50%; content: ""; background: rgba(231, 239, 214, .68); box-shadow: 0 0 0 5px rgba(231, 239, 214, .09); }
-        .cell.legal:hover { background: rgba(255, 255, 255, .07); }
-        .cell:focus-visible { z-index: 2; outline: 3px solid #f4c45f; outline-offset: -4px; }
-        .cell.last::after { position: absolute; z-index: 3; width: 13%; aspect-ratio: 1; border: 1px solid rgba(255,255,255,.9); border-radius: 50%; content: ""; background: #c6473e; box-shadow: 0 1px 2px rgba(25, 30, 22, .4); }
-        .disc { width: 88%; aspect-ratio: 1; border-radius: 50%; box-shadow: 0 3px 4px rgba(20, 31, 22, .4); }
-        .disc.black { background: radial-gradient(circle at 35% 28%, #62615e, #151514 68%); }
-        .disc.white { border: 1px solid #b9b0a3; background: radial-gradient(circle at 35% 28%, #fff, #e7e2d9 72%); }
+        .cell.legal::before {
+            width: 20%; aspect-ratio: 1; border-radius: 50%; content: "";
+            background: color-mix(in srgb, var(--stone-white) 70%, transparent);
+            box-shadow: 0 0 0 5px color-mix(in srgb, var(--stone-white) 10%, transparent);
+        }
+        .cell.legal:hover { background: color-mix(in srgb, var(--stone-white) 8%, transparent); }
+        .cell:focus-visible { z-index: 2; outline: 3px solid var(--focus); outline-offset: -4px; }
+        .cell.last::after {
+            position: absolute; z-index: 3; width: 13%; aspect-ratio: 1;
+            border: 1px solid color-mix(in srgb, var(--stone-white) 90%, transparent); border-radius: 50%; content: "";
+            background: var(--hint); box-shadow: 0 1px 2px rgba(0, 0, 0, .35);
+        }
+        .disc { width: 88%; aspect-ratio: 1; border-radius: 50%; box-shadow: 0 3px 4px rgba(0, 0, 0, .35); }
+        .disc.black { background: radial-gradient(circle at 35% 28%, #555, var(--stone-black) 68%); }
+        .disc.white { border: 1px solid var(--stone-white-edge); background: radial-gradient(circle at 35% 28%, #fff, var(--stone-white) 72%); }
         .cell.flipped .disc { animation: flip .34s ease-out; }
         @keyframes flip { 0% { transform: scaleX(.08); filter: brightness(.7); } 60% { transform: scaleX(1.08); } 100% { transform: scaleX(1); } }
         .board[aria-disabled="true"] .cell { cursor: wait; }
