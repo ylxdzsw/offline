@@ -1,0 +1,8 @@
+[
+  {"id":"xiangqi","element":"xiangqi-game","worker":true},
+  {"id":"wuziqi","element":"wuziqi-game","worker":true},
+  {"id":"sudoku","element":"sudoku-game","worker":false},
+  {"id":"junqi","element":"junqi-game","worker":true},
+  {"id":"chess","element":"chess-game","worker":true},
+  {"id":"reversi","element":"reversi-game","worker":true}
+]

@@ -1,0 +1,104 @@
+<style>
+    .game-gallery { display: block; }
+    .game-gallery .intro { margin: 4px 4px 18px; color: #746658; font-size: .93rem; line-height: 1.55; }
+    .game-gallery .games { display: grid; gap: 16px; }
+    .game-gallery article {
+        overflow: hidden;
+        border: 1px solid #dfcfb3;
+        border-radius: 18px;
+        background: #fffaf0;
+        box-shadow: 0 8px 22px rgba(72, 49, 31, .09);
+    }
+    .game-gallery .preview {
+        position: relative;
+        display: grid;
+        height: 128px;
+        place-items: center;
+        color: #f9ead1;
+        background: #8b463e;
+    }
+    .game-gallery article:nth-child(2) .preview { color: #423b34; background: #d7b77d; }
+    .game-gallery article:nth-child(3) .preview { color: #67463a; background: #e8ddc9; }
+    .game-gallery article:nth-child(4) .preview { color: #f4e4bd; background: #526a54; }
+    .game-gallery article:nth-child(5) .preview { color: #f9edda; background: #665044; }
+    .game-gallery article:nth-child(6) .preview { color: #eff6e8; background: #39784b; }
+    .game-gallery .xiangqi-mark {
+        display: grid;
+        width: 78px;
+        height: 78px;
+        border: 4px double currentColor;
+        border-radius: 50%;
+        place-items: center;
+        font-family: "Noto Serif SC", serif;
+        font-size: 2.4rem;
+        font-weight: 700;
+    }
+    .game-gallery .gomoku-mark {
+        position: relative;
+        width: 92px;
+        height: 92px;
+        background-image: linear-gradient(#76634a 1px, transparent 1px), linear-gradient(90deg, #76634a 1px, transparent 1px);
+        background-size: 23px 23px;
+    }
+    .game-gallery .gomoku-mark::before, .game-gallery .gomoku-mark::after {
+        position: absolute;
+        width: 25px;
+        height: 25px;
+        border-radius: 50%;
+        content: "";
+    }
+    .game-gallery .gomoku-mark::before { top: 11px; left: 11px; background: #252422; }
+    .game-gallery .gomoku-mark::after { right: 10px; bottom: 10px; border: 1px solid #b9aa91; background: #faf8f1; }
+    .game-gallery .sudoku-mark { display: grid; width: 90px; height: 90px; grid-template-columns: repeat(3, 1fr); border: 3px solid currentColor; background: rgba(255,255,255,.35); }
+    .game-gallery .sudoku-mark i { display: grid; border: 1px solid currentColor; place-items: center; font-family: Georgia, serif; font-size: 1.1rem; font-style: normal; font-weight: 700; }
+    .game-gallery .junqi-mark { display: grid; width: 94px; height: 82px; grid-template-columns: repeat(3, 1fr); gap: 6px; transform: perspective(90px) rotateX(5deg); }
+    .game-gallery .junqi-mark i { display: grid; border: 2px solid currentColor; border-radius: 5px; place-items: center; font-family: "Noto Serif SC", serif; font-size: .82rem; font-style: normal; font-weight: 800; background: rgba(255,255,255,.1); }
+    .game-gallery .chess-mark { position: relative; display: grid; width: 90px; height: 90px; grid-template: repeat(2,1fr)/repeat(2,1fr); overflow: hidden; border: 3px solid currentColor; border-radius: 5px; background: currentColor; }
+    .game-gallery .chess-mark i:nth-child(1), .game-gallery .chess-mark i:nth-child(4) { background: #9e7c65; }
+    .game-gallery .chess-mark i:nth-child(2), .game-gallery .chess-mark i:nth-child(3) { background: #ead9b7; }
+    .game-gallery .chess-mark::after { position: absolute; inset: 0; display: grid; place-items: center; color: #47372f; content: "N"; font-family: Georgia,serif; font-size: 3.8rem; font-weight: 800; text-shadow: 0 1px #fff4dc; }
+    .game-gallery .reversi-mark { display: grid; width: 94px; height: 94px; grid-template-columns: repeat(4, 1fr); gap: 5px; padding: 7px; border: 2px solid rgba(238,247,229,.55); border-radius: 8px; background: #2d673e; }
+    .game-gallery .reversi-mark i { border-radius: 50%; box-shadow: 0 2px 3px rgba(19,36,24,.4); }
+    .game-gallery .reversi-mark i:nth-child(1), .game-gallery .reversi-mark i:nth-child(4), .game-gallery .reversi-mark i:nth-child(6), .game-gallery .reversi-mark i:nth-child(11), .game-gallery .reversi-mark i:nth-child(13), .game-gallery .reversi-mark i:nth-child(16) { background: radial-gradient(circle at 35% 28%, #fff, #e2ded5 72%); }
+    .game-gallery .reversi-mark i:not(:nth-child(1)):not(:nth-child(4)):not(:nth-child(6)):not(:nth-child(11)):not(:nth-child(13)):not(:nth-child(16)) { background: radial-gradient(circle at 35% 28%, #5b5a57, #171716 70%); }
+    .game-gallery .content { padding: 15px 16px 17px; }
+    .game-gallery h2 { margin: 0 0 5px; color: #4d302b; font-family: Georgia, "Noto Serif SC", serif; font-size: 1.22rem; }
+    .game-gallery p { min-height: 2.8em; margin: 0 0 14px; color: #746658; font-size: .88rem; line-height: 1.45; }
+    .game-gallery a { display: flex; min-height: 46px; align-items: center; justify-content: center; border-radius: 11px; color: #fffaf0; font-weight: 700; text-decoration: none; background: #762f2b; }
+</style>
+
+<p class="intro"></p>
+<div class="games"></div>
+
+<script>
+(() => {
+    const render = () => {
+        const root = document.querySelector('.game-gallery')
+        if (!root) return
+        const {i18n, storage} = OfflineGames
+        root.querySelector('.intro').textContent = i18n.locale === 'zh'
+            ? '不需要网络，随时选择一款经典游戏。'
+            : 'No connection required. Choose a classic game and play anywhere.'
+        const marks = {
+            xiangqi: '<span class="xiangqi-mark">棋</span>',
+            wuziqi: '<span class="gomoku-mark"></span>',
+            sudoku: '<span class="sudoku-mark"><i>8</i><i></i><i>2</i><i></i><i>5</i><i></i><i>1</i><i></i><i>9</i></span>',
+            junqi: '<span class="junqi-mark"><i>司令</i><i>军旗</i><i>工兵</i><i>炸弹</i><i>师长</i><i>地雷</i></span>',
+            chess: '<span class="chess-mark"><i></i><i></i><i></i><i></i></span>',
+            reversi: '<span class="reversi-mark">' + '<i></i>'.repeat(16) + '</span>',
+        }
+        root.querySelector('.games').innerHTML = (OfflineGames.catalog || []).map(game => `
+            <article>
+                <div class="preview">${marks[game.id] || ''}</div>
+                <div class="content">
+                    <h2>${i18n.t(game.id)}</h2>
+                    <p>${i18n.t(game.id + 'Desc')}</p>
+                    <a href="${i18n.href('./' + game.id + '.html')}">${i18n.t(storage.hasProgress(game.id) ? 'continue' : 'play')}</a>
+                </div>
+            </article>
+        `).join('')
+    }
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render, {once: true})
+    else render()
+})()
+</script>

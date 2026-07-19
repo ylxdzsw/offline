@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#762f2b">
+<meta name="author" content="ylxdzsw">
+<meta name="license" content="MIT">
+<meta name="github" content="https://github.com/ylxdzsw/offline">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<title>Offline Classical Games / 离线棋局</title>
+[require](./styles.less)
+[require](./i18n.js)
+[require](./storage.js)
+[require](./runtime.js)
+[offline-catalog](../games/catalog.json)
+</head>
+<body>
+[require](./shell.html)
+[require](./gallery.html)
+<offline-shell page="gallery">
+<section class="game-gallery"></section>
+</offline-shell>
+</body>
+</html>
+
+[mixin] common.ymd
+[mixin] ../../app/macros.ymd

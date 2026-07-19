@@ -1,27 +1,34 @@
 const {test, expect} = require('@playwright/test')
 const fs = require('node:fs')
 const path = require('node:path')
+const catalog = require('../../games/catalog.json')
+const pageFiles = ['index.html', ...catalog.map(game => `${game.id}.html`)]
 
 test('build is self-contained and contains the complete PWA shell', async () => {
     const dist = path.resolve('dist')
-    for (const file of ['index.html', 'xiangqi.html', 'wuziqi.html', 'sudoku.html', 'junqi.html', 'chess.html', 'reversi.html', 'manifest.webmanifest', 'sw.js', 'icons/icon-192.png', 'icons/icon-512.png']) {
+    for (const file of [...pageFiles, 'manifest.webmanifest', 'sw.js', 'icons/icon-192.png', 'icons/icon-512.png']) {
         expect(fs.existsSync(path.join(dist, file)), file).toBeTruthy()
     }
-    for (const page of ['index.html', 'xiangqi.html', 'wuziqi.html', 'sudoku.html', 'junqi.html', 'chess.html', 'reversi.html']) {
+    for (const page of pageFiles) {
         const html = fs.readFileSync(path.join(dist, page), 'utf8')
         expect(html).toContain('manifest.webmanifest')
         expect(html).not.toMatch(/<(?:script|link|img)[^>]+(?:src|href)=["']https?:\/\//i)
     }
+    for (const game of catalog) {
+        const html = fs.readFileSync(path.join(dist, `${game.id}.html`), 'utf8')
+        expect(html).toContain(`<${game.element}`)
+        expect(html.includes(`id=${game.id}-worker-payload`)).toBe(game.worker)
+    }
     const sw = fs.readFileSync(path.join(dist, 'sw.js'), 'utf8')
-    for (const asset of ['./index.html', './xiangqi.html', './wuziqi.html', './sudoku.html', './junqi.html', './chess.html', './reversi.html', './manifest.webmanifest']) expect(sw).toContain(asset)
+    for (const asset of [...pageFiles.map(file => './' + file), './manifest.webmanifest']) expect(sw).toContain(asset)
 })
 
 test('gallery and sidebar localize from query and preserve the override', async ({page}) => {
     await page.goto('/index.html?lang=zh')
     await expect(page.locator('offline-shell h1')).toHaveText('经典棋类')
-    await expect(page.locator('game-gallery h2').first()).toHaveText('中国象棋')
-    await expect(page.locator('game-gallery article')).toHaveCount(6)
-    await expect(page.locator('game-gallery h2').last()).toHaveText('黑白棋')
+    await expect(page.locator('.game-gallery h2').first()).toHaveText('中国象棋')
+    await expect(page.locator('.game-gallery article')).toHaveCount(6)
+    await expect(page.locator('.game-gallery h2').last()).toHaveText('黑白棋')
     await page.locator('offline-shell .menu').click()
     await expect(page.locator('offline-shell aside')).toHaveAttribute('aria-hidden', 'false')
     await expect(page.locator('offline-shell a[data-page="xiangqi"]')).toHaveAttribute('href', /xiangqi\.html\?lang=zh$/)
@@ -176,7 +183,7 @@ test('Reversi flips discs, plays an AI reply, persists, and undoes the turn', as
 for (const viewport of [{width: 320, height: 568}, {width: 390, height: 844}, {width: 430, height: 932}]) {
     test(`all pages fit a ${viewport.width}x${viewport.height} mobile viewport`, async ({page}) => {
         await page.setViewportSize(viewport)
-        for (const url of ['/index.html', '/xiangqi.html', '/wuziqi.html', '/sudoku.html', '/junqi.html', '/chess.html', '/reversi.html']) {
+        for (const url of pageFiles.map(file => '/' + file)) {
             await page.goto(url)
             expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), url).toBeTruthy()
         }

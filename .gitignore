@@ -1,5 +1,6 @@
 node_modules/
 engine/target/
+games/target/
 dist/
 .playwright/
 test-results/

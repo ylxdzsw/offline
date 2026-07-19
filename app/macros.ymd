@@ -1,0 +1,13 @@
+[offline-wasm]=
+const {args: [name, file]} = std_call()
+const compressed = read(file, 'compressed-base64')
+;`<script>OfflineGames.wasm.registerEmbedded(${JSON.stringify(name)}, ${JSON.stringify(compressed)})</script>`
+
+[offline-worker]=
+const {args: [id, wasm, ...files]} = std_call()
+;`<script type="application/octet-stream" id="${id}" data-wasm-module="${wasm}">${files.map(file => read(file, 'base64')).join('.')}</script>`
+
+[offline-catalog]=
+const {args: [file]} = std_call()
+const catalog = JSON.parse(read(file))
+;`<script>OfflineGames.catalog = ${JSON.stringify(catalog)}</script>`
