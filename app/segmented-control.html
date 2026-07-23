@@ -1,0 +1,99 @@
+<template id="offline-segmented-template">
+    <style>
+        :host {
+            display: block;
+            position: relative;
+        }
+        .track {
+            position: relative;
+            display: grid;
+            padding: 3px;
+            border-radius: var(--radius-sm);
+            background: var(--bg-muted);
+        }
+        .indicator {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            height: calc(100% - 6px);
+            border-radius: calc(var(--radius-sm) - 2px);
+            background: var(--bg-surface);
+            box-shadow: 0 1px 3px rgba(0,0,0,.12), 0 1px 0 rgba(0,0,0,.06);
+            transition: transform .2s cubic-bezier(.4,0,.2,1),
+                        width .2s cubic-bezier(.4,0,.2,1);
+            pointer-events: none;
+        }
+        [data-theme="dark"] .indicator {
+            box-shadow: 0 1px 3px rgba(0,0,0,.40), 0 0 0 0.5px rgba(255,255,255,.06);
+        }
+        button {
+            position: relative;
+            z-index: 1;
+            min-height: 34px;
+            padding: 0 6px;
+            border: 0;
+            border-radius: calc(var(--radius-sm) - 2px);
+            background: transparent;
+            color: var(--ink-muted);
+            font-size: .84rem;
+            font-weight: 500;
+            letter-spacing: -.01em;
+            transition: color .15s ease;
+        }
+        button[aria-pressed="true"] { color: var(--ink); font-weight: 600; }
+    </style>
+    <div class="track" role="group">
+        <div class="indicator"></div>
+    </div>
+</template>
+<script>
+customElements.define('offline-segmented', class extends HTMLElement {
+    connectedCallback() {
+        if (this._ready) return
+        this._ready = true
+        const tmpl = document.getElementById('offline-segmented-template')
+        this.attachShadow({mode: 'open'}).append(tmpl.content.cloneNode(true))
+        const opts = JSON.parse(this.getAttribute('options') || '[]')
+        const current = this.getAttribute('value') || opts[0]?.value
+        this._build(opts, current)
+    }
+
+    _build(opts, current) {
+        const track = this.shadowRoot.querySelector('.track')
+        const indicator = track.querySelector('.indicator')
+        track.style.gridTemplateColumns = `repeat(${opts.length}, 1fr)`
+        opts.forEach((opt, i) => {
+            const btn = document.createElement('button')
+            btn.type = 'button'
+            btn.textContent = opt.label
+            btn.dataset.value = opt.value
+            btn.setAttribute('aria-pressed', String(opt.value === current))
+            btn.addEventListener('click', () => this._select(opt.value))
+            track.append(btn)
+        })
+        this._updateIndicator(current)
+    }
+
+    _select(value) {
+        for (const btn of this.shadowRoot.querySelectorAll('button')) {
+            btn.setAttribute('aria-pressed', String(btn.dataset.value === value))
+        }
+        this._updateIndicator(value)
+        this.dispatchEvent(new CustomEvent('change', {detail: {value}, bubbles: true}))
+    }
+
+    _updateIndicator(value) {
+        const buttons = [...this.shadowRoot.querySelectorAll('button')]
+        const idx = buttons.findIndex(b => b.dataset.value === value)
+        if (idx < 0) return
+        const indicator = this.shadowRoot.querySelector('.indicator')
+        const w = 100 / buttons.length
+        indicator.style.width = `calc(${w}% - 0px)`
+        indicator.style.transform = `translateX(${idx * 100}%)`
+    }
+
+    setValue(value) {
+        this._select(value)
+    }
+})
+</script>

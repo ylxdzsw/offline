@@ -1,0 +1,206 @@
+<template id="offline-drawer-template">
+    <style>
+        :host { display: contents; }
+        .backdrop {
+            position: fixed;
+            z-index: 40;
+            inset: 0;
+            border: 0;
+            padding: 0;
+            opacity: 0;
+            pointer-events: none;
+            background: var(--drawer-scrim);
+            backdrop-filter: blur(2px);
+            -webkit-backdrop-filter: blur(2px);
+            transition: opacity .22s ease;
+        }
+        aside {
+            position: fixed;
+            z-index: 41;
+            top: 0;
+            bottom: 0;
+            left: max(0px, calc((100vw - var(--shell-max)) / 2));
+            width: min(82vw, 300px);
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            padding:
+                calc(16px + var(--safe-top))
+                16px
+                calc(20px + var(--safe-bottom));
+            color: var(--ink);
+            background: var(--bg-shell);
+            overscroll-behavior: contain;
+            transform: translateX(calc(-100% - 8px));
+            transition: transform .26s cubic-bezier(.4,0,.2,1);
+            /* iOS sheet edge radius */
+            border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+            box-shadow: var(--shadow-modal);
+        }
+        :host([open]) .backdrop { opacity: 1; pointer-events: auto; }
+        :host([open]) aside { transform: translateX(0); }
+
+        .head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 22px;
+        }
+        .brand {
+            font-family: var(--font-display);
+            font-size: 1.08rem;
+            font-weight: 700;
+            letter-spacing: -.02em;
+            color: var(--ink);
+        }
+        .close-btn {
+            width: 30px;
+            height: 30px;
+            display: grid;
+            place-items: center;
+            border: 0;
+            border-radius: 50%;
+            background: var(--bg-muted);
+            color: var(--ink-muted);
+            font-size: .88rem;
+        }
+        .close-btn:active { filter: brightness(.94); }
+        nav { display: grid; gap: 3px; }
+        nav a {
+            display: flex;
+            align-items: center;
+            min-height: 44px;
+            padding: 0 12px;
+            border-radius: var(--radius-sm);
+            font-size: .95rem;
+            font-weight: 500;
+            text-decoration: none;
+            color: var(--ink);
+            letter-spacing: -.01em;
+            transition: background .12s ease;
+        }
+        nav a:hover { background: var(--bg-fill); }
+        nav a[aria-current="page"] {
+            color: var(--accent-ink);
+            background: var(--accent);
+            font-weight: 600;
+        }
+        nav a[aria-current="page"]:hover { filter: brightness(1.04); }
+        .section {
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid var(--separator);
+        }
+        .section-label {
+            margin: 0 0 10px;
+            padding-left: 4px;
+            color: var(--ink-faint);
+            font-size: .7rem;
+            font-weight: 700;
+            letter-spacing: .06em;
+            text-transform: uppercase;
+        }
+        offline-segmented { display: block; }
+    </style>
+    <button class="backdrop" type="button" tabindex="-1" aria-hidden="true"></button>
+    <aside aria-hidden="true" inert>
+        <div class="head">
+            <span class="brand"></span>
+            <button class="close-btn" type="button">✕</button>
+        </div>
+        <nav></nav>
+        <section class="section">
+            <p class="section-label lang-label"></p>
+            <offline-segmented class="lang-seg"></offline-segmented>
+        </section>
+        <section class="section">
+            <p class="section-label theme-label"></p>
+            <offline-segmented class="theme-seg"></offline-segmented>
+        </section>
+    </aside>
+</template>
+<script>
+customElements.define('offline-drawer', class extends HTMLElement {
+    connectedCallback() {
+        const tmpl = document.getElementById('offline-drawer-template')
+        this.attachShadow({mode: 'open'}).append(tmpl.content.cloneNode(true))
+        const s = this.shadowRoot
+        const aside = s.querySelector('aside')
+        s.querySelector('.backdrop').addEventListener('click', () => this.close())
+        s.querySelector('.close-btn').addEventListener('click', () => this.close())
+        this.addEventListener('keydown', e => {
+            if (e.key === 'Escape' && this.hasAttribute('open')) this.close()
+        })
+    }
+
+    setup({i18n, theme, games, currentPage, layoutEl, triggerEl}) {
+        this._triggerEl = triggerEl
+        this._layoutEl = layoutEl
+        const s = this.shadowRoot
+        s.querySelector('.brand').textContent = i18n.t('siteName')
+        s.querySelector('.close-btn').setAttribute('aria-label', i18n.t('close'))
+        s.querySelector('.lang-label').textContent = i18n.t('language')
+        s.querySelector('.theme-label').textContent = i18n.t('appearance')
+
+        /* Navigation */
+        const pages = [{id: 'gallery', page: 'index.html'}, ...games.map(g => ({id: g.id, page: g.id + '.html'}))]
+        s.querySelector('nav').replaceChildren(...pages.map(item => {
+            const a = document.createElement('a')
+            a.href = i18n.href('./' + item.page)
+            a.textContent = i18n.t(item.id === 'gallery' ? 'gallery' : item.id)
+            if (item.id === currentPage) a.setAttribute('aria-current', 'page')
+            return a
+        }))
+
+        /* Language segmented */
+        const langSeg = s.querySelector('.lang-seg')
+        langSeg.setAttribute('options', JSON.stringify([
+            {value: 'zh', label: '中文'},
+            {value: 'en', label: 'English'},
+        ]))
+        langSeg.setAttribute('value', i18n.locale)
+        langSeg.addEventListener('change', e => i18n.setLocale(e.detail.value))
+
+        /* Theme segmented */
+        const themeSeg = s.querySelector('.theme-seg')
+        const themeOpts = [
+            {value: 'system', label: i18n.t('themeSystem')},
+            {value: 'light',  label: i18n.t('themeLight')},
+            {value: 'dark',   label: i18n.t('themeDark')},
+        ]
+        themeSeg.setAttribute('options', JSON.stringify(themeOpts))
+        themeSeg.setAttribute('value', theme.getPreference())
+        themeSeg.addEventListener('change', e => {
+            theme.setPreference(e.detail.value)
+            themeSeg.setValue(theme.getPreference())
+        })
+        this._unsubTheme = theme.subscribe(() => themeSeg.setValue(theme.getPreference()))
+    }
+
+    open() {
+        const s = this.shadowRoot
+        const aside = s.querySelector('aside')
+        this.setAttribute('open', '')
+        aside.removeAttribute('inert')
+        aside.setAttribute('aria-hidden', 'false')
+        this._layoutEl?.setAttribute('inert', '')
+        this._triggerEl?.setAttribute('aria-expanded', 'true')
+        s.querySelector('.close-btn').focus()
+    }
+
+    close() {
+        const s = this.shadowRoot
+        const aside = s.querySelector('aside')
+        this.removeAttribute('open')
+        aside.setAttribute('inert', '')
+        aside.setAttribute('aria-hidden', 'true')
+        this._layoutEl?.removeAttribute('inert')
+        this._triggerEl?.setAttribute('aria-expanded', 'false')
+        this._triggerEl?.focus()
+    }
+
+    disconnectedCallback() {
+        this._unsubTheme?.()
+    }
+})
+</script>

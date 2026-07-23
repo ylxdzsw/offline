@@ -29,7 +29,7 @@
             meta.setAttribute('name', 'theme-color')
             document.head?.append(meta)
         }
-        meta.setAttribute('content', theme === 'dark' ? '#171816' : '#f7f6f2')
+        meta.setAttribute('content', theme === 'dark' ? '#1c1c1e' : '#f5f4f2')
     }
 
     const apply = () => {

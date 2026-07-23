@@ -3,14 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#f7f6f2">
+<meta name="theme-color" content="#f5f4f2">
 <meta name="author" content="ylxdzsw">
 <meta name="license" content="MIT">
 <meta name="github" content="https://github.com/ylxdzsw/offline">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
 <title>Reversi / 黑白棋</title>
-[require](../../app/styles.less)
+[require](../../app/tokens.css)
 [require](../../app/theme.js)
 [require](../../app/i18n.js)
 [require](../../app/storage.js)
@@ -21,7 +21,10 @@
 </head>
 <body>
 [offline-catalog](../catalog.json)
-[require](../../app/shell.html)
+[require](../../app/segmented-control.html)
+[require](../../app/guide-dialog.html)
+[require](../../app/side-drawer.html)
+[require](../../app/app-shell.html)
 [require](./reversi.html)
 [offline-worker](reversi-worker-payload)(reversi)(../../app/wasm.js)(./api.js)(./worker.js)
 <offline-shell page="reversi"><reversi-game></reversi-game></offline-shell>

@@ -1,0 +1,145 @@
+<template id="offline-guide-template">
+    <style>
+        dialog {
+            width: min(calc(100vw - 32px), 400px);
+            max-height: min(calc(100dvh - 48px), 600px);
+            overflow-y: auto;
+            padding: 0;
+            border: none;
+            border-radius: var(--radius-lg);
+            color: var(--ink);
+            background: var(--bg-surface);
+            box-shadow: var(--shadow-modal);
+            overscroll-behavior: contain;
+        }
+        dialog::backdrop {
+            background: var(--drawer-scrim);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+        }
+        .content {
+            padding: 20px 20px max(20px, var(--safe-bottom));
+        }
+        .head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+        h2 {
+            margin: 0;
+            font-family: var(--font-display);
+            font-size: 1.18rem;
+            font-weight: 700;
+            letter-spacing: -.015em;
+            color: var(--ink);
+        }
+        .close-btn {
+            flex: 0 0 30px;
+            width: 30px;
+            height: 30px;
+            display: grid;
+            place-items: center;
+            border: 0;
+            border-radius: 50%;
+            background: var(--bg-muted);
+            color: var(--ink-muted);
+            font-size: .9rem;
+            margin-top: -2px;
+        }
+        .close-btn:active { filter: brightness(.94); }
+        .intro {
+            margin: 0 0 16px;
+            color: var(--ink-muted);
+            font-size: .9rem;
+            line-height: 1.6;
+        }
+        section { margin-top: 16px; }
+        h3 {
+            margin: 0 0 8px;
+            color: var(--ink-faint);
+            font-size: .7rem;
+            font-weight: 700;
+            letter-spacing: .07em;
+            text-transform: uppercase;
+        }
+        ul {
+            display: grid;
+            gap: 7px;
+            margin: 0;
+            padding-left: 18px;
+            color: var(--ink-muted);
+            font-size: .88rem;
+            line-height: 1.55;
+        }
+        li::marker { color: var(--accent); }
+        .done-btn {
+            display: block;
+            width: 100%;
+            min-height: 46px;
+            margin-top: 20px;
+            border: 0;
+            border-radius: var(--radius-md);
+            color: var(--accent-ink);
+            font-size: .95rem;
+            font-weight: 600;
+            background: var(--accent);
+            letter-spacing: -.01em;
+        }
+        .done-btn:active { filter: brightness(.94); }
+    </style>
+    <dialog aria-labelledby="guide-heading">
+        <div class="content">
+            <div class="head">
+                <h2 id="guide-heading"></h2>
+                <button class="close-btn" type="button" aria-label="Close">✕</button>
+            </div>
+            <p class="intro"></p>
+            <section>
+                <h3 class="rules-title"></h3>
+                <ul class="rules-list"></ul>
+            </section>
+            <section>
+                <h3 class="tips-title"></h3>
+                <ul class="tips-list"></ul>
+            </section>
+            <button class="done-btn" type="button"></button>
+        </div>
+    </dialog>
+</template>
+<script>
+customElements.define('offline-guide', class extends HTMLElement {
+    connectedCallback() {
+        const tmpl = document.getElementById('offline-guide-template')
+        this.attachShadow({mode: 'open'}).append(tmpl.content.cloneNode(true))
+        const s = this.shadowRoot
+        const dialog = s.querySelector('dialog')
+        s.querySelector('.close-btn').addEventListener('click', () => dialog.close())
+        s.querySelector('.done-btn').addEventListener('click', () => dialog.close())
+        dialog.addEventListener('click', e => { if (e.target === dialog) dialog.close() })
+    }
+
+    setup(i18n, game, triggerEl) {
+        const guide = i18n.guide(game)
+        if (!guide) return false
+        const s = this.shadowRoot
+        s.querySelector('h2').textContent = i18n.t('howToPlay')
+        s.querySelector('.close-btn').setAttribute('aria-label', i18n.t('close'))
+        s.querySelector('.intro').textContent = guide.intro
+        s.querySelector('.rules-title').textContent = i18n.t('rules')
+        s.querySelector('.tips-title').textContent = i18n.t('basicTips')
+        s.querySelector('.rules-list').replaceChildren(...guide.rules.map(r =>
+            Object.assign(document.createElement('li'), {textContent: r})))
+        s.querySelector('.tips-list').replaceChildren(...guide.tips.map(t =>
+            Object.assign(document.createElement('li'), {textContent: t})))
+        s.querySelector('.done-btn').textContent = i18n.t('gotIt')
+        const dialog = s.querySelector('dialog')
+        dialog.addEventListener('close', () => triggerEl?.focus())
+        return true
+    }
+
+    open() { this.shadowRoot.querySelector('dialog').showModal() }
+    close() { this.shadowRoot.querySelector('dialog').close() }
+})
+</script>

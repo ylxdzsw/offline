@@ -1,0 +1,178 @@
+<template id="offline-shell-template">
+    <style>
+        :host {
+            display: block;
+            width: min(100%, var(--shell-max));
+            min-height: 100dvh;
+            margin: 0 auto;
+            color: var(--ink);
+            background: var(--bg-shell);
+            box-shadow: var(--shadow);
+        }
+        .layout {
+            display: grid;
+            min-height: 100dvh;
+            grid-template-rows: auto 1fr auto;
+        }
+        header {
+            position: sticky;
+            z-index: 20;
+            top: 0;
+            display: grid;
+            grid-template-columns: 48px 1fr 48px;
+            align-items: center;
+            min-height: calc(48px + var(--safe-top));
+            padding: var(--safe-top) 4px 0;
+            color: var(--ink);
+            background: var(--header-bg);
+            border-bottom: 0.5px solid var(--header-border);
+            backdrop-filter: blur(20px) saturate(1.6);
+            -webkit-backdrop-filter: blur(20px) saturate(1.6);
+        }
+        h1 {
+            margin: 0;
+            font-family: var(--font-display);
+            font-size: 1rem;
+            font-weight: 650;
+            letter-spacing: -.015em;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .icon-btn {
+            display: grid;
+            width: 44px;
+            height: 44px;
+            place-items: center;
+            border: 0;
+            border-radius: 50%;
+            background: transparent;
+            color: inherit;
+            transition: background .12s ease;
+        }
+        .icon-btn[hidden] { display: none; }
+        .icon-btn:active { background: var(--bg-fill); }
+        /* Hamburger lines */
+        .hamburger, .hamburger::before, .hamburger::after {
+            display: block;
+            width: 17px;
+            height: 1.5px;
+            border-radius: 1px;
+            background: currentColor;
+        }
+        .hamburger { position: relative; }
+        .hamburger::before, .hamburger::after {
+            position: absolute;
+            left: 0;
+            content: "";
+        }
+        .hamburger::before { top: -5.5px; width: 13px; }
+        .hamburger::after  { top:  5.5px; width: 10px; }
+        /* Info button */
+        .info-circle {
+            display: grid;
+            width: 20px;
+            height: 20px;
+            border: 1.5px solid currentColor;
+            border-radius: 50%;
+            place-items: center;
+            font-family: var(--font-display);
+            font-size: .76rem;
+            font-weight: 700;
+            line-height: 1;
+            opacity: .7;
+        }
+        main {
+            padding: 16px
+                max(14px, var(--safe-right))
+                24px
+                max(14px, var(--safe-left));
+        }
+        footer {
+            padding: 10px 14px calc(12px + var(--safe-bottom));
+            color: var(--ink-faint);
+            font-size: .6rem;
+            line-height: 1.55;
+            text-align: center;
+            border-top: 0.5px solid var(--separator);
+        }
+        footer a {
+            color: inherit;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+        @media (max-width: 340px) {
+            main { padding-inline: 10px; }
+        }
+    </style>
+    <div class="layout">
+        <header>
+            <button class="icon-btn menu-btn" type="button"
+                    aria-controls="offline-shell-drawer" aria-expanded="false">
+                <span class="hamburger" aria-hidden="true"></span>
+            </button>
+            <h1></h1>
+            <button class="icon-btn guide-btn" type="button" hidden>
+                <span class="info-circle" aria-hidden="true">i</span>
+            </button>
+        </header>
+        <main><slot></slot></main>
+        <footer>
+            <span class="copyright"></span><br>
+            <a href="https://github.com/ylxdzsw/offline" rel="external noopener"></a>
+        </footer>
+    </div>
+    <offline-drawer id="offline-shell-drawer"></offline-drawer>
+    <offline-guide></offline-guide>
+</template>
+<script>
+customElements.define('offline-shell', class extends HTMLElement {
+    constructor() {
+        super()
+        this.attachShadow({mode: 'open'}).append(
+            document.getElementById('offline-shell-template').content.cloneNode(true)
+        )
+    }
+
+    connectedCallback() {
+        const {i18n, theme} = OfflineGames
+        const page = this.getAttribute('page') || 'gallery'
+        const s = this.shadowRoot
+
+        /* Titles */
+        const title = i18n.t(page === 'gallery' ? 'gallery' : page)
+        s.querySelector('h1').textContent = title
+        document.title = `${title} · ${i18n.t('siteName')}`
+        s.querySelector('.copyright').textContent = i18n.t('copyright')
+        s.querySelector('footer a').textContent = i18n.t('source')
+
+        /* Buttons */
+        const menuBtn = s.querySelector('.menu-btn')
+        const guideBtn = s.querySelector('.guide-btn')
+        menuBtn.setAttribute('aria-label', i18n.t('menu'))
+        const layout = s.querySelector('.layout')
+
+        /* Drawer */
+        const drawer = s.querySelector('offline-drawer')
+        drawer.setup({
+            i18n,
+            theme,
+            games: OfflineGames.catalog || [],
+            currentPage: page,
+            layoutEl: layout,
+            triggerEl: menuBtn,
+        })
+        menuBtn.addEventListener('click', () => drawer.open())
+
+        /* Guide dialog */
+        const guide = s.querySelector('offline-guide')
+        guideBtn.setAttribute('aria-label', i18n.t('openGuide'))
+        const hasGuide = guide.setup(i18n, page, guideBtn)
+        if (hasGuide) {
+            guideBtn.hidden = false
+            guideBtn.addEventListener('click', () => guide.open())
+        }
+    }
+})
+</script>

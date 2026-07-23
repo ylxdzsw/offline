@@ -1,0 +1,213 @@
+:root {
+    color-scheme: light;
+
+    /* Typography */
+    --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans SC", "PingFang SC", "Helvetica Neue", sans-serif;
+    --font-display: "Iowan Old Style", "Palatino Linotype", Palatino, "Noto Serif SC", "Songti SC", Georgia, serif;
+    --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+
+    /* Backgrounds — iOS layered material system, warm-neutral */
+    --bg-page:    #f5f4f2;
+    --bg-shell:   #ffffff;
+    --bg-surface: #ffffff;
+    --bg-grouped: #f5f4f2;
+    --bg-elevated:#efeeec;
+    --bg-muted:   #e8e7e4;
+    --bg-fill:    rgba(60, 60, 67, .06);
+
+    /* Ink */
+    --ink:        #19191a;
+    --ink-muted:  #6b6968;
+    --ink-faint:  #9a9896;
+
+    /* Separators — thin, opacity-based (iOS style) */
+    --border:        rgba(60, 60, 67, .16);
+    --border-strong: rgba(60, 60, 67, .28);
+    --separator:     rgba(60, 60, 67, .10);
+
+    /* Accent — sage green */
+    --accent:      #2d6357;
+    --accent-ink:  #ffffff;
+    --accent-soft: #e6f4f0;
+    --accent-dim:  rgba(45, 99, 87, .12);
+
+    /* Semantic */
+    --danger:      #c0392b;
+    --danger-soft: #fde8e6;
+    --focus:       #3a6f9a;
+    --status-bg:   #e8ece7;
+    --status-ink:  #2f3c34;
+
+    /* Header */
+    --header-bg:     rgba(255, 255, 255, .88);
+    --header-border: rgba(60, 60, 67, .12);
+
+    /* Shadows — layered, iOS-inspired */
+    --shadow:       0 1px 0 rgba(0,0,0,.06), 0 8px 28px rgba(0,0,0,.08);
+    --shadow-soft:  0 1px 2px rgba(0,0,0,.06);
+    --shadow-modal: 0 2px 0 rgba(0,0,0,.04), 0 20px 60px rgba(0,0,0,.14);
+
+    /* Drawer */
+    --drawer-scrim: rgba(0, 0, 0, .32);
+
+    /* Shape */
+    --radius-xs: 6px;
+    --radius-sm: 10px;
+    --radius-md: 14px;
+    --radius-lg: 20px;
+    --radius-xl: 28px;
+
+    /* Layout */
+    --control-h:  44px;
+    --shell-max:  480px;
+    --safe-top:    env(safe-area-inset-top,    0px);
+    --safe-right:  env(safe-area-inset-right,  0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left:   env(safe-area-inset-left,   0px);
+
+    /* Board materials — unchanged */
+    --board-wood:       #d4b07a;
+    --board-wood-deep:  #c49a5f;
+    --board-wood-line:  #6a4a2f;
+    --board-wood-edge:  #6f4d33;
+    --board-paper:      #fbfaf6;
+    --board-paper-line: #cfc8b8;
+    --board-paper-box:  #6d6456;
+    --board-light:      #ebe4d4;
+    --board-dark:       #7d8a72;
+    --board-last-light: #d7dfb0;
+    --board-last-dark:  #6f8058;
+    --board-felt:       #2f6a45;
+    --board-felt-edge:  #214a30;
+    --board-felt-line:  rgba(18, 48, 28, .55);
+    --piece-face:       #f6ecd4;
+    --piece-red:        #b12f28;
+    --piece-black:      #222624;
+    --piece-white:      #f7f4ec;
+    --piece-outline:    #2a2622;
+    --legal:            rgba(45, 99, 87, .72);
+    --legal-soft:       rgba(45, 99, 87, .16);
+    --capture:          rgba(192, 57, 43, .72);
+    --selected:         #3a6f9a;
+    --check:            #c24a42;
+    --stone-black:      #1a1b1a;
+    --stone-white:      #f4f1e8;
+    --stone-white-edge: #b7b0a2;
+    --hint:             #c6473e;
+}
+
+[data-theme="dark"] {
+    color-scheme: dark;
+
+    --bg-page:    #000000;
+    --bg-shell:   #1c1c1e;
+    --bg-surface: #2c2c2e;
+    --bg-grouped: #1c1c1e;
+    --bg-elevated:#3a3a3c;
+    --bg-muted:   #48484a;
+    --bg-fill:    rgba(116, 116, 128, .18);
+
+    --ink:        #f2f2f7;
+    --ink-muted:  #aeaeb2;
+    --ink-faint:  #636366;
+
+    --border:        rgba(84, 84, 88, .40);
+    --border-strong: rgba(84, 84, 88, .65);
+    --separator:     rgba(84, 84, 88, .30);
+
+    --accent:      #5db49f;
+    --accent-ink:  #001810;
+    --accent-soft: #1a3330;
+    --accent-dim:  rgba(93, 180, 159, .14);
+
+    --danger:      #f97066;
+    --danger-soft: #3a1f1d;
+    --focus:       #7aa8d4;
+    --status-bg:   #243029;
+    --status-ink:  #d5e4da;
+
+    --header-bg:     rgba(28, 28, 30, .88);
+    --header-border: rgba(84, 84, 88, .30);
+
+    --shadow:       0 1px 0 rgba(255,255,255,.04), 0 8px 28px rgba(0,0,0,.40);
+    --shadow-soft:  0 2px 8px rgba(0,0,0,.30);
+    --shadow-modal: 0 2px 0 rgba(255,255,255,.04), 0 24px 64px rgba(0,0,0,.70);
+
+    --drawer-scrim: rgba(0, 0, 0, .55);
+
+    --board-wood:       #8d6b3f;
+    --board-wood-deep:  #7a5a34;
+    --board-wood-line:  #d8b888;
+    --board-wood-edge:  #b89058;
+    --board-paper:      #22231f;
+    --board-paper-line: #4a4b43;
+    --board-paper-box:  #9a9688;
+    --board-light:      #3d4338;
+    --board-dark:       #1f2620;
+    --board-last-light: #4d5840;
+    --board-last-dark:  #2c3728;
+    --board-felt:       #245538;
+    --board-felt-edge:  #173926;
+    --board-felt-line:  rgba(8, 28, 16, .70);
+    --piece-face:       #2b261c;
+    --piece-red:        #e06a61;
+    --piece-black:      #d8d4c8;
+    --piece-white:      #f0ece2;
+    --piece-outline:    #d8d2c4;
+    --legal:            rgba(93, 180, 159, .78);
+    --legal-soft:       rgba(93, 180, 159, .18);
+    --capture:          rgba(249, 112, 102, .78);
+    --selected:         #7aa8d4;
+    --check:            #c24a42;
+    --stone-black:      #0d0e0d;
+    --stone-white:      #ebe7dc;
+    --stone-white-edge: #8f887a;
+    --hint:             #e06a61;
+}
+
+/* ── Base resets ─────────────────────────────────────────── */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+    min-height: 100%;
+    margin: 0;
+}
+
+body {
+    min-width: 280px;
+    min-height: 100dvh;
+    font-family: var(--font-ui);
+    color: var(--ink);
+    overscroll-behavior-y: contain;
+    /* Quiet radial glow from accent at top */
+    background:
+        radial-gradient(
+            ellipse 120% 40% at 50% -5%,
+            color-mix(in srgb, var(--accent) 8%, transparent),
+            transparent 60%
+        ),
+        var(--bg-page);
+    -webkit-tap-highlight-color: transparent;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+}
+
+button, select { font: inherit; color: inherit; }
+button { touch-action: manipulation; cursor: default; }
+a { color: inherit; }
+
+:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+    }
+}
