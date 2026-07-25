@@ -12,6 +12,7 @@ const guideAssets = [
     'guides/chess-special.svg',
     'guides/reversi-bracket.webp',
     'guides/huarong-escape.svg',
+    'guides/minesweeper-counts.svg',
 ]
 
 test('build is self-contained and contains the complete PWA shell', async () => {
@@ -45,8 +46,8 @@ test('gallery and sidebar localize from query and preserve the override', async 
     await page.goto('/index.html?lang=zh')
     await expect(page.locator('offline-shell h1')).toHaveText('经典游戏')
     await expect(page.locator('.game-gallery h2').first()).toHaveText('中国象棋')
-    await expect(page.locator('.game-gallery article')).toHaveCount(8)
-    await expect(page.locator('.game-gallery h2').last()).toHaveText('华容道')
+    await expect(page.locator('.game-gallery article')).toHaveCount(catalog.length)
+    await expect(page.locator('.game-gallery h2').last()).toHaveText('扫雷')
     await page.locator('offline-shell .menu-btn').click()
     await expect(page.locator('offline-shell aside')).toHaveAttribute('aria-hidden', 'false')
     await expect(page.locator('offline-shell offline-drawer .brand')).toHaveAttribute('href', /index\.html\?lang=zh$/)
@@ -374,6 +375,59 @@ test('Huarong Dao hints an optimal slide, moves, persists, reloads, and undoes',
     await expect(page.locator('huarong-game .move-count')).toHaveText('0')
 })
 
+test('Minesweeper confirms reveals, keeps flags reversible, persists, and has no undo', async ({page}) => {
+    await page.goto('/minesweeper.html?lang=en')
+    await expect(page.locator('minesweeper-game .cell')).toHaveCount(256)
+    await expect(page.locator('minesweeper-game .undo')).toHaveCount(0)
+    await expect(page.locator('minesweeper-game .timer')).toHaveText('00:00')
+
+    const first = page.locator('minesweeper-game .cell[data-index="119"]')
+    const second = page.locator('minesweeper-game .cell[data-index="120"]')
+    await first.click()
+    await expect(first).toHaveClass(/selected/)
+    expect(await page.locator('minesweeper-game .cell.revealed').count()).toBe(0)
+
+    await second.click()
+    await expect(second).toHaveClass(/selected/)
+    await expect(first).not.toHaveClass(/selected/)
+    expect(await page.locator('minesweeper-game .cell.revealed').count()).toBe(0)
+
+    await second.click()
+    expect(await page.locator('minesweeper-game .cell.revealed').count()).toBeGreaterThanOrEqual(9)
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:minesweeper')))
+    expect(saved.board.started).toBe(true)
+    expect(saved.board.cells[120]).toBe(0)
+    expect(saved.board.outcome).toBeNull()
+
+    const coveredIndex = await page.locator('minesweeper-game').evaluate(game =>
+        game.state.board.revealed.findIndex(revealed => !revealed))
+    const covered = page.locator(`minesweeper-game .cell[data-index="${coveredIndex}"]`)
+    await covered.click()
+    await page.locator('minesweeper-game .flag').click()
+    await expect(covered).toHaveClass(/flagged/)
+    await page.locator('minesweeper-game .flag').click()
+    await expect(covered).not.toHaveClass(/flagged/)
+    await covered.dispatchEvent('pointerdown', {
+        pointerId: 9, pointerType: 'touch', button: 0, clientX: 100, clientY: 300,
+    })
+    await page.waitForTimeout(560)
+    await covered.dispatchEvent('pointerup', {
+        pointerId: 9, pointerType: 'touch', button: 0, clientX: 100, clientY: 300,
+    })
+    await covered.dispatchEvent('click')
+    await expect(covered).toHaveClass(/flagged/)
+    await page.locator('minesweeper-game .flag').click()
+    await expect(covered).not.toHaveClass(/flagged/)
+
+    await page.reload()
+    expect(await page.locator('minesweeper-game .cell.revealed').count()).toBeGreaterThanOrEqual(9)
+    await page.locator('offline-shell .guide-btn').click()
+    await expect(page.locator('offline-shell .guide-image')).toHaveAttribute('src', './guides/minesweeper-counts.svg')
+    await expect(page.locator('offline-shell .rule-group')).toHaveCount(3)
+    await page.goto('/index.html?lang=en')
+    await expect(page.locator('.game-gallery article[data-game="minesweeper"] a')).toHaveText('Continue')
+})
+
 for (const viewport of [{width: 320, height: 568}, {width: 390, height: 844}, {width: 430, height: 932}]) {
     test(`all pages fit a ${viewport.width}x${viewport.height} mobile viewport`, async ({page}) => {
         await page.setViewportSize(viewport)
@@ -403,5 +457,8 @@ test('the installed app reloads and navigates completely offline', async ({brows
     await page.goto('/huarong.html?lang=en')
     await expect(page.locator('offline-shell h1')).toHaveText('Huarong Dao')
     await expect(page.locator('huarong-game .piece')).toHaveCount(10)
+    await page.goto('/minesweeper.html?lang=zh')
+    await expect(page.locator('offline-shell h1')).toHaveText('扫雷')
+    await expect(page.locator('minesweeper-game .cell')).toHaveCount(256)
     await context.close()
 })

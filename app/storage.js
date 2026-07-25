@@ -33,7 +33,7 @@
     }
     const hasProgress = game => {
         const state = read(game)
-        return Boolean(state && state.history?.length && !state.outcome)
+        return Boolean(state && !state.outcome && (state.history?.length || state.progress))
     }
 
     root.OfflineGames = Object.assign(root.OfflineGames || {}, {

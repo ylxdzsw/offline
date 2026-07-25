@@ -60,4 +60,6 @@ test('variant-specific rules are documented rather than implied', () => {
     assert.match(allRules('chess'), /En passant/)
     assert.match(allRules('chess'), /insufficient mating material/i)
     assert.match(allRules('reversi'), /passes automatically/i)
+    assert.match(allRules('minesweeper'), /There is no Undo/i)
+    assert.match(allRules('minesweeper'), /may sometimes require a guess/i)
 })

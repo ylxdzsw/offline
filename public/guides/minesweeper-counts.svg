@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-labelledby="title desc">
+  <title id="title">Minesweeper number and flag example</title>
+  <desc id="desc">A revealed number two touches two flagged mines and one remaining covered cell, making that cell safe.</desc>
+  <rect width="960" height="540" fill="#f1eee7"/>
+  <g transform="translate(252 42)">
+    <rect x="-12" y="-12" width="480" height="480" rx="24" fill="#8c918c"/>
+    <g fill="#fbfaf6" stroke="#b8b4aa" stroke-width="3">
+      <rect width="150" height="150"/><rect x="150" width="150" height="150"/><rect x="300" width="150" height="150"/>
+      <rect y="150" width="150" height="150"/><rect x="150" y="150" width="150" height="150"/><rect x="300" y="150" width="150" height="150"/>
+      <rect y="300" width="150" height="150"/><rect x="150" y="300" width="150" height="150"/>
+    </g>
+    <rect x="300" y="300" width="150" height="150" fill="#dddcd8" stroke="#8c918c" stroke-width="3"/>
+    <path d="M326 326h98v98h-98z" fill="none" stroke="#3a6f9a" stroke-width="10" rx="8"/>
+    <g font-family="ui-monospace,monospace" font-weight="800" text-anchor="middle">
+      <text x="225" y="255" fill="#31713d" font-size="96">2</text>
+      <text x="75" y="106" fill="#c0392b" font-size="76">⚑</text>
+      <text x="375" y="106" fill="#c0392b" font-size="76">⚑</text>
+    </g>
+    <path d="M375 348v54m0-27h42" stroke="#3a6f9a" stroke-width="10" stroke-linecap="round"/>
+  </g>
+</svg>

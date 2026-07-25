@@ -36,6 +36,7 @@
     .game-gallery article[data-game="chess"]   .preview { color: var(--ink); background: color-mix(in srgb, var(--board-dark) 35%, var(--bg-elevated)); }
     .game-gallery article[data-game="reversi"] .preview { color: var(--stone-white); background: color-mix(in srgb, var(--board-felt) 70%, var(--bg-elevated)); }
     .game-gallery article[data-game="huarong"] .preview { color: var(--piece-red); background: color-mix(in srgb, var(--board-wood) 62%, var(--bg-elevated)); }
+    .game-gallery article[data-game="minesweeper"] .preview { color: var(--ink); background: color-mix(in srgb, var(--selected) 14%, var(--bg-elevated)); }
     /* Preview marks — unchanged */
     .game-gallery .xiangqi-mark {
         display: grid; width: 56px; height: 56px;
@@ -132,6 +133,24 @@
     .game-gallery .huarong-mark .s2 { top: 41px; left: 27px; width: 9px; height: 9px; }
     .game-gallery .huarong-mark .s3 { bottom: 3px; left: 3px; width: 9px; height: 9px; }
     .game-gallery .huarong-mark .s4 { right: 3px; bottom: 3px; width: 9px; height: 9px; }
+    .game-gallery .minesweeper-mark {
+        display: grid; width: 62px; height: 62px; box-sizing: border-box;
+        grid-template-columns: repeat(4, 1fr); gap: 2px; padding: 3px;
+        border: 1px solid var(--border-strong); border-radius: 6px;
+        background: var(--border);
+    }
+    .game-gallery .minesweeper-mark i {
+        display: grid; min-width: 0; border-radius: 2px; place-items: center;
+        color: var(--ink); background: var(--board-paper);
+        font-family: var(--font-mono); font-size: .62rem; font-style: normal; font-weight: 850;
+    }
+    .game-gallery .minesweeper-mark i.covered {
+        background: linear-gradient(145deg, var(--bg-surface), var(--bg-muted));
+        box-shadow: inset 1px 1px rgba(255,255,255,.4), inset -1px -1px rgba(0,0,0,.12);
+    }
+    .game-gallery .minesweeper-mark i.one { color: #2567a8; }
+    .game-gallery .minesweeper-mark i.two { color: #31713d; }
+    .game-gallery .minesweeper-mark i.flag { color: var(--danger); }
     /* Card content */
     .game-gallery .content {
         display: grid;
@@ -206,6 +225,7 @@
             chess:   '<span class="chess-mark"><i></i><i></i><i></i><i></i></span>',
             reversi: '<span class="reversi-mark">' + '<i></i>'.repeat(16) + '</span>',
             huarong: '<span class="huarong-mark"><i class="cao"></i><i class="guan"></i><i class="g1"></i><i class="g2"></i><i class="g3"></i><i class="g4"></i><i class="s1"></i><i class="s2"></i><i class="s3"></i><i class="s4"></i></span>',
+            minesweeper: '<span class="minesweeper-mark"><i></i><i class="one">1</i><i class="covered"></i><i class="covered"></i><i></i><i class="one">1</i><i class="two">2</i><i class="covered flag">⚑</i><i></i><i></i><i class="one">1</i><i class="covered"></i><i></i><i></i><i class="one">1</i><i class="covered"></i></span>',
         }
         root.querySelector('.games').innerHTML = (OfflineGames.catalog || []).map(game => `
             <article data-game="${game.id}">

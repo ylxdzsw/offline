@@ -1,0 +1,538 @@
+<template id="minesweeper-game-template">
+    <style>
+        :host { display: block; color: var(--ink); }
+        .toolbar {
+            display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px;
+            align-items: end; margin-bottom: 10px;
+        }
+        label {
+            display: grid; min-width: 0; gap: 3px; color: var(--ink-muted);
+            font-size: .7rem; font-weight: 600; letter-spacing: .02em;
+        }
+        select, button {
+            min-height: var(--control-h, 42px); border: 1px solid var(--border-strong);
+            border-radius: var(--radius-sm); color: var(--ink); background: var(--bg-surface);
+        }
+        select { width: 100%; min-width: 0; padding: 0 28px 0 10px; text-overflow: ellipsis; }
+        button { padding: 0 13px; font-weight: 650; touch-action: manipulation; }
+        button:disabled { opacity: .42; }
+        .warning { margin: 0 0 9px; color: var(--danger); font-size: .77rem; text-align: center; }
+        .warning[hidden] { display: none; }
+        .dashboard {
+            display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;
+            margin-bottom: 9px;
+        }
+        .meter {
+            display: grid; min-height: 48px; grid-template-columns: auto auto;
+            align-content: center; justify-content: center; gap: 3px 8px;
+            border: 1px solid var(--border); border-radius: var(--radius-sm);
+            background: var(--bg-surface); box-shadow: var(--shadow-soft);
+        }
+        .meter span {
+            grid-column: 1 / -1; color: var(--ink-faint); font-size: .63rem;
+            font-weight: 700; letter-spacing: .055em; text-align: center; text-transform: uppercase;
+        }
+        .meter strong {
+            grid-column: 1 / -1; color: var(--ink); font-family: var(--font-mono);
+            font-size: 1.22rem; font-variant-numeric: tabular-nums; line-height: 1;
+            text-align: center;
+        }
+        .status {
+            display: flex; min-height: 44px; align-items: center; justify-content: center;
+            margin: 0 0 9px; padding: 7px 11px; border-radius: var(--radius-sm);
+            color: var(--status-ink); font-size: .84rem; font-weight: 700; line-height: 1.35;
+            text-align: center; background: var(--status-bg);
+        }
+        .status.lost { color: var(--danger); background: var(--danger-soft); }
+        .board {
+            --columns: 9;
+            display: grid; width: min(100%, 420px); margin: 0 auto; box-sizing: border-box;
+            grid-template-columns: repeat(var(--columns), minmax(0, 1fr)); gap: 1px;
+            padding: 3px; overflow: hidden; border: 1px solid var(--border-strong);
+            border-radius: var(--radius-md); background: var(--border-strong);
+            box-shadow: var(--shadow-soft); touch-action: manipulation; user-select: none;
+            -webkit-touch-callout: none;
+        }
+        .cell {
+            position: relative; display: grid; min-width: 0; min-height: 0; aspect-ratio: 1;
+            padding: 0; border: 0; border-radius: 2px; place-items: center;
+            color: var(--ink); background:
+                linear-gradient(145deg,
+                    color-mix(in srgb, var(--bg-surface) 80%, white),
+                    color-mix(in srgb, var(--bg-elevated) 90%, var(--ink-faint)));
+            box-shadow:
+                inset 1px 1px 0 color-mix(in srgb, white 72%, transparent),
+                inset -1px -1px 0 color-mix(in srgb, var(--ink) 18%, transparent);
+            font-family: var(--font-mono); font-size: clamp(.54rem, calc(41vw / var(--columns)), 1.08rem);
+            font-weight: 850; line-height: 1; transition: filter .1s ease, transform .1s ease, box-shadow .1s ease;
+        }
+        .cell:active { filter: brightness(.94); }
+        .cell.revealed {
+            border-radius: 0; background: var(--board-paper); box-shadow: none;
+        }
+        .cell.selected {
+            z-index: 3; transform: scale(.88);
+            background: color-mix(in srgb, var(--selected) 22%, var(--bg-surface));
+            box-shadow:
+                inset 0 0 0 3px var(--selected),
+                0 0 0 1px color-mix(in srgb, var(--bg-shell) 90%, transparent),
+                0 3px 8px color-mix(in srgb, var(--selected) 28%, transparent);
+        }
+        .cell.selected::after {
+            position: absolute; top: 3px; right: 3px; width: 4px; height: 4px;
+            border: 1px solid var(--bg-shell); border-radius: 50%; content: "";
+            background: var(--selected);
+        }
+        .cell.flagged { color: var(--danger); font-size: clamp(.68rem, calc(48vw / var(--columns)), 1.25rem); }
+        .cell.mine { color: var(--piece-black); font-size: clamp(.65rem, calc(47vw / var(--columns)), 1.18rem); }
+        .cell.exploded { color: #fff; background: var(--danger); }
+        .cell.wrong { color: var(--danger); background: var(--danger-soft); }
+        .cell[data-count="1"] { color: #2567a8; }
+        .cell[data-count="2"] { color: #31713d; }
+        .cell[data-count="3"] { color: #c0392b; }
+        .cell[data-count="4"] { color: #57469b; }
+        .cell[data-count="5"] { color: #8d3027; }
+        .cell[data-count="6"] { color: #187982; }
+        .cell[data-count="7"] { color: var(--ink); }
+        .cell[data-count="8"] { color: var(--ink-muted); }
+        .cell:focus-visible { z-index: 5; outline: 3px solid var(--focus); outline-offset: -3px; }
+        .actions {
+            display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;
+            width: min(100%, 420px); margin: 9px auto 0;
+        }
+        .reveal { color: var(--accent-ink); border-color: transparent; background: var(--accent); }
+        .flag { color: var(--danger); background: var(--bg-surface); }
+        .gesture-note {
+            margin: 9px auto 0; max-width: 420px; color: var(--ink-faint);
+            font-size: .71rem; line-height: 1.45; text-align: center;
+        }
+        @media (max-width: 340px) {
+            .toolbar { gap: 5px; }
+            .toolbar button { padding-inline: 9px; }
+            .board { padding: 2px; }
+            .cell.selected { box-shadow: inset 0 0 0 2px var(--selected), 0 0 0 1px var(--bg-shell); }
+        }
+    </style>
+    <div class="toolbar">
+        <label><span class="difficulty-label"></span><select class="difficulty">
+            <option value="easy"></option>
+            <option value="medium"></option>
+            <option value="hard"></option>
+        </select></label>
+        <button class="new" type="button"></button>
+    </div>
+    <p class="warning" hidden></p>
+    <div class="dashboard">
+        <div class="meter"><span class="mines-label"></span><strong class="mines-left">0</strong></div>
+        <div class="meter"><span class="time-label"></span><strong class="timer">00:00</strong></div>
+    </div>
+    <div class="status" role="status" aria-live="polite"></div>
+    <div class="board" role="grid"></div>
+    <div class="actions">
+        <button class="reveal" type="button"></button>
+        <button class="flag" type="button"></button>
+    </div>
+    <p class="gesture-note"></p>
+</template>
+
+<script>
+OfflineGames.wasm.defineElement('minesweeper', 'minesweeper-game', class extends HTMLElement {
+    constructor() {
+        super()
+        this.attachShadow({mode: 'open'}).append(
+            document.getElementById('minesweeper-game-template').content.cloneNode(true)
+        )
+        this.selected = null
+        this.notice = null
+        this.hold = null
+        this.ignoreClick = false
+        this.suppressContextUntil = 0
+        this.timerOrigin = null
+        this.timerInterval = null
+        this.visibilityHandler = () => this.visibilityChanged()
+    }
+
+    connectedCallback() {
+        this.engine = OfflineGames.Minesweeper
+        this.i18n = OfflineGames.i18n
+        this.storage = OfflineGames.storage
+        this.load()
+        this.bind()
+        this.localize()
+        this.render()
+        this.resumeTimer()
+        document.addEventListener('visibilitychange', this.visibilityHandler)
+    }
+
+    disconnectedCallback() {
+        document.removeEventListener('visibilitychange', this.visibilityHandler)
+        this.cancelHold()
+        this.pauseTimer(true)
+    }
+
+    fresh(difficulty = 'medium') {
+        const board = this.engine.newGame(difficulty, OfflineGames.runtime.randomSeed())
+        return {
+            schema: 1,
+            game: 'minesweeper',
+            difficulty,
+            board,
+            elapsedMs: 0,
+            progress: false,
+            outcome: null,
+        }
+    }
+
+    valid(saved) {
+        return saved
+            && ['easy', 'medium', 'hard'].includes(saved.difficulty)
+            && saved.board?.difficulty === saved.difficulty
+            && this.engine.validate(saved.board)
+            && Number.isFinite(saved.elapsedMs)
+            && saved.elapsedMs >= 0
+    }
+
+    load() {
+        const saved = this.storage.read('minesweeper')
+        this.state = this.valid(saved) ? saved : this.fresh()
+        this.state.outcome = this.state.board.outcome
+        this.state.progress = Boolean(
+            this.state.board.started || this.state.board.flagged.some(Boolean) || this.state.outcome
+        )
+    }
+
+    bind() {
+        const s = this.shadowRoot
+        const board = s.querySelector('.board')
+        board.addEventListener('click', event => {
+            const cell = event.target.closest('.cell')
+            if (!cell) return
+            if (this.ignoreClick) {
+                this.ignoreClick = false
+                return
+            }
+            this.select(Number(cell.dataset.index), true)
+        })
+        board.addEventListener('contextmenu', event => {
+            const cell = event.target.closest('.cell')
+            if (!cell) return
+            event.preventDefault()
+            if (performance.now() < this.suppressContextUntil) return
+            if (this.hold) {
+                this.ignoreClick = true
+                this.cancelHold()
+            }
+            this.toggleFlag(Number(cell.dataset.index), true)
+        })
+        board.addEventListener('pointerdown', event => this.beginHold(event))
+        board.addEventListener('pointermove', event => this.moveHold(event))
+        board.addEventListener('pointerup', () => this.cancelHold())
+        board.addEventListener('pointercancel', () => this.cancelHold())
+        board.addEventListener('keydown', event => this.keydown(event))
+        s.querySelector('.reveal').addEventListener('click', () => this.confirmSelection())
+        s.querySelector('.flag').addEventListener('click', () => {
+            if (this.selected != null) this.toggleFlag(this.selected)
+        })
+        s.querySelector('.new').addEventListener('click', () => this.newGame())
+        s.querySelector('.difficulty').addEventListener('change', event => {
+            this.newGame(event.target.value, true)
+        })
+    }
+
+    localize() {
+        const s = this.shadowRoot, t = key => this.i18n.t(key)
+        s.querySelector('.difficulty-label').textContent = t('difficulty')
+        for (const option of s.querySelectorAll('.difficulty option')) {
+            const suffix = t(`minesweeperPreset${option.value[0].toUpperCase()}${option.value.slice(1)}`)
+            option.textContent = `${t(option.value)} · ${suffix}`
+        }
+        s.querySelector('.new').textContent = t('newGame')
+        s.querySelector('.mines-label').textContent = t('minesweeperMines')
+        s.querySelector('.time-label').textContent = t('minesweeperTime')
+        s.querySelector('.warning').textContent = t('storageWarning')
+        s.querySelector('.gesture-note').textContent = t('minesweeperGesture')
+        s.querySelector('.board').setAttribute('aria-label', t('minesweeperBoard'))
+    }
+
+    beginHold(event) {
+        if (event.pointerType === 'mouse' || event.button !== 0 || this.state.outcome) return
+        const cell = event.target.closest('.cell')
+        if (!cell) return
+        this.cancelHold()
+        const index = Number(cell.dataset.index)
+        this.hold = {
+            pointerId: event.pointerId,
+            index,
+            x: event.clientX,
+            y: event.clientY,
+            timer: setTimeout(() => {
+                if (!this.hold) return
+                this.ignoreClick = true
+                this.suppressContextUntil = performance.now() + 1000
+                this.toggleFlag(index, true)
+                this.cancelHold()
+            }, 520),
+        }
+    }
+
+    moveHold(event) {
+        if (!this.hold || event.pointerId !== this.hold.pointerId) return
+        if (Math.hypot(event.clientX - this.hold.x, event.clientY - this.hold.y) > 10) {
+            this.cancelHold()
+        }
+    }
+
+    cancelHold() {
+        if (this.hold) clearTimeout(this.hold.timer)
+        this.hold = null
+    }
+
+    keydown(event) {
+        const cell = event.target.closest('.cell')
+        if (!cell || this.state.outcome) return
+        const index = Number(cell.dataset.index)
+        if (event.key.toLowerCase() === 'f') {
+            event.preventDefault()
+            this.toggleFlag(index, true)
+            return
+        }
+        if (event.key === 'Escape') {
+            event.preventDefault()
+            this.selected = null
+            this.notice = null
+            this.render()
+            return
+        }
+        const directions = {
+            ArrowUp: -this.state.board.width,
+            ArrowRight: 1,
+            ArrowDown: this.state.board.width,
+            ArrowLeft: -1,
+        }
+        if (!(event.key in directions)) return
+        event.preventDefault()
+        const column = index % this.state.board.width
+        if ((event.key === 'ArrowLeft' && column === 0)
+            || (event.key === 'ArrowRight' && column === this.state.board.width - 1)) return
+        const next = index + directions[event.key]
+        if (next < 0 || next >= this.state.board.width * this.state.board.height) return
+        this.select(next, true)
+    }
+
+    select(index, focus = false) {
+        if (this.state.outcome) return
+        const board = this.state.board
+        if (board.revealed[index] && board.cells[index] === 0) return
+        this.notice = null
+        if (this.selected === index) {
+            this.confirmSelection()
+            return
+        }
+        this.selected = index
+        this.render()
+        if (focus) this.focusCell(index)
+    }
+
+    focusCell(index) {
+        requestAnimationFrame(() => {
+            this.shadowRoot.querySelector(`.cell[data-index="${index}"]`)?.focus({preventScroll: true})
+        })
+    }
+
+    confirmSelection() {
+        if (this.selected == null || this.state.outcome) return
+        const board = this.state.board
+        const index = this.selected
+        if (board.flagged[index]) {
+            this.notice = 'flagged'
+            this.render()
+            return
+        }
+        if (board.revealed[index]) {
+            if (board.cells[index] > 0) this.apply(this.engine.chord(board, index))
+            return
+        }
+        this.apply(this.engine.reveal(board, index))
+    }
+
+    toggleFlag(index, focus = false) {
+        if (this.state.outcome || this.state.board.revealed[index]) return
+        this.selected = index
+        this.notice = null
+        this.apply(this.engine.toggleFlag(this.state.board, index), {keepSelection: true})
+        if (focus) this.focusCell(index)
+    }
+
+    apply(result, {keepSelection = false} = {}) {
+        const wasStarted = this.state.board.started
+        this.state.board = result.board
+        this.state.difficulty = result.board.difficulty
+        this.state.outcome = result.board.outcome
+        this.state.progress = Boolean(
+            result.board.started || result.board.flagged.some(Boolean) || result.board.outcome
+        )
+        this.notice = result.flagMismatch ? 'flagMismatch' : null
+        if (!keepSelection && !result.flagMismatch) this.selected = null
+        if (!wasStarted && result.board.started && !result.board.outcome) this.resumeTimer()
+        if (result.board.outcome) this.pauseTimer(false)
+        this.save()
+        this.render()
+    }
+
+    newGame(difficulty = this.state.difficulty, force = false) {
+        if (!force && this.state.progress && !this.state.outcome
+            && !confirm(this.i18n.t('confirmNew'))) return
+        this.pauseTimer(false)
+        this.state = this.fresh(difficulty)
+        this.selected = null
+        this.notice = null
+        this.save()
+        this.render()
+    }
+
+    syncTimer() {
+        if (this.timerOrigin != null) {
+            this.state.elapsedMs = Math.max(0, performance.now() - this.timerOrigin)
+        }
+    }
+
+    resumeTimer() {
+        if (!this.state.board.started || this.state.outcome || this.timerOrigin != null
+            || document.visibilityState === 'hidden') return
+        this.timerOrigin = performance.now() - this.state.elapsedMs
+        this.timerInterval = setInterval(() => {
+            this.syncTimer()
+            this.renderTimer()
+        }, 250)
+    }
+
+    pauseTimer(persist) {
+        this.syncTimer()
+        if (this.timerInterval != null) clearInterval(this.timerInterval)
+        this.timerInterval = null
+        this.timerOrigin = null
+        if (persist && this.state) this.writeState()
+    }
+
+    visibilityChanged() {
+        if (document.visibilityState === 'hidden') this.pauseTimer(true)
+        else this.resumeTimer()
+    }
+
+    save() {
+        this.syncTimer()
+        this.writeState()
+    }
+
+    writeState() {
+        if (!this.storage.write('minesweeper', this.state)) {
+            this.shadowRoot.querySelector('.warning').hidden = false
+        }
+    }
+
+    timeText() {
+        const seconds = Math.min(99 * 60 + 59, Math.floor(this.state.elapsedMs / 1000))
+        return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
+    }
+
+    renderTimer() {
+        this.shadowRoot.querySelector('.timer').textContent = this.timeText()
+    }
+
+    format(template, values) {
+        return Object.entries(values).reduce(
+            (text, [key, value]) => text.replaceAll(`{${key}}`, value),
+            template,
+        )
+    }
+
+    statusText() {
+        const t = key => this.i18n.t(key)
+        if (this.state.outcome === 'won') return t('minesweeperWon')
+        if (this.state.outcome === 'lost') return t('minesweeperLost')
+        if (this.notice === 'flagMismatch') return t('minesweeperFlagMismatch')
+        if (this.notice === 'flagged') return t('minesweeperFlagged')
+        if (this.selected == null) return t('minesweeperPrompt')
+        const board = this.state.board
+        if (board.flagged[this.selected]) return t('minesweeperSelectedFlag')
+        if (board.revealed[this.selected]) return t('minesweeperSelectedNumber')
+        return t('minesweeperSelectedCovered')
+    }
+
+    cellLabel(index, shownMine, wrongFlag) {
+        const board = this.state.board
+        const values = {
+            row: Math.floor(index / board.width) + 1,
+            column: index % board.width + 1,
+        }
+        let state
+        if (wrongFlag) state = this.i18n.t('minesweeperWrongFlag')
+        else if (shownMine) state = index === board.exploded
+            ? this.i18n.t('minesweeperExplodedMine')
+            : this.i18n.t('minesweeperMine')
+        else if (board.flagged[index]) state = this.i18n.t('minesweeperFlaggedCell')
+        else if (!board.revealed[index]) state = this.i18n.t('minesweeperCoveredCell')
+        else if (board.cells[index] === 0) state = this.i18n.t('minesweeperEmptyCell')
+        else state = this.format(this.i18n.t('minesweeperNumberCell'), {count: board.cells[index]})
+        return this.format(this.i18n.t('minesweeperCellLabel'), {...values, state})
+    }
+
+    render() {
+        const s = this.shadowRoot, boardElement = s.querySelector('.board')
+        const board = this.state.board
+        const fragment = document.createDocumentFragment()
+        boardElement.style.setProperty('--columns', board.width)
+        boardElement.style.maxWidth = board.width === 9 ? '360px' : '420px'
+        for (let index = 0; index < board.width * board.height; index++) {
+            const cell = document.createElement('button')
+            cell.type = 'button'
+            cell.className = 'cell'
+            cell.dataset.index = index
+            cell.setAttribute('role', 'gridcell')
+            cell.setAttribute('aria-selected', String(index === this.selected))
+            cell.tabIndex = index === (this.selected ?? 0) ? 0 : -1
+
+            const isMine = board.started && board.cells[index] === this.engine.MINE
+            const shownMine = isMine && board.outcome === 'lost'
+            const wrongFlag = board.outcome === 'lost' && board.flagged[index] && !isMine
+            if (board.revealed[index]) cell.classList.add('revealed')
+            if (index === this.selected) cell.classList.add('selected')
+            if (board.flagged[index]) cell.classList.add('flagged')
+            if (shownMine) cell.classList.add('mine', 'revealed')
+            if (index === board.exploded) cell.classList.add('exploded')
+            if (wrongFlag) cell.classList.add('wrong', 'revealed')
+
+            if (wrongFlag) cell.textContent = '×'
+            else if (shownMine) cell.textContent = '✹'
+            else if (board.flagged[index]) cell.textContent = '⚑'
+            else if (board.revealed[index] && board.cells[index] > 0) {
+                cell.textContent = board.cells[index]
+                cell.dataset.count = board.cells[index]
+            }
+            cell.setAttribute('aria-label', this.cellLabel(index, shownMine, wrongFlag))
+            fragment.append(cell)
+        }
+        boardElement.replaceChildren(fragment)
+        s.querySelector('.difficulty').value = this.state.difficulty
+        const flagCount = board.flagged.filter(Boolean).length
+        s.querySelector('.mines-left').textContent = board.mineCount - flagCount
+        this.renderTimer()
+        const status = s.querySelector('.status')
+        status.textContent = this.statusText()
+        status.classList.toggle('lost', this.state.outcome === 'lost')
+        const selectedFlagged = this.selected != null && board.flagged[this.selected]
+        const selectedRevealed = this.selected != null && board.revealed[this.selected]
+        const reveal = s.querySelector('.reveal')
+        reveal.textContent = selectedRevealed
+            ? this.i18n.t('minesweeperOpenAround')
+            : this.i18n.t('minesweeperReveal')
+        reveal.disabled = this.selected == null || selectedFlagged || Boolean(this.state.outcome)
+            || (selectedRevealed && board.cells[this.selected] === 0)
+        const flag = s.querySelector('.flag')
+        flag.textContent = selectedFlagged
+            ? this.i18n.t('minesweeperUnflag')
+            : this.i18n.t('minesweeperFlag')
+        flag.disabled = this.selected == null || selectedRevealed || Boolean(this.state.outcome)
+    }
+})
+</script>
