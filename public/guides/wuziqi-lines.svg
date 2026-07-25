@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-labelledby="title desc">
+  <title id="title">Wuziqi winning lines</title>
+  <desc id="desc">Five black stones connect vertically, horizontally, and diagonally; a six-stone overline is also shown as a win.</desc>
+  <defs>
+    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse"><path d="M48 0H0V48" fill="none" stroke="#6a4a2f" stroke-width="2"/></pattern>
+    <radialGradient id="black" cx="35%" cy="28%"><stop stop-color="#555"/><stop offset=".7" stop-color="#171817"/></radialGradient>
+    <filter id="shadow"><feDropShadow dx="0" dy="3" stdDeviation="2" flood-opacity=".3"/></filter>
+  </defs>
+  <rect width="960" height="540" rx="28" fill="#f5f2ea"/>
+  <rect x="55" y="45" width="850" height="450" rx="20" fill="#d4b07a" stroke="#6f4d33" stroke-width="5"/>
+  <rect x="96" y="70" width="768" height="384" fill="url(#grid)" stroke="#6a4a2f" stroke-width="2"/>
+  <g fill="url(#black)" filter="url(#shadow)">
+    <circle cx="144" cy="118" r="18"/><circle cx="192" cy="118" r="18"/><circle cx="240" cy="118" r="18"/><circle cx="288" cy="118" r="18"/><circle cx="336" cy="118" r="18"/>
+    <circle cx="480" cy="118" r="18"/><circle cx="480" cy="166" r="18"/><circle cx="480" cy="214" r="18"/><circle cx="480" cy="262" r="18"/><circle cx="480" cy="310" r="18"/>
+    <circle cx="624" cy="166" r="18"/><circle cx="672" cy="214" r="18"/><circle cx="720" cy="262" r="18"/><circle cx="768" cy="310" r="18"/><circle cx="816" cy="358" r="18"/>
+    <circle cx="192" cy="358" r="18"/><circle cx="240" cy="358" r="18"/><circle cx="288" cy="358" r="18"/><circle cx="336" cy="358" r="18"/><circle cx="384" cy="358" r="18"/><circle cx="432" cy="358" r="18"/>
+  </g>
+  <g fill="none" stroke="#2d6357" stroke-width="7" stroke-linecap="round">
+    <path d="M137 83h207"/><path d="M519 111v207"/><path d="M617 137l207 207"/><path d="M185 397h255"/>
+  </g>
+  <g fill="#2d6357">
+    <circle cx="137" cy="83" r="7"/><circle cx="344" cy="83" r="7"/>
+    <circle cx="519" cy="111" r="7"/><circle cx="519" cy="318" r="7"/>
+    <circle cx="617" cy="137" r="7"/><circle cx="824" cy="344" r="7"/>
+    <circle cx="185" cy="397" r="7"/><circle cx="440" cy="397" r="7"/>
+  </g>
+</svg>

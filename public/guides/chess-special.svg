@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-labelledby="title desc">
+  <title id="title">Chess knight, castling, and en passant</title>
+  <desc id="desc">Three panels show the knight's eight L-shaped destinations, king-side castling before and after, and an en passant pawn capture.</desc>
+  <defs>
+    <pattern id="board" width="56" height="56" patternUnits="userSpaceOnUse"><rect width="56" height="56" fill="#ebe4d4"/><rect width="28" height="28" fill="#7d8a72"/><rect x="28" y="28" width="28" height="28" fill="#7d8a72"/></pattern>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0l10 5-10 5z" fill="#2d6357"/></marker>
+    <filter id="shadow"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-opacity=".2"/></filter>
+  </defs>
+  <rect width="960" height="540" rx="28" fill="#f5f2ea"/>
+  <g transform="translate(25 28)">
+    <rect width="285" height="484" rx="20" fill="#fff" stroke="#cfc8b8" stroke-width="3"/>
+    <rect x="30" y="110" width="224" height="224" fill="url(#board)" stroke="#6d6456" stroke-width="3"/>
+    <g fill="#2d6357">
+      <circle cx="86" cy="138" r="13"/><circle cx="198" cy="138" r="13"/><circle cx="58" cy="194" r="13"/><circle cx="226" cy="194" r="13"/>
+      <circle cx="58" cy="306" r="13"/><circle cx="226" cy="306" r="13"/><circle cx="86" cy="362" r="13"/><circle cx="198" cy="362" r="13"/>
+    </g>
+    <g filter="url(#shadow)">
+      <circle cx="142" cy="250" r="31" fill="#242725"/>
+      <text x="142" y="263" text-anchor="middle" font-size="35" font-weight="800" fill="#f7f4ec" font-family="Georgia,serif">N</text>
+    </g>
+    <g stroke="#2d6357" stroke-width="5" fill="none" opacity=".65">
+      <path d="M126 226L92 148M158 226l34-78M118 241L65 199M166 241l53-42M118 259l-53 42M166 259l53 42M126 274l-34 78M158 274l34 78"/>
+    </g>
+  </g>
+  <g transform="translate(337 28)">
+    <rect width="286" height="484" rx="20" fill="#fff" stroke="#cfc8b8" stroke-width="3"/>
+    <g transform="translate(31 88)">
+      <rect width="224" height="112" fill="url(#board)" stroke="#6d6456" stroke-width="3"/>
+      <g filter="url(#shadow)"><circle cx="28" cy="84" r="23" fill="#f7f4ec" stroke="#2a2622" stroke-width="3"/><circle cx="196" cy="84" r="23" fill="#f7f4ec" stroke="#2a2622" stroke-width="3"/></g>
+      <text x="28" y="94" text-anchor="middle" font-size="28" font-weight="800" font-family="Georgia,serif">K</text><text x="196" y="94" text-anchor="middle" font-size="28" font-weight="800" font-family="Georgia,serif">R</text>
+      <path d="M61 47h96" stroke="#2d6357" stroke-width="7" marker-end="url(#arrow)"/>
+    </g>
+    <path d="M143 225v42" stroke="#2d6357" stroke-width="8" marker-end="url(#arrow)"/>
+    <g transform="translate(31 298)">
+      <rect width="224" height="112" fill="url(#board)" stroke="#6d6456" stroke-width="3"/>
+      <g filter="url(#shadow)"><circle cx="140" cy="84" r="23" fill="#f7f4ec" stroke="#2a2622" stroke-width="3"/><circle cx="84" cy="84" r="23" fill="#f7f4ec" stroke="#2a2622" stroke-width="3"/></g>
+      <text x="140" y="94" text-anchor="middle" font-size="28" font-weight="800" font-family="Georgia,serif">K</text><text x="84" y="94" text-anchor="middle" font-size="28" font-weight="800" font-family="Georgia,serif">R</text>
+    </g>
+  </g>
+  <g transform="translate(650 28)">
+    <rect width="285" height="484" rx="20" fill="#fff" stroke="#cfc8b8" stroke-width="3"/>
+    <rect x="30" y="76" width="224" height="336" fill="url(#board)" stroke="#6d6456" stroke-width="3"/>
+    <g filter="url(#shadow)">
+      <circle cx="114" cy="216" r="23" fill="#f7f4ec" stroke="#2a2622" stroke-width="3"/><text x="114" y="226" text-anchor="middle" font-size="28" font-weight="800" font-family="Georgia,serif">P</text>
+      <circle cx="170" cy="216" r="23" fill="#242725"/><text x="170" y="226" text-anchor="middle" font-size="28" font-weight="800" fill="#f7f4ec" font-family="Georgia,serif">P</text>
+    </g>
+    <path d="M170 105v82" stroke="#c24a42" stroke-width="7" stroke-dasharray="9 7" marker-end="url(#arrow)"/>
+    <path d="M114 188c7-19 25-29 53-29" fill="none" stroke="#2d6357" stroke-width="8" marker-end="url(#arrow)"/>
+    <circle cx="170" cy="216" r="27" fill="none" stroke="#c24a42" stroke-width="5" stroke-dasharray="8 6"/>
+    <path d="M156 202l28 28m0-28l-28 28" stroke="#c24a42" stroke-width="4" stroke-linecap="round"/>
+  </g>
+</svg>

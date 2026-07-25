@@ -3,10 +3,19 @@ const fs = require('node:fs')
 const path = require('node:path')
 const catalog = require('../../games/catalog.json')
 const pageFiles = ['index.html', ...catalog.map(game => `${game.id}.html`)]
+const guideAssets = [
+    'guides/xiangqi-movement.svg',
+    'guides/wuziqi-lines.svg',
+    'guides/sudoku-peers.svg',
+    'guides/2048-merge.svg',
+    'guides/junqi-board.svg',
+    'guides/chess-special.svg',
+    'guides/reversi-bracket.webp',
+]
 
 test('build is self-contained and contains the complete PWA shell', async () => {
     const dist = path.resolve('dist')
-    for (const file of [...pageFiles, 'manifest.webmanifest', 'sw.js', 'icons/icon-192.png', 'icons/icon-512.png']) {
+    for (const file of [...pageFiles, 'manifest.webmanifest', 'sw.js', ...guideAssets, 'icons/icon-192.png', 'icons/icon-512.png']) {
         expect(fs.existsSync(path.join(dist, file)), file).toBeTruthy()
     }
     for (const page of pageFiles) {
@@ -20,7 +29,9 @@ test('build is self-contained and contains the complete PWA shell', async () => 
         expect(html.includes(`id=${game.id}-worker-payload`)).toBe(game.worker)
     }
     const sw = fs.readFileSync(path.join(dist, 'sw.js'), 'utf8')
-    for (const asset of [...pageFiles.map(file => './' + file), './manifest.webmanifest']) expect(sw).toContain(asset)
+    for (const asset of [...pageFiles.map(file => './' + file), './manifest.webmanifest', ...guideAssets.map(file => './' + file)]) {
+        expect(sw).toContain(asset)
+    }
 })
 
 test('gallery and sidebar localize from query and preserve the override', async ({page}) => {
@@ -100,8 +111,13 @@ test('game intro opens localized rules and tips without appearing in the gallery
     const dialog = page.locator('offline-shell offline-guide dialog')
     await expect(dialog).toBeVisible()
     await expect(dialog.locator('.intro')).toContainText('Black stones')
-    await expect(dialog.locator('.rules-list li')).toHaveCount(3)
+    await expect(dialog.locator('.quick-list li')).toHaveCount(3)
+    await expect(dialog.locator('.rule-group')).toHaveCount(3)
+    expect(await dialog.locator('.rule-group li').count()).toBeGreaterThanOrEqual(8)
     await expect(dialog.locator('.tips-list li')).toHaveCount(3)
+    await expect(dialog.locator('figcaption')).toContainText('Winning lines')
+    await expect(dialog.locator('.guide-image')).toHaveAttribute('src', './guides/wuziqi-lines.svg')
+    expect(await dialog.locator('.guide-image').evaluate(image => image.complete && image.naturalWidth > 0)).toBeTruthy()
     expect(await dialog.evaluate(element => {
         const rect = element.getBoundingClientRect()
         return rect.left >= 0 && rect.right <= innerWidth && rect.top >= 0 && rect.bottom <= innerHeight
@@ -113,7 +129,9 @@ test('game intro opens localized rules and tips without appearing in the gallery
     await page.goto('/sudoku.html?lang=zh')
     await page.locator('offline-shell .guide-btn').click()
     await expect(page.locator('offline-shell #guide-heading')).toHaveText('怎么玩')
-    await expect(page.locator('offline-shell .rules-title')).toHaveText('基本规则')
+    await expect(page.locator('offline-shell .quick-title')).toHaveText('三步上手')
+    await expect(page.locator('offline-shell .rules-title')).toHaveText('完整规则')
+    await expect(page.locator('offline-shell .rule-group').first()).toContainText('谜题构成')
     await expect(page.locator('offline-shell .done-btn')).toHaveText('知道了')
 })
 

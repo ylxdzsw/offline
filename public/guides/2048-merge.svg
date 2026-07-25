@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-labelledby="title desc">
+  <title id="title">2048 merge examples</title>
+  <desc id="desc">Four twos become two fours, while three fours become one eight followed by one four, showing that a tile merges only once per move.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0l10 5-10 5z" fill="#2d6357"/></marker>
+    <filter id="shadow"><feDropShadow dx="0" dy="4" stdDeviation="4" flood-opacity=".18"/></filter>
+  </defs>
+  <rect width="960" height="540" rx="28" fill="#f5f2ea"/>
+  <g transform="translate(50 60)" font-family="Georgia,serif" text-anchor="middle" font-size="42" font-weight="800">
+    <rect width="860" height="190" rx="22" fill="#bbada0"/>
+    <g filter="url(#shadow)">
+      <g fill="#eee4da" stroke="#d8cabc" stroke-width="3"><rect x="28" y="38" width="112" height="112" rx="12"/><rect x="154" y="38" width="112" height="112" rx="12"/><rect x="280" y="38" width="112" height="112" rx="12"/><rect x="406" y="38" width="112" height="112" rx="12"/></g>
+      <g fill="#776e65"><text x="84" y="107">2</text><text x="210" y="107">2</text><text x="336" y="107">2</text><text x="462" y="107">2</text></g>
+      <path d="M548 94h68" stroke="#2d6357" stroke-width="9" marker-end="url(#arrow)"/>
+      <g fill="#ede0c8"><rect x="652" y="38" width="82" height="112" rx="12"/><rect x="748" y="38" width="82" height="112" rx="12"/></g>
+      <g fill="#776e65"><text x="693" y="107">4</text><text x="789" y="107">4</text></g>
+    </g>
+  </g>
+  <g transform="translate(50 290)" font-family="Georgia,serif" text-anchor="middle" font-size="42" font-weight="800">
+    <rect width="860" height="190" rx="22" fill="#bbada0"/>
+    <g filter="url(#shadow)">
+      <g fill="#ede0c8"><rect x="28" y="38" width="112" height="112" rx="12"/><rect x="154" y="38" width="112" height="112" rx="12"/><rect x="280" y="38" width="112" height="112" rx="12"/></g>
+      <g fill="#776e65"><text x="84" y="107">4</text><text x="210" y="107">4</text><text x="336" y="107">4</text></g>
+      <path d="M413 94h68" stroke="#2d6357" stroke-width="9" marker-end="url(#arrow)"/>
+      <rect x="518" y="38" width="135" height="112" rx="12" fill="#f2b179"/>
+      <rect x="667" y="38" width="135" height="112" rx="12" fill="#ede0c8"/>
+      <text x="585.5" y="107" fill="#fff">8</text><text x="734.5" y="107" fill="#776e65">4</text>
+      <path d="M520 164h280" stroke="#c24a42" stroke-width="6" stroke-linecap="round"/>
+    </g>
+  </g>
+</svg>

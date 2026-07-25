@@ -1,8 +1,8 @@
 <template id="offline-guide-template">
     <style>
         dialog {
-            width: min(calc(100vw - 32px), 400px);
-            max-height: min(calc(100dvh - 48px), 600px);
+            width: min(calc(100vw - 24px), 560px);
+            max-height: min(calc(100dvh - 24px), 760px);
             overflow-y: auto;
             padding: 0;
             border: none;
@@ -50,12 +50,12 @@
         }
         .close-btn:active { filter: brightness(.94); }
         .intro {
-            margin: 0 0 16px;
+            margin: 0 0 18px;
             color: var(--ink-muted);
             font-size: .9rem;
             line-height: 1.6;
         }
-        section { margin-top: 16px; }
+        section { margin-top: 18px; }
         h3 {
             margin: 0 0 8px;
             color: var(--ink-faint);
@@ -66,7 +66,7 @@
         }
         ul {
             display: grid;
-            gap: 7px;
+            gap: 8px;
             margin: 0;
             padding-left: 18px;
             color: var(--ink-muted);
@@ -74,6 +74,85 @@
             line-height: 1.55;
         }
         li::marker { color: var(--accent); }
+        .quick-list {
+            counter-reset: quick;
+            display: grid;
+            gap: 9px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+        .quick-list li {
+            position: relative;
+            min-height: 34px;
+            padding: 7px 10px 7px 42px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--ink-muted);
+            font-size: .88rem;
+            line-height: 1.45;
+            background: var(--bg-fill);
+        }
+        .quick-list li::before {
+            position: absolute;
+            top: 7px;
+            left: 9px;
+            display: grid;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            place-items: center;
+            counter-increment: quick;
+            content: counter(quick);
+            color: var(--accent-ink);
+            font-size: .75rem;
+            font-weight: 800;
+            background: var(--accent);
+        }
+        .example {
+            margin: 18px 0 0;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            background: var(--bg-grouped);
+        }
+        .guide-image {
+            width: 100%;
+            height: auto;
+            display: block;
+            aspect-ratio: 16 / 9;
+            object-fit: cover;
+            background: var(--bg-grouped);
+        }
+        figcaption {
+            padding: 9px 12px;
+            border-top: 1px solid var(--separator);
+            color: var(--ink-muted);
+            font-size: .78rem;
+            line-height: 1.45;
+            background: var(--bg-surface);
+        }
+        .rule-groups {
+            display: grid;
+            gap: 12px;
+        }
+        .rule-group {
+            margin: 0;
+            padding: 12px 13px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            background: var(--bg-fill);
+        }
+        .rule-group h4 {
+            margin: 0 0 7px;
+            color: var(--ink);
+            font-size: .88rem;
+        }
+        .rule-group ul { font-size: .84rem; }
+        @media (max-width: 340px) {
+            .content { padding-inline: 16px; }
+            .rule-group { padding-inline: 11px; }
+        }
         .done-btn {
             display: block;
             width: 100%;
@@ -97,8 +176,16 @@
             </div>
             <p class="intro"></p>
             <section>
+                <h3 class="quick-title"></h3>
+                <ol class="quick-list"></ol>
+            </section>
+            <figure class="example">
+                <img class="guide-image" width="960" height="540">
+                <figcaption></figcaption>
+            </figure>
+            <section>
                 <h3 class="rules-title"></h3>
-                <ul class="rules-list"></ul>
+                <div class="rule-groups"></div>
             </section>
             <section>
                 <h3 class="tips-title"></h3>
@@ -109,6 +196,16 @@
     </dialog>
 </template>
 <script>
+const guideVisuals = {
+    xiangqi: './guides/xiangqi-movement.svg',
+    wuziqi: './guides/wuziqi-lines.svg',
+    sudoku: './guides/sudoku-peers.svg',
+    '2048': './guides/2048-merge.svg',
+    junqi: './guides/junqi-board.svg',
+    chess: './guides/chess-special.svg',
+    reversi: './guides/reversi-bracket.webp',
+}
+
 customElements.define('offline-guide', class extends HTMLElement {
     connectedCallback() {
         const tmpl = document.getElementById('offline-guide-template')
@@ -127,10 +224,25 @@ customElements.define('offline-guide', class extends HTMLElement {
         s.querySelector('h2').textContent = i18n.t('howToPlay')
         s.querySelector('.close-btn').setAttribute('aria-label', i18n.t('close'))
         s.querySelector('.intro').textContent = guide.intro
-        s.querySelector('.rules-title').textContent = i18n.t('rules')
+        s.querySelector('.quick-title').textContent = i18n.t('quickStart')
+        s.querySelector('.rules-title').textContent = i18n.t('completeRules')
         s.querySelector('.tips-title').textContent = i18n.t('basicTips')
-        s.querySelector('.rules-list').replaceChildren(...guide.rules.map(r =>
-            Object.assign(document.createElement('li'), {textContent: r})))
+        s.querySelector('.quick-list').replaceChildren(...guide.quick.map(item =>
+            Object.assign(document.createElement('li'), {textContent: item})))
+        const example = s.querySelector('.example')
+        const image = s.querySelector('.guide-image')
+        image.src = guideVisuals[game] || ''
+        image.alt = guide.visual
+        s.querySelector('figcaption').textContent = guide.visual
+        example.hidden = !guide.visual || !guideVisuals[game]
+        s.querySelector('.rule-groups').replaceChildren(...guide.sections.map(group => {
+            const section = Object.assign(document.createElement('section'), {className: 'rule-group'})
+            section.append(Object.assign(document.createElement('h4'), {textContent: group.title}))
+            const list = document.createElement('ul')
+            list.append(...group.items.map(item => Object.assign(document.createElement('li'), {textContent: item})))
+            section.append(list)
+            return section
+        }))
         s.querySelector('.tips-list').replaceChildren(...guide.tips.map(t =>
             Object.assign(document.createElement('li'), {textContent: t})))
         s.querySelector('.done-btn').textContent = i18n.t('gotIt')

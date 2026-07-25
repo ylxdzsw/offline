@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-labelledby="title desc">
+  <title id="title">Xiangqi movement examples</title>
+  <desc id="desc">A blocked horse leg, a cannon jumping one screen to capture, and a soldier gaining sideways movement after crossing the river.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0l10 5-10 5z" fill="#2d6357"/></marker>
+    <marker id="bad-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0l10 5-10 5z" fill="#c24a42"/></marker>
+    <pattern id="grid" width="54" height="54" patternUnits="userSpaceOnUse"><path d="M54 0H0V54" fill="none" stroke="#765334" stroke-width="2"/></pattern>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-opacity=".22"/></filter>
+  </defs>
+  <rect width="960" height="540" rx="28" fill="#f5f2ea"/>
+  <g transform="translate(28 30)">
+    <rect width="278" height="480" rx="22" fill="#d8b47e" stroke="#765334" stroke-width="3"/>
+    <rect x="29" y="72" width="220" height="324" fill="url(#grid)" stroke="#765334" stroke-width="2"/>
+    <circle cx="139" cy="234" r="31" fill="#f6ecd4" stroke="#b12f28" stroke-width="5" filter="url(#shadow)"/>
+    <text x="139" y="245" text-anchor="middle" font-size="30" font-weight="800" fill="#b12f28" font-family="serif">馬</text>
+    <circle cx="139" cy="180" r="20" fill="#312d29" stroke="#171514" stroke-width="3"/>
+    <path d="M139 202v-22" stroke="#c24a42" stroke-width="7" stroke-linecap="round"/>
+    <path d="M126 190l26-26M152 190l-26-26" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
+    <path d="M118 224C83 205 69 173 72 140" fill="none" stroke="#c24a42" stroke-width="6" stroke-dasharray="10 8" marker-end="url(#bad-arrow)"/>
+    <path d="M116 253C84 275 69 306 72 340M162 257c34 21 48 52 44 84" fill="none" stroke="#2d6357" stroke-width="6" marker-end="url(#arrow)"/>
+    <circle cx="72" cy="342" r="11" fill="#2d6357"/><circle cx="207" cy="342" r="11" fill="#2d6357"/>
+  </g>
+  <g transform="translate(341 30)">
+    <rect width="278" height="480" rx="22" fill="#d8b47e" stroke="#765334" stroke-width="3"/>
+    <path d="M34 240H244" stroke="#765334" stroke-width="3"/>
+    <g filter="url(#shadow)">
+      <circle cx="52" cy="240" r="31" fill="#f6ecd4" stroke="#b12f28" stroke-width="5"/>
+      <text x="52" y="251" text-anchor="middle" font-size="30" font-weight="800" fill="#b12f28" font-family="serif">炮</text>
+      <circle cx="139" cy="240" r="25" fill="#f6ecd4" stroke="#765334" stroke-width="4"/>
+      <circle cx="226" cy="240" r="31" fill="#f6ecd4" stroke="#222624" stroke-width="5"/>
+      <text x="226" y="251" text-anchor="middle" font-size="30" font-weight="800" fill="#222624" font-family="serif">車</text>
+    </g>
+    <text x="139" y="249" text-anchor="middle" font-size="25" font-weight="800" fill="#765334" font-family="sans-serif">1</text>
+    <path d="M72 204C106 112 197 112 218 199" fill="none" stroke="#2d6357" stroke-width="8" marker-end="url(#arrow)"/>
+    <path d="M118 301h42" stroke="#c24a42" stroke-width="7" stroke-linecap="round"/>
+    <path d="M126 290l26 22m0-22l-26 22" stroke="#c24a42" stroke-width="5" stroke-linecap="round"/>
+  </g>
+  <g transform="translate(654 30)">
+    <rect width="278" height="480" rx="22" fill="#d8b47e" stroke="#765334" stroke-width="3"/>
+    <rect x="28" y="54" width="222" height="372" fill="url(#grid)" stroke="#765334" stroke-width="2"/>
+    <rect x="28" y="225" width="222" height="54" fill="#ead4a8"/>
+    <path d="M28 225h222M28 279h222" stroke="#765334" stroke-width="3"/>
+    <path d="M78 252h122" stroke="#765334" stroke-width="2" stroke-dasharray="9 8"/>
+    <g filter="url(#shadow)">
+      <circle cx="139" cy="357" r="29" fill="#f6ecd4" stroke="#b12f28" stroke-width="5"/>
+      <text x="139" y="368" text-anchor="middle" font-size="29" font-weight="800" fill="#b12f28" font-family="serif">兵</text>
+      <circle cx="139" cy="171" r="29" fill="#f6ecd4" stroke="#b12f28" stroke-width="5"/>
+      <text x="139" y="182" text-anchor="middle" font-size="29" font-weight="800" fill="#b12f28" font-family="serif">兵</text>
+    </g>
+    <path d="M139 319v-52" stroke="#2d6357" stroke-width="7" marker-end="url(#arrow)"/>
+    <path d="M139 132V91M106 171H68M172 171h38" stroke="#2d6357" stroke-width="7" marker-end="url(#arrow)"/>
+  </g>
+</svg>

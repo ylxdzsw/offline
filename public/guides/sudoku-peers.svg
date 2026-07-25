@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-labelledby="title desc">
+  <title id="title">Sudoku row, column, and box peers</title>
+  <desc id="desc">A selected center cell highlights its entire row and column plus its three-by-three box, showing where the same digit cannot repeat.</desc>
+  <rect width="960" height="540" rx="28" fill="#f5f2ea"/>
+  <g transform="translate(250 40)">
+    <rect width="460" height="460" rx="8" fill="#fffdf8" stroke="#6d6456" stroke-width="8"/>
+    <rect x="0" y="204.44" width="460" height="51.12" fill="#e6f4f0"/>
+    <rect x="204.44" y="0" width="51.12" height="460" fill="#e6f4f0"/>
+    <rect x="153.33" y="153.33" width="153.34" height="153.34" fill="#f2dfcc" opacity=".9"/>
+    <g stroke="#cfc8b8" stroke-width="2">
+      <path d="M51.11 0v460M102.22 0v460M153.33 0v460M204.44 0v460M255.56 0v460M306.67 0v460M357.78 0v460M408.89 0v460"/>
+      <path d="M0 51.11h460M0 102.22h460M0 153.33h460M0 204.44h460M0 255.56h460M0 306.67h460M0 357.78h460M0 408.89h460"/>
+    </g>
+    <g stroke="#6d6456" stroke-width="6">
+      <path d="M153.33 0v460M306.67 0v460M0 153.33h460M0 306.67h460"/>
+    </g>
+    <rect x="205.5" y="205.5" width="49" height="49" rx="7" fill="#2d6357"/>
+    <text x="230" y="241" text-anchor="middle" font-size="34" font-weight="800" fill="#fff" font-family="sans-serif">5</text>
+    <g font-family="sans-serif" text-anchor="middle" font-size="29" font-weight="650" fill="#4d4b48">
+      <text x="25.5" y="39">8</text><text x="127.5" y="39">3</text><text x="281" y="39">2</text><text x="383" y="39">6</text>
+      <text x="76.5" y="141">6</text><text x="179" y="141">1</text><text x="332" y="141">9</text><text x="434" y="141">5</text>
+      <text x="25.5" y="243">4</text><text x="127.5" y="243">7</text><text x="332" y="243">1</text><text x="434" y="243">9</text>
+      <text x="76.5" y="345">7</text><text x="179" y="345">2</text><text x="281" y="345">8</text><text x="383" y="345">4</text>
+      <text x="25.5" y="447">2</text><text x="127.5" y="447">8</text><text x="281" y="447">7</text><text x="434" y="447">3</text>
+    </g>
+    <g fill="#c24a42" font-family="sans-serif" text-anchor="middle" font-size="30" font-weight="800">
+      <text x="230" y="90">5</text><text x="383" y="243">5</text><text x="281" y="294">5</text>
+    </g>
+    <g stroke="#c24a42" stroke-width="4" stroke-linecap="round">
+      <path d="M219 56l22 22m0-22l-22 22M372 209l22 22m0-22l-22 22M270 260l22 22m0-22l-22 22"/>
+    </g>
+  </g>
+</svg>

@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-labelledby="title desc">
+  <title id="title">Junqi board anatomy and engineer railway movement</title>
+  <desc id="desc">A full Junqi board highlights thick railway lines, diamond camps, boxed headquarters, three central crossings, and an engineer turning along a railway.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0l10 5-10 5z" fill="#2d6357"/></marker>
+    <filter id="shadow"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-opacity=".2"/></filter>
+  </defs>
+  <rect width="960" height="540" rx="28" fill="#f5f2ea"/>
+  <g transform="translate(277 25)">
+    <rect width="406" height="490" rx="20" fill="#d4b07a" stroke="#6f4d33" stroke-width="5"/>
+    <g fill="none" stroke="#765334" stroke-width="2">
+      <path d="M42 42H364M42 79H364M42 116H364M42 153H364M42 190H364M42 227H364M42 263H364M42 300H364M42 337H364M42 374H364M42 411H364M42 448H364"/>
+      <path d="M42 42v406M122 42v406M203 42v406M284 42v406M364 42v406"/>
+      <path d="M42 227l161 36 161-36M42 263l161-36 161 36"/>
+    </g>
+    <g fill="none" stroke="#765334" stroke-width="10">
+      <path d="M42 79H364M42 227H364M42 263H364M42 411H364"/>
+      <path d="M42 79v332M364 79v332"/>
+    </g>
+    <g fill="#f6ecd4" stroke="#765334" stroke-width="3">
+      <rect x="105" y="99" width="34" height="34" transform="rotate(45 122 116)"/>
+      <rect x="267" y="99" width="34" height="34" transform="rotate(45 284 116)"/>
+      <rect x="186" y="136" width="34" height="34" transform="rotate(45 203 153)"/>
+      <rect x="105" y="321" width="34" height="34" transform="rotate(45 122 338)"/>
+      <rect x="267" y="321" width="34" height="34" transform="rotate(45 284 338)"/>
+      <rect x="186" y="284" width="34" height="34" transform="rotate(45 203 301)"/>
+    </g>
+    <g fill="#f6ecd4" stroke="#765334" stroke-width="5">
+      <rect x="94" y="421" width="56" height="38"/><rect x="256" y="421" width="56" height="38"/>
+      <rect x="94" y="28" width="56" height="38"/><rect x="256" y="28" width="56" height="38"/>
+    </g>
+    <g stroke="#f5f2ea" stroke-width="12" stroke-linecap="round">
+      <path d="M42 245h0M203 245h0M364 245h0"/>
+    </g>
+    <path d="M122 411H42V227H203V79H364" fill="none" stroke="#2d6357" stroke-width="9" stroke-linejoin="round" marker-end="url(#arrow)"/>
+    <g transform="translate(88 385)" filter="url(#shadow)">
+      <rect width="68" height="42" rx="9" fill="#f6ecd4" stroke="#b12f28" stroke-width="4"/>
+      <text x="34" y="30" text-anchor="middle" font-size="28" font-weight="800" fill="#b12f28" font-family="serif">工</text>
+    </g>
+  </g>
+  <g transform="translate(58 150)" filter="url(#shadow)">
+    <path d="M72 0l62 28v59c0 58-38 94-62 107C48 181 10 145 10 87V28z" fill="#e6f4f0" stroke="#2d6357" stroke-width="5"/>
+    <rect x="41" y="68" width="62" height="42" rx="8" fill="#f6ecd4" stroke="#765334" stroke-width="4"/>
+    <text x="72" y="98" text-anchor="middle" font-size="27" font-weight="800" fill="#765334" font-family="serif">营</text>
+  </g>
+  <g transform="translate(752 151)" filter="url(#shadow)">
+    <rect width="142" height="92" rx="16" fill="#f6ecd4" stroke="#765334" stroke-width="4"/>
+    <rect x="38" y="25" width="66" height="44" rx="6" fill="#d4b07a" stroke="#765334" stroke-width="4"/>
+    <path d="M27 16h88v62H27z" fill="none" stroke="#765334" stroke-width="2" stroke-dasharray="7 6"/>
+    <text x="71" y="58" text-anchor="middle" font-size="25" font-weight="800" fill="#765334" font-family="serif">旗</text>
+  </g>
+</svg>
