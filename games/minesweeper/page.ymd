@@ -17,13 +17,12 @@
 [require](./api.js)
 </head>
 <body>
-[offline-catalog](../catalog.json)
 [require](../../app/segmented-control.html)
 [require](../../app/guide-dialog.html)
 [require](../../app/side-drawer.html)
 [require](../../app/app-shell.html)
 [require](./minesweeper.html)
-<offline-shell page="minesweeper"><minesweeper-game></minesweeper-game></offline-shell>
+<offline-shell page="minesweeper" guide="./guides/minesweeper.svg"><minesweeper-game></minesweeper-game></offline-shell>
 </body>
 </html>
 

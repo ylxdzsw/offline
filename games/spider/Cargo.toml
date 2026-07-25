@@ -1,13 +1,21 @@
 [package]
 name = "offline-spider"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-authors.workspace = true
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+authors = ["ylxdzsw"]
 
 [lib]
+path = "lib.rs"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-serde.workspace = true
-serde_json.workspace = true
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = 3
+panic = "abort"
+strip = true

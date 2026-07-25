@@ -267,13 +267,13 @@
             solitaire: '<span class="solitaire-mark"><i>♥</i><i>♣</i><i>♦</i></span>',
             spider: '<span class="spider-mark"><i>K♠</i><i>Q♥</i><i>J♣</i></span>',
         }
-        root.querySelector('.games').innerHTML = (OfflineGames.catalog || []).map(game => `
-            <article data-game="${game.id}">
-                <div class="preview">${marks[game.id] || ''}</div>
+        root.querySelector('.games').innerHTML = OfflineGames.games.map(game => `
+            <article data-game="${game}">
+                <div class="preview">${marks[game] || ''}</div>
                 <div class="content">
-                    <h2>${i18n.t(game.id)}</h2>
-                    <p>${i18n.t(game.id + 'Desc')}</p>
-                    <a href="${i18n.href('./' + game.id + '.html')}">${i18n.t(storage.hasProgress(game.id) ? 'continue' : 'play')}</a>
+                    <h2>${i18n.t(game)}</h2>
+                    <p>${i18n.t(game + 'Desc')}</p>
+                    <a href="${i18n.href('./' + game + '.html')}">${i18n.t(storage.hasProgress(game) ? 'continue' : 'play')}</a>
                 </div>
             </article>
         `).join('')

@@ -1,21 +1,15 @@
 const {test, expect} = require('@playwright/test')
 const fs = require('node:fs')
 const path = require('node:path')
-const catalog = require('../../games/catalog.json')
-const pageFiles = ['index.html', ...catalog.map(game => `${game.id}.html`)]
-const guideAssets = [
-    'guides/xiangqi-movement.svg',
-    'guides/wuziqi-lines.svg',
-    'guides/sudoku-peers.svg',
-    'guides/2048-merge.svg',
-    'guides/junqi-board.svg',
-    'guides/chess-special.svg',
-    'guides/reversi-bracket.webp',
-    'guides/huarong-escape.svg',
-    'guides/minesweeper-counts.svg',
-    'guides/solitaire-layout.svg',
-    'guides/spider-runs.svg',
-]
+const gamesRoot = path.resolve('games')
+const games = fs.readdirSync(gamesRoot, {withFileTypes: true})
+    .filter(entry => entry.isDirectory() && fs.existsSync(path.join(gamesRoot, entry.name, 'Cargo.toml')))
+    .map(entry => entry.name)
+const pageFiles = ['index.html', ...games.map(game => `${game}.html`)]
+const guideAssets = games.map(game => {
+    const extension = fs.existsSync(path.join(gamesRoot, game, 'guide.svg')) ? 'svg' : 'webp'
+    return `guides/${game}.${extension}`
+})
 
 test('build is self-contained and contains the complete PWA shell', async () => {
     const dist = path.resolve('dist')
@@ -33,10 +27,10 @@ test('build is self-contained and contains the complete PWA shell', async () => 
     const manifest = JSON.parse(fs.readFileSync(path.join(dist, 'manifest.webmanifest'), 'utf8'))
     expect(manifest.background_color).toBe('#f5f4f2')
     expect(manifest.theme_color).toBe('#f5f4f2')
-    for (const game of catalog) {
-        const html = fs.readFileSync(path.join(dist, `${game.id}.html`), 'utf8')
-        expect(html).toContain(`<${game.element}`)
-        expect(html.includes(`id=${game.id}-worker-payload`)).toBe(game.worker)
+    for (const game of games) {
+        const html = fs.readFileSync(path.join(dist, `${game}.html`), 'utf8')
+        expect(html).toContain(`<offline-shell page=${game}`)
+        expect(html.includes(`id=${game}-worker-payload`)).toBe(fs.existsSync(path.join(gamesRoot, game, 'worker.js')))
     }
     const sw = fs.readFileSync(path.join(dist, 'sw.js'), 'utf8')
     for (const asset of [...pageFiles.map(file => './' + file), './manifest.webmanifest', ...guideAssets.map(file => './' + file)]) {
@@ -48,12 +42,12 @@ test('gallery and sidebar localize from query and preserve the override', async 
     await page.goto('/index.html?lang=zh')
     await expect(page.locator('offline-shell h1')).toHaveText('经典游戏')
     await expect(page.locator('.game-gallery h2').first()).toHaveText('中国象棋')
-    await expect(page.locator('.game-gallery article')).toHaveCount(catalog.length)
+    await expect(page.locator('.game-gallery article')).toHaveCount(games.length)
     await expect(page.locator('.game-gallery h2').last()).toHaveText('蜘蛛纸牌')
     await page.locator('offline-shell .menu-btn').click()
     await expect(page.locator('offline-shell aside')).toHaveAttribute('aria-hidden', 'false')
     await expect(page.locator('offline-shell offline-drawer .brand')).toHaveAttribute('href', /index\.html\?lang=zh$/)
-    await expect(page.locator('offline-shell offline-drawer nav a')).toHaveCount(catalog.length)
+    await expect(page.locator('offline-shell offline-drawer nav a')).toHaveCount(games.length)
     await expect(page.locator('offline-shell offline-drawer nav a[href*="index.html"]')).toHaveCount(0)
     await expect(page.locator('offline-shell offline-drawer a[href*="xiangqi.html"]')).toHaveAttribute('href', /xiangqi\.html\?lang=zh$/)
     await expect(page.locator('offline-shell offline-drawer a[href*="reversi.html"]')).toHaveAttribute('href', /reversi\.html\?lang=zh$/)
@@ -175,7 +169,7 @@ test('game intro opens localized rules and tips without appearing in the gallery
     expect(await dialog.locator('.rule-group li').count()).toBeGreaterThanOrEqual(8)
     await expect(dialog.locator('.tips-list li')).toHaveCount(3)
     await expect(dialog.locator('figcaption')).toContainText('Winning lines')
-    await expect(dialog.locator('.guide-image')).toHaveAttribute('src', './guides/wuziqi-lines.svg')
+    await expect(dialog.locator('.guide-image')).toHaveAttribute('src', './guides/wuziqi.svg')
     expect(await dialog.locator('.guide-image').evaluate(image => image.complete && image.naturalWidth > 0)).toBeTruthy()
     expect(await dialog.evaluate(element => {
         const rect = element.getBoundingClientRect()
@@ -360,7 +354,7 @@ test('Huarong Dao hints an optimal slide, moves, persists, reloads, and undoes',
     await expect(page.locator('huarong-game .piece')).toHaveCount(10)
     await page.locator('offline-shell .guide-btn').click()
     await expect(page.locator('offline-shell .rule-group')).toHaveCount(3)
-    await expect(page.locator('offline-shell .guide-image')).toHaveAttribute('src', './guides/huarong-escape.svg')
+    await expect(page.locator('offline-shell .guide-image')).toHaveAttribute('src', './guides/huarong.svg')
     await page.keyboard.press('Escape')
     await page.locator('huarong-game .difficulty').selectOption('easy')
     await expect(page.locator('huarong-game .move-count')).toHaveText('0')
@@ -424,7 +418,7 @@ test('Minesweeper confirms reveals, keeps flags reversible, persists, and has no
     await page.reload()
     expect(await page.locator('minesweeper-game .cell.revealed').count()).toBeGreaterThanOrEqual(9)
     await page.locator('offline-shell .guide-btn').click()
-    await expect(page.locator('offline-shell .guide-image')).toHaveAttribute('src', './guides/minesweeper-counts.svg')
+    await expect(page.locator('offline-shell .guide-image')).toHaveAttribute('src', './guides/minesweeper.svg')
     await expect(page.locator('offline-shell .rule-group')).toHaveCount(3)
     await page.goto('/index.html?lang=en')
     await expect(page.locator('.game-gallery article[data-game="minesweeper"] a')).toHaveText('Continue')
@@ -476,7 +470,7 @@ test('Solitaire draws, moves a tableau card, persists, reloads, and undoes', asy
     await expect(page.locator('solitaire-game .moves')).toHaveText('1')
 
     await page.locator('offline-shell .guide-btn').click()
-    await expect(page.locator('offline-shell .guide-image')).toHaveAttribute('src', './guides/solitaire-layout.svg')
+    await expect(page.locator('offline-shell .guide-image')).toHaveAttribute('src', './guides/solitaire.svg')
     await expect(page.locator('offline-shell .rule-group')).toHaveCount(3)
     await page.keyboard.press('Escape')
 
@@ -516,7 +510,7 @@ test('Spider deals, persists, blocks empty-column deals, and completes the final
     await expect(page.locator('spider-game .stock-count')).toHaveText('5')
 
     await page.locator('offline-shell .guide-btn').click()
-    await expect(page.locator('offline-shell .guide-image')).toHaveAttribute('src', './guides/spider-runs.svg')
+    await expect(page.locator('offline-shell .guide-image')).toHaveAttribute('src', './guides/spider.svg')
     await expect(page.locator('offline-shell .rule-group')).toHaveCount(3)
     await page.keyboard.press('Escape')
 

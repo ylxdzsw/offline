@@ -13,14 +13,13 @@
 [require](./api.js)
 </head>
 <body>
-[offline-catalog](../catalog.json)
 [require](../../app/segmented-control.html)
 [require](../../app/guide-dialog.html)
 [require](../../app/side-drawer.html)
 [require](../../app/app-shell.html)
 [require](./junqi.html)
 [offline-worker](junqi-worker-payload)(junqi)(../../app/wasm.js)(./api.js)(./worker.js)
-<offline-shell page="junqi"><junqi-game></junqi-game></offline-shell>
+<offline-shell page="junqi" guide="./guides/junqi.svg"><junqi-game></junqi-game></offline-shell>
 </body></html>
 
 [mixin] ../../app/macros.ymd

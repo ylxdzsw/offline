@@ -1,6 +1,6 @@
 mod game;
 mod wasm_abi {
-    include!("../../wasm_abi.rs");
+    include!("../wasm_abi.rs");
 }
 
 use serde::de::DeserializeOwned;
@@ -18,52 +18,53 @@ fn dispatch(request: Value) -> DispatchResult {
         .and_then(Value::as_str)
         .ok_or_else(|| DispatchError::new("request is missing a string op field"))?;
     match operation {
-        "ping" => Ok(json!({"abi": wasm_abi::ABI_VERSION, "game": "solitaire"})),
+        "ping" => Ok(json!({"abi": wasm_abi::ABI_VERSION, "game": "minesweeper"})),
+        "config" => {
+            #[derive(serde::Deserialize)]
+            struct Input {
+                difficulty: String,
+            }
+            Ok(json!(
+                game::config(&args::<Input>(&request)?.difficulty).map_err(DispatchError::new)?
+            ))
+        }
         "newGame" => {
             #[derive(serde::Deserialize)]
-            #[serde(rename_all = "camelCase")]
             struct Input {
+                difficulty: String,
                 seed: u64,
-                draw_count: u8,
             }
             let input = args::<Input>(&request)?;
             Ok(json!(
-                game::new_game(input.seed, input.draw_count).map_err(DispatchError::new)?
+                game::new_game(&input.difficulty, input.seed).map_err(DispatchError::new)?
             ))
         }
         "validate" => {
             #[derive(serde::Deserialize)]
             struct Input {
-                game: game::Game,
+                board: game::Board,
             }
             Ok(json!(
-                game::validate(&args::<Input>(&request)?.game).is_ok()
+                game::validate(&args::<Input>(&request)?.board).is_ok()
             ))
         }
-        "draw" => {
+        "reveal" | "toggleFlag" | "chord" => {
             #[derive(serde::Deserialize)]
             struct Input {
-                game: game::Game,
-            }
-            Ok(json!(
-                game::draw(args::<Input>(&request)?.game).map_err(DispatchError::new)?
-            ))
-        }
-        "move" => {
-            #[derive(serde::Deserialize)]
-            struct Input {
-                game: game::Game,
-                source: game::Source,
-                destination: game::Destination,
+                board: game::Board,
+                index: usize,
             }
             let input = args::<Input>(&request)?;
-            Ok(json!(
-                game::move_cards(input.game, input.source, input.destination)
-                    .map_err(DispatchError::new)?
-            ))
+            let result = match operation {
+                "reveal" => game::reveal(input.board, input.index),
+                "toggleFlag" => game::toggle_flag(input.board, input.index),
+                "chord" => game::chord(input.board, input.index),
+                _ => unreachable!(),
+            };
+            Ok(json!(result.map_err(DispatchError::new)?))
         }
         _ => Err(DispatchError::new(format!(
-            "unknown solitaire operation {operation:?}"
+            "unknown minesweeper operation {operation:?}"
         ))),
     }
 }

@@ -17,14 +17,13 @@
 [require](./api.js)
 </head>
 <body>
-[offline-catalog](../catalog.json)
 [require](../../app/segmented-control.html)
 [require](../../app/guide-dialog.html)
 [require](../../app/side-drawer.html)
 [require](../../app/app-shell.html)
 [require](./xiangqi.html)
 [offline-worker](xiangqi-worker-payload)(xiangqi)(../../app/wasm.js)(./api.js)(./worker.js)
-<offline-shell page="xiangqi">
+<offline-shell page="xiangqi" guide="./guides/xiangqi.svg">
 <xiangqi-game></xiangqi-game>
 </offline-shell>
 </body>

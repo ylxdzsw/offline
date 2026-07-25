@@ -17,13 +17,12 @@
 [require](./api.js)
 </head>
 <body>
-[offline-catalog](../catalog.json)
 [require](../../app/segmented-control.html)
 [require](../../app/guide-dialog.html)
 [require](../../app/side-drawer.html)
 [require](../../app/app-shell.html)
 [require](./sudoku.html)
-<offline-shell page="sudoku"><sudoku-game tabindex="0"></sudoku-game></offline-shell>
+<offline-shell page="sudoku" guide="./guides/sudoku.svg"><sudoku-game tabindex="0"></sudoku-game></offline-shell>
 </body>
 </html>
 

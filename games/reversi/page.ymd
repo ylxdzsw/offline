@@ -17,14 +17,13 @@
 [require](./api.js)
 </head>
 <body>
-[offline-catalog](../catalog.json)
 [require](../../app/segmented-control.html)
 [require](../../app/guide-dialog.html)
 [require](../../app/side-drawer.html)
 [require](../../app/app-shell.html)
 [require](./reversi.html)
 [offline-worker](reversi-worker-payload)(reversi)(../../app/wasm.js)(./api.js)(./worker.js)
-<offline-shell page="reversi"><reversi-game></reversi-game></offline-shell>
+<offline-shell page="reversi" guide="./guides/reversi.webp"><reversi-game></reversi-game></offline-shell>
 </body>
 </html>
 

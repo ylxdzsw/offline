@@ -12,7 +12,6 @@
 [require](./i18n.js)
 [require](./storage.js)
 [require](./runtime.js)
-[offline-catalog](../games/catalog.json)
 </head>
 <body>
 [require](./segmented-control.html)
@@ -27,4 +26,4 @@
 </html>
 
 [mixin] common.ymd
-[mixin] ../../app/macros.ymd
+[mixin] ./macros.ymd

@@ -1,7 +1,7 @@
 mod game;
 mod search;
 mod wasm_abi {
-    include!("../../wasm_abi.rs");
+    include!("../wasm_abi.rs");
 }
 
 #[cfg(not(target_arch = "wasm32"))]

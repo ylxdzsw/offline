@@ -4,7 +4,10 @@ const path = require('node:path')
 const test = require('node:test')
 const vm = require('node:vm')
 
-const catalog = require('../games/catalog.json')
+const gamesRoot = path.join(__dirname, '../games')
+const games = fs.readdirSync(gamesRoot, {withFileTypes: true})
+    .filter(entry => entry.isDirectory() && fs.existsSync(path.join(gamesRoot, entry.name, 'Cargo.toml')))
+    .map(entry => entry.name)
 const source = fs.readFileSync(path.join(__dirname, 'i18n.js'), 'utf8')
 
 function loadI18n(locale) {
@@ -27,7 +30,7 @@ test('every game has a complete guide in both languages', () => {
     for (const locale of ['en', 'zh']) {
         const i18n = loadI18n(locale)
         assert.equal(i18n.locale, locale)
-        for (const {id} of catalog) {
+        for (const id of games) {
             const guide = i18n.guide(id)
             assert.ok(guide, `${locale}/${id} guide`)
             assert.equal(guide.quick.length, 3, `${locale}/${id} quick start`)

@@ -1,7 +1,7 @@
 mod game;
 mod search;
 mod wasm_abi {
-    include!("../../wasm_abi.rs");
+    include!("../wasm_abi.rs");
 }
 
 use serde::de::DeserializeOwned;

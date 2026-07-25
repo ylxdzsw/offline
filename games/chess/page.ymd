@@ -8,14 +8,13 @@
 [offline-wasm](chess)(../target/wasm32-unknown-unknown/release/offline_chess.wasm)
 [require](./api.js)
 </head><body>
-[offline-catalog](../catalog.json)
 [require](../../app/segmented-control.html)
 [require](../../app/guide-dialog.html)
 [require](../../app/side-drawer.html)
 [require](../../app/app-shell.html)
 [require](./chess.html)
 [offline-worker](chess-worker-payload)(chess)(../../app/wasm.js)(./api.js)(./worker.js)
-<offline-shell page="chess"><chess-game></chess-game></offline-shell>
+<offline-shell page="chess" guide="./guides/chess.svg"><chess-game></chess-game></offline-shell>
 </body></html>
 
 [mixin] ../../app/macros.ymd

@@ -17,14 +17,13 @@
 [require](./api.js)
 </head>
 <body>
-[offline-catalog](../catalog.json)
 [require](../../app/segmented-control.html)
 [require](../../app/guide-dialog.html)
 [require](../../app/side-drawer.html)
 [require](../../app/app-shell.html)
 [require](./huarong.html)
 [offline-worker](huarong-worker-payload)(huarong)(../../app/wasm.js)(./api.js)(./worker.js)
-<offline-shell page="huarong"><huarong-game></huarong-game></offline-shell>
+<offline-shell page="huarong" guide="./guides/huarong.svg"><huarong-game></huarong-game></offline-shell>
 </body>
 </html>
 

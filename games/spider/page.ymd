@@ -17,13 +17,12 @@
 [require](./api.js)
 </head>
 <body>
-[offline-catalog](../catalog.json)
 [require](../../app/segmented-control.html)
 [require](../../app/guide-dialog.html)
 [require](../../app/side-drawer.html)
 [require](../../app/app-shell.html)
 [require](./spider.html)
-<offline-shell page="spider"><spider-game></spider-game></offline-shell>
+<offline-shell page="spider" guide="./guides/spider.svg"><spider-game></spider-game></offline-shell>
 </body>
 </html>
 

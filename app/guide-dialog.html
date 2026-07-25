@@ -196,20 +196,6 @@
     </dialog>
 </template>
 <script>
-const guideVisuals = {
-    xiangqi: './guides/xiangqi-movement.svg',
-    wuziqi: './guides/wuziqi-lines.svg',
-    sudoku: './guides/sudoku-peers.svg',
-    '2048': './guides/2048-merge.svg',
-    junqi: './guides/junqi-board.svg',
-    chess: './guides/chess-special.svg',
-    reversi: './guides/reversi-bracket.webp',
-    huarong: './guides/huarong-escape.svg',
-    minesweeper: './guides/minesweeper-counts.svg',
-    solitaire: './guides/solitaire-layout.svg',
-    spider: './guides/spider-runs.svg',
-}
-
 customElements.define('offline-guide', class extends HTMLElement {
     connectedCallback() {
         const tmpl = document.getElementById('offline-guide-template')
@@ -221,7 +207,7 @@ customElements.define('offline-guide', class extends HTMLElement {
         dialog.addEventListener('click', e => { if (e.target === dialog) dialog.close() })
     }
 
-    setup(i18n, game, triggerEl) {
+    setup(i18n, game, visual, triggerEl) {
         const guide = i18n.guide(game)
         if (!guide) return false
         const s = this.shadowRoot
@@ -235,10 +221,10 @@ customElements.define('offline-guide', class extends HTMLElement {
             Object.assign(document.createElement('li'), {textContent: item})))
         const example = s.querySelector('.example')
         const image = s.querySelector('.guide-image')
-        image.src = guideVisuals[game] || ''
+        image.src = visual || ''
         image.alt = guide.visual
         s.querySelector('figcaption').textContent = guide.visual
-        example.hidden = !guide.visual || !guideVisuals[game]
+        example.hidden = !guide.visual || !visual
         s.querySelector('.rule-groups').replaceChildren(...guide.sections.map(group => {
             const section = Object.assign(document.createElement('section'), {className: 'rule-group'})
             section.append(Object.assign(document.createElement('h4'), {textContent: group.title}))

@@ -17,13 +17,12 @@
 [require](./api.js)
 </head>
 <body>
-[offline-catalog](../catalog.json)
 [require](../../app/segmented-control.html)
 [require](../../app/guide-dialog.html)
 [require](../../app/side-drawer.html)
 [require](../../app/app-shell.html)
 [require](./2048.html)
-<offline-shell page="2048"><game-2048></game-2048></offline-shell>
+<offline-shell page="2048" guide="./guides/2048.svg"><game-2048></game-2048></offline-shell>
 </body>
 </html>
 

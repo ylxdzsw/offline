@@ -1,7 +1,7 @@
 mod ai;
 mod game;
 mod wasm_abi {
-    include!("../../wasm_abi.rs");
+    include!("../wasm_abi.rs");
 }
 
 use game::{Move, State};

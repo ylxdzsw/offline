@@ -17,14 +17,13 @@
 [require](./api.js)
 </head>
 <body>
-[offline-catalog](../catalog.json)
 [require](../../app/segmented-control.html)
 [require](../../app/guide-dialog.html)
 [require](../../app/side-drawer.html)
 [require](../../app/app-shell.html)
 [require](./wuziqi.html)
 [offline-worker](wuziqi-worker-payload)(wuziqi)(../../app/wasm.js)(./api.js)(./worker.js)
-<offline-shell page="wuziqi">
+<offline-shell page="wuziqi" guide="./guides/wuziqi.svg">
 <wuziqi-game></wuziqi-game>
 </offline-shell>
 </body>

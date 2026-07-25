@@ -5,6 +5,7 @@
   "description": "Bilingual mobile-first offline classic games PWA",
   "license": "MIT",
   "devDependencies": {
-    "@playwright/test": "1.61.1"
+    "@playwright/test": "1.61.1",
+    "nattoppet": "4.1.1"
   }
 }

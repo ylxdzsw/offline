@@ -128,6 +128,20 @@
     <offline-guide></offline-guide>
 </template>
 <script>
+OfflineGames.games = [
+    'xiangqi',
+    'wuziqi',
+    'sudoku',
+    '2048',
+    'junqi',
+    'chess',
+    'reversi',
+    'huarong',
+    'minesweeper',
+    'solitaire',
+    'spider',
+]
+
 customElements.define('offline-shell', class extends HTMLElement {
     constructor() {
         super()
@@ -165,7 +179,7 @@ customElements.define('offline-shell', class extends HTMLElement {
         drawer.setup({
             i18n,
             theme,
-            games: OfflineGames.catalog || [],
+            games: OfflineGames.games,
             currentPage: page,
             layoutEl: layout,
             triggerEl: menuBtn,
@@ -175,7 +189,7 @@ customElements.define('offline-shell', class extends HTMLElement {
         /* Guide dialog */
         const guide = s.querySelector('offline-guide')
         guideBtn.setAttribute('aria-label', i18n.t('openGuide'))
-        const hasGuide = guide.setup(i18n, page, guideBtn)
+        const hasGuide = guide.setup(i18n, page, this.getAttribute('guide'), guideBtn)
         if (hasGuide) {
             guideBtn.hidden = false
             guideBtn.addEventListener('click', () => guide.open())

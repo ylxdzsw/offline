@@ -16,18 +16,19 @@ A mobile-first bilingual collection of classic board and puzzle games that remai
 
 Every game is compiled by [Nattoppet](https://github.com/ylxdzsw/nattoppet) into a self-contained HTML page. The PWA uses no gameplay server, CDN, remote font, analytics service, or downloadable AI model.
 
-Rules, puzzle generation, and computer play live in the Rust workspace under
-`games/`. Each game directory owns its page, HTML component, browser adapter,
-worker, contract tests, and Rust crate. The Makefile builds one WebAssembly module per game; Nattoppet
+Rules, puzzle generation, and computer play live in independent Rust crates
+under `games/`. Each game directory owns its page, HTML component, browser
+adapter, worker, guide, contract tests, manifest, and lockfile. The Makefile
+builds one WebAssembly module per game; Nattoppet
 compresses and inlines that module into its page, while AI searches run in Web
 Workers. Saved games carry a seed, so undo/retry is reproducible and each new
 game can still vary among near-equal moves without randomizing away forced
 tactics.
 
-Shared page behavior lives directly under `app/`. The game order and runtime
-navigation come from `games/catalog.json`. Deployment inputs are in `public/`,
-and the small build utilities are in `scripts/`. See [AGENTS.md](AGENTS.md) for
-the complete file-ownership and development notes.
+Shared page behavior and deployment assets live directly under `app/`. Product
+membership is explicit in the Makefile, while the shared shell owns runtime
+navigation order. Small build utilities live in `scripts/`. See
+[AGENTS.md](AGENTS.md) for the complete file-ownership and development notes.
 
 ## Build and test
 
