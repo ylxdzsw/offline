@@ -11,6 +11,7 @@ const guideAssets = [
     'guides/junqi-board.svg',
     'guides/chess-special.svg',
     'guides/reversi-bracket.webp',
+    'guides/huarong-escape.svg',
 ]
 
 test('build is self-contained and contains the complete PWA shell', async () => {
@@ -38,8 +39,8 @@ test('gallery and sidebar localize from query and preserve the override', async 
     await page.goto('/index.html?lang=zh')
     await expect(page.locator('offline-shell h1')).toHaveText('经典游戏')
     await expect(page.locator('.game-gallery h2').first()).toHaveText('中国象棋')
-    await expect(page.locator('.game-gallery article')).toHaveCount(7)
-    await expect(page.locator('.game-gallery h2').last()).toHaveText('黑白棋')
+    await expect(page.locator('.game-gallery article')).toHaveCount(8)
+    await expect(page.locator('.game-gallery h2').last()).toHaveText('华容道')
     await page.locator('offline-shell .menu-btn').click()
     await expect(page.locator('offline-shell aside')).toHaveAttribute('aria-hidden', 'false')
     await expect(page.locator('offline-shell offline-drawer .brand')).toHaveAttribute('href', /index\.html\?lang=zh$/)
@@ -47,6 +48,7 @@ test('gallery and sidebar localize from query and preserve the override', async 
     await expect(page.locator('offline-shell offline-drawer nav a[href*="index.html"]')).toHaveCount(0)
     await expect(page.locator('offline-shell offline-drawer a[href*="xiangqi.html"]')).toHaveAttribute('href', /xiangqi\.html\?lang=zh$/)
     await expect(page.locator('offline-shell offline-drawer a[href*="reversi.html"]')).toHaveAttribute('href', /reversi\.html\?lang=zh$/)
+    await expect(page.locator('offline-shell offline-drawer a[href*="huarong.html"]')).toHaveAttribute('href', /huarong\.html\?lang=zh$/)
     await page.locator('offline-shell .backdrop').click({position: {x: 380, y: 400}})
     await expect(page.locator('offline-shell aside')).toHaveAttribute('aria-hidden', 'true')
 })
@@ -299,6 +301,28 @@ test('Reversi flips discs, plays an AI reply, persists, and undoes the turn', as
     await expect(page.locator('reversi-game .cell[data-index="3"]')).toHaveClass(/legal/)
 })
 
+test('Huarong Dao hints an optimal slide, moves, persists, reloads, and undoes', async ({page}) => {
+    await page.goto('/huarong.html?lang=en')
+    await expect(page.locator('huarong-game .piece')).toHaveCount(10)
+    await page.locator('offline-shell .guide-btn').click()
+    await expect(page.locator('offline-shell .rule-group')).toHaveCount(3)
+    await expect(page.locator('offline-shell .guide-image')).toHaveAttribute('src', './guides/huarong-escape.svg')
+    await page.keyboard.press('Escape')
+    await page.locator('huarong-game .difficulty').selectOption('easy')
+    await expect(page.locator('huarong-game .move-count')).toHaveText('0')
+    await page.locator('huarong-game .hint').click()
+    await expect(page.locator('huarong-game .piece.hinted')).toHaveCount(1, {timeout: 6000})
+    await expect(page.locator('huarong-game .target.hinted')).toHaveCount(1)
+    await expect(page.locator('huarong-game .status')).toContainText('optimal moves remain')
+    await page.locator('huarong-game .target.hinted').click()
+    await expect(page.locator('huarong-game .move-count')).toHaveText('1')
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:huarong')).history.length)).toBe(1)
+    await page.reload()
+    await expect(page.locator('huarong-game .undo')).toBeEnabled()
+    await page.locator('huarong-game .undo').click()
+    await expect(page.locator('huarong-game .move-count')).toHaveText('0')
+})
+
 for (const viewport of [{width: 320, height: 568}, {width: 390, height: 844}, {width: 430, height: 932}]) {
     test(`all pages fit a ${viewport.width}x${viewport.height} mobile viewport`, async ({page}) => {
         await page.setViewportSize(viewport)
@@ -325,5 +349,8 @@ test('the installed app reloads and navigates completely offline', async ({brows
     await page.goto('/reversi.html?lang=zh')
     await expect(page.locator('offline-shell h1')).toHaveText('黑白棋')
     await expect(page.locator('reversi-game .cell.legal')).toHaveCount(4)
+    await page.goto('/huarong.html?lang=en')
+    await expect(page.locator('offline-shell h1')).toHaveText('Huarong Dao')
+    await expect(page.locator('huarong-game .piece')).toHaveCount(10)
     await context.close()
 })

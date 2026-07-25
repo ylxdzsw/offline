@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img" aria-labelledby="title desc">
+  <title id="title">Huarong Dao escape</title>
+  <desc id="desc">A four by five wooden board showing Cao Cao sliding toward the bottom gate.</desc>
+  <defs>
+    <linearGradient id="wood" x2="0" y2="1">
+      <stop stop-color="#dfbd87"/>
+      <stop offset="1" stop-color="#c99a5d"/>
+    </linearGradient>
+    <linearGradient id="red" x2="0" y2="1">
+      <stop stop-color="#cf6253"/>
+      <stop offset="1" stop-color="#9e3028"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="5" stdDeviation="5" flood-opacity=".25"/>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="9" refY="6" orient="auto">
+      <path d="M0 0l12 6-12 6z" fill="#c6473e"/>
+    </marker>
+  </defs>
+  <rect width="960" height="540" fill="#f5f4f2"/>
+  <g transform="translate(300 24)" filter="url(#shadow)">
+    <rect x="0" y="0" width="360" height="450" rx="20" fill="url(#wood)" stroke="#6f4d33" stroke-width="8"/>
+    <g stroke="#6a4a2f" stroke-opacity=".22">
+      <path d="M90 4v442M180 4v442M270 4v442"/>
+      <path d="M4 90h352M4 180h352M4 270h352M4 360h352"/>
+    </g>
+    <g fill="#f6ecd4" stroke="#6b4d34" stroke-width="3">
+      <rect x="8" y="8" width="74" height="164" rx="10"/>
+      <rect x="278" y="8" width="74" height="164" rx="10"/>
+      <rect x="8" y="188" width="74" height="164" rx="10"/>
+      <rect x="278" y="188" width="74" height="164" rx="10"/>
+      <rect x="98" y="188" width="164" height="74" rx="10" fill="#987129"/>
+      <rect x="98" y="278" width="74" height="74" rx="10"/>
+      <rect x="188" y="278" width="74" height="74" rx="10"/>
+      <rect x="8" y="368" width="74" height="74" rx="10"/>
+      <rect x="278" y="368" width="74" height="74" rx="10"/>
+    </g>
+    <rect x="98" y="8" width="164" height="164" rx="13" fill="url(#red)" stroke="#77251f" stroke-width="3"/>
+    <g font-family="serif" font-weight="700" text-anchor="middle">
+      <text x="180" y="102" fill="#fff7ec" font-size="36">曹操</text>
+      <text x="180" y="235" fill="#fff8dd" font-size="28">关羽</text>
+      <text x="45" y="104" fill="#b12f28" font-size="24">张飞</text>
+      <text x="315" y="104" fill="#b12f28" font-size="24">赵云</text>
+      <text x="45" y="284" fill="#b12f28" font-size="24">马超</text>
+      <text x="315" y="284" fill="#b12f28" font-size="24">黄忠</text>
+    </g>
+    <path d="M180 178v235" fill="none" stroke="#c6473e" stroke-width="12" stroke-linecap="round" stroke-dasharray="18 15" marker-end="url(#arrow)"/>
+    <path d="M94 450h172" stroke="#f5f4f2" stroke-width="12"/>
+  </g>
+  <g font-family="system-ui,sans-serif" text-anchor="middle">
+    <text x="480" y="510" fill="#6b6968" font-size="24">Slide every block without lifting or rotating it · 平移棋子，不能拿起或旋转</text>
+  </g>
+</svg>

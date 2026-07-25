@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "2048",
     "chess",
+    "huarong",
     "junqi",
     "reversi",
     "sudoku",

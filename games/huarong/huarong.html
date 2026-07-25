@@ -1,0 +1,372 @@
+<template id="huarong-game-template">
+    <style>
+        :host { display: block; color: var(--ink); }
+        .toolbar { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: end; margin-bottom: 10px; }
+        label { display: grid; min-width: 0; gap: 3px; color: var(--ink-muted); font-size: .7rem; font-weight: 600; letter-spacing: .02em; }
+        select, button {
+            min-height: var(--control-h, 42px); border: 1px solid var(--border-strong);
+            border-radius: var(--radius-sm); color: var(--ink); background: var(--bg-surface);
+        }
+        select { width: 100%; min-width: 0; padding: 0 28px 0 10px; text-overflow: ellipsis; }
+        button { padding: 0 12px; font-weight: 650; }
+        button:disabled { opacity: .42; }
+        .warning { margin: 0 0 9px; color: var(--danger); font-size: .77rem; text-align: center; }
+        .warning[hidden] { display: none; }
+        .summary {
+            display: grid; grid-template-columns: 1fr auto; align-items: stretch; gap: 8px; margin-bottom: 9px;
+        }
+        .moves {
+            display: flex; min-width: 0; min-height: 44px; align-items: center; justify-content: center; gap: 8px;
+            border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--ink-muted);
+            background: var(--bg-surface); box-shadow: var(--shadow-soft); font-size: .78rem;
+        }
+        .moves strong {
+            color: var(--ink); font-family: var(--font-display); font-size: 1.35rem;
+            font-variant-numeric: tabular-nums;
+        }
+        .hint { min-width: 92px; color: var(--accent-ink); border-color: transparent; background: var(--accent); }
+        .hint.thinking::after {
+            display: inline-block; width: 5px; height: 5px; margin-left: 7px; border-radius: 50%;
+            content: ""; background: currentColor; animation: pulse .8s ease-in-out infinite alternate;
+        }
+        @keyframes pulse { to { opacity: .25; transform: scale(.7); } }
+        .status {
+            display: flex; min-height: 42px; align-items: center; justify-content: center;
+            margin: 0 0 9px; padding: 7px 11px; border-radius: var(--radius-sm);
+            color: var(--status-ink); font-size: .86rem; font-weight: 700; line-height: 1.35;
+            text-align: center; background: var(--status-bg);
+        }
+        .board {
+            position: relative; width: min(100%, 360px); aspect-ratio: 4 / 5; margin: 0 auto;
+            overflow: hidden; border: 4px solid var(--board-wood-edge); border-radius: var(--radius-md);
+            background-color: var(--board-wood);
+            background-image:
+                linear-gradient(to right, transparent calc(25% - .5px), color-mix(in srgb, var(--board-wood-line) 20%, transparent) calc(25% - .5px), color-mix(in srgb, var(--board-wood-line) 20%, transparent) calc(25% + .5px), transparent calc(25% + .5px)),
+                linear-gradient(to bottom, transparent calc(20% - .5px), color-mix(in srgb, var(--board-wood-line) 20%, transparent) calc(20% - .5px), color-mix(in srgb, var(--board-wood-line) 20%, transparent) calc(20% + .5px), transparent calc(20% + .5px));
+            background-size: 25% 100%, 100% 20%;
+            box-shadow: inset 0 0 24px rgba(64, 39, 14, .22), var(--shadow-soft);
+            touch-action: none; user-select: none;
+        }
+        .board::after {
+            position: absolute; z-index: 1; right: 25%; bottom: -4px; left: 25%; height: 8px; content: "";
+            background: var(--bg-shell); box-shadow: 0 -2px 0 var(--hint);
+        }
+        .exit-label {
+            position: absolute; z-index: 2; right: 25%; bottom: 3px; left: 25%;
+            color: color-mix(in srgb, var(--board-wood-line) 75%, transparent);
+            font-size: .58rem; font-weight: 800; letter-spacing: .12em; text-align: center;
+            pointer-events: none;
+        }
+        .piece {
+            position: absolute; z-index: 3; display: grid; box-sizing: border-box;
+            left: calc(var(--x) * 25% + 4px); top: calc(var(--y) * 20% + 4px);
+            width: calc(var(--w) * 25% - 8px); height: calc(var(--h) * 20% - 8px);
+            min-width: 0; min-height: 0; padding: 4px; border: 1px solid color-mix(in srgb, var(--piece-outline) 72%, transparent);
+            border-radius: 9px; place-items: center; color: var(--piece-black);
+            background: linear-gradient(145deg, color-mix(in srgb, var(--piece-face) 92%, white), var(--piece-face));
+            box-shadow: inset 0 0 0 2px color-mix(in srgb, currentColor 10%, transparent), 0 2px 5px rgba(50, 30, 12, .28);
+            font-family: var(--font-display); font-size: clamp(.62rem, 3.3vw, .9rem); line-height: 1.05;
+            text-align: center; transition: left .2s ease, top .2s ease, filter .15s ease, transform .15s ease, box-shadow .15s ease;
+        }
+        .piece-name { display: block; }
+        .piece.cao { color: #fff7ec; border-color: #77251f; background: linear-gradient(145deg, #c95748, #9d3028); font-size: clamp(.95rem, 5vw, 1.25rem); }
+        .piece.guan { color: #fff8dd; border-color: #6f5420; background: linear-gradient(145deg, #ad8636, #7f5d21); font-size: clamp(.78rem, 4vw, 1.05rem); }
+        .piece.general { color: var(--piece-red); }
+        .piece.soldier { color: var(--piece-black); font-size: clamp(.55rem, 2.8vw, .76rem); }
+        .piece.selected {
+            z-index: 6; transform: scale(.96); box-shadow: inset 0 0 0 3px var(--selected), 0 3px 8px rgba(40, 30, 18, .32);
+        }
+        .piece.hinted { animation: hint-piece .85s ease-in-out infinite alternate; }
+        @keyframes hint-piece { to { filter: brightness(1.16); box-shadow: inset 0 0 0 3px var(--hint), 0 3px 9px rgba(40, 30, 18, .36); } }
+        .target {
+            position: absolute; z-index: 7; display: grid; left: calc(var(--x) * 25%); top: calc(var(--y) * 20%);
+            width: 25%; height: 20%; min-height: 0; padding: 0; border: 0; border-radius: 0;
+            place-items: center; background: transparent;
+        }
+        .target::after {
+            width: 24%; aspect-ratio: 1; border-radius: 50%; content: "";
+            background: var(--legal); box-shadow: 0 0 0 7px var(--legal-soft);
+        }
+        .target.hinted::after { background: var(--hint); box-shadow: 0 0 0 8px color-mix(in srgb, var(--hint) 18%, transparent); animation: target-pulse .75s ease-in-out infinite alternate; }
+        @keyframes target-pulse { to { transform: scale(1.3); } }
+        .piece:focus-visible, .target:focus-visible { z-index: 9; outline: 3px solid var(--focus); outline-offset: -3px; }
+        .board.solved .piece.cao { z-index: 8; animation: escape .7s ease-in-out alternate 2; }
+        @keyframes escape { to { transform: translateY(8%) scale(1.03); filter: brightness(1.15); } }
+        .gesture-note { margin: 9px 0 0; color: var(--ink-faint); font-size: .72rem; line-height: 1.4; text-align: center; }
+        @media (max-width: 340px) {
+            .toolbar { gap: 4px; }
+            .toolbar button { padding-inline: 8px; font-size: .82rem; }
+            .hint { min-width: 78px; }
+            .piece { border-radius: 7px; }
+        }
+    </style>
+    <div class="toolbar">
+        <label><span class="difficulty-label"></span><select class="difficulty">
+            <option value="easy"></option><option value="medium"></option><option value="hard"></option>
+        </select></label>
+        <button class="undo" type="button"></button>
+        <button class="new" type="button"></button>
+    </div>
+    <p class="warning" hidden></p>
+    <div class="summary">
+        <div class="moves"><span class="moves-label"></span><strong class="move-count">0</strong></div>
+        <button class="hint" type="button"></button>
+    </div>
+    <div class="status" role="status" aria-live="polite"></div>
+    <div class="board" role="grid" aria-label="">
+        <span class="exit-label"></span>
+    </div>
+    <p class="gesture-note"></p>
+</template>
+
+<script>
+OfflineGames.wasm.defineElement('huarong', 'huarong-game', class extends HTMLElement {
+    constructor() {
+        super()
+        this.attachShadow({mode: 'open'}).append(document.getElementById('huarong-game-template').content.cloneNode(true))
+        this.selected = null
+        this.hintMove = null
+        this.hintDistance = null
+        this.hinting = false
+        this.hintError = false
+        this.worker = null
+        this.requestId = 0
+        this.pointer = null
+        this.dragHandled = false
+    }
+    connectedCallback() {
+        this.engine = OfflineGames.Huarong
+        this.i18n = OfflineGames.i18n
+        this.storage = OfflineGames.storage
+        this.load()
+        this.bind()
+        this.localize()
+        this.render()
+    }
+    disconnectedCallback() { this.cancelHint() }
+    fresh(difficulty = 'medium') {
+        const layout = this.engine.layout(difficulty)
+        return {schema: 1, game: 'huarong', difficulty, positions: layout.positions, history: [], outcome: null}
+    }
+    valid(saved) {
+        return saved && ['easy', 'medium', 'hard'].includes(saved.difficulty)
+            && Array.isArray(saved.positions) && this.engine.validate(saved.positions)
+            && Array.isArray(saved.history)
+    }
+    load() {
+        const saved = this.storage.read('huarong')
+        this.state = this.valid(saved) ? saved : this.fresh()
+        this.state.outcome = this.engine.isSolved(this.state.positions) ? {ended: true, reason: 'escaped'} : null
+    }
+    bind() {
+        const s = this.shadowRoot, board = s.querySelector('.board')
+        board.addEventListener('click', event => {
+            const target = event.target.closest('.target')
+            if (target) { this.moveTo(Number(target.dataset.to)); return }
+            const piece = event.target.closest('.piece')
+            if (!piece) return
+            if (this.dragHandled) { this.dragHandled = false; return }
+            this.select(Number(piece.dataset.piece))
+        })
+        board.addEventListener('pointerdown', event => {
+            const piece = event.target.closest('.piece')
+            if (!piece || event.button !== 0 || this.state.outcome) return
+            this.pointer = {piece: Number(piece.dataset.piece), x: event.clientX, y: event.clientY}
+            piece.setPointerCapture?.(event.pointerId)
+        })
+        board.addEventListener('pointerup', event => {
+            if (!this.pointer) return
+            const pointer = this.pointer
+            this.pointer = null
+            const dx = event.clientX - pointer.x, dy = event.clientY - pointer.y
+            if (Math.max(Math.abs(dx), Math.abs(dy)) < 18) return
+            const horizontal = Math.abs(dx) > Math.abs(dy)
+            const moves = this.engine.legalMoves(this.state.positions, pointer.piece).filter(move => {
+                const deltaRow = this.engine.rowOf(move.to) - this.engine.rowOf(move.from)
+                const deltaColumn = this.engine.columnOf(move.to) - this.engine.columnOf(move.from)
+                return horizontal ? Math.sign(deltaColumn) === Math.sign(dx) : Math.sign(deltaRow) === Math.sign(dy)
+            })
+            if (!moves.length) return
+            moves.sort((a, b) => Math.abs(b.to - b.from) - Math.abs(a.to - a.from))
+            this.selected = pointer.piece
+            this.dragHandled = true
+            this.moveTo(moves[0].to)
+        })
+        board.addEventListener('pointercancel', () => { this.pointer = null })
+        board.addEventListener('keydown', event => {
+            const piece = event.target.closest('.piece')
+            if (!piece || this.state.outcome) return
+            const directions = {ArrowUp: [0,-1], ArrowRight: [1,0], ArrowDown: [0,1], ArrowLeft: [-1,0]}
+            if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault()
+                this.select(Number(piece.dataset.piece))
+                return
+            }
+            const direction = directions[event.key]
+            if (!direction) return
+            event.preventDefault()
+            const index = Number(piece.dataset.piece)
+            const from = this.state.positions[index]
+            const move = this.engine.legalMoves(this.state.positions, index).find(candidate => {
+                const dx = this.engine.columnOf(candidate.to) - this.engine.columnOf(from)
+                const dy = this.engine.rowOf(candidate.to) - this.engine.rowOf(from)
+                return Math.sign(dx) === direction[0] && Math.sign(dy) === direction[1]
+            })
+            if (move) { this.selected = index; this.moveTo(move.to) }
+        })
+        s.querySelector('.undo').addEventListener('click', () => this.undo())
+        s.querySelector('.new').addEventListener('click', () => this.newGame())
+        s.querySelector('.hint').addEventListener('click', () => this.requestHint())
+        s.querySelector('.difficulty').addEventListener('change', event => this.newGame(event.target.value, true))
+    }
+    localize() {
+        const s = this.shadowRoot, t = key => this.i18n.t(key)
+        s.querySelector('.difficulty-label').textContent = t('difficulty')
+        for (const option of s.querySelectorAll('.difficulty option')) option.textContent = `${t(option.value)} · ${t('huarongLayout' + option.value[0].toUpperCase() + option.value.slice(1))}`
+        s.querySelector('.undo').textContent = t('undo')
+        s.querySelector('.new').textContent = t('newGame')
+        s.querySelector('.hint').textContent = t('huarongHint')
+        s.querySelector('.moves-label').textContent = t('huarongMoves')
+        s.querySelector('.warning').textContent = t('storageWarning')
+        s.querySelector('.exit-label').textContent = t('huarongExit')
+        s.querySelector('.gesture-note').textContent = t('huarongGesture')
+        s.querySelector('.board').setAttribute('aria-label', t('huarongBoard'))
+    }
+    save() {
+        if (!this.storage.write('huarong', this.state)) this.shadowRoot.querySelector('.warning').hidden = false
+    }
+    clearHint() {
+        this.cancelHint()
+        this.hintMove = null
+        this.hintDistance = null
+        this.hintError = false
+    }
+    select(piece) {
+        if (this.state.outcome || this.hinting) return
+        this.hintMove = null
+        this.hintDistance = null
+        this.hintError = false
+        this.selected = this.selected === piece ? null : piece
+        this.render()
+    }
+    moveTo(to) {
+        if (this.selected == null || this.state.outcome || this.hinting) return
+        if (!this.engine.legalMoves(this.state.positions, this.selected).some(move => move.to === to)) return
+        this.cancelHint()
+        this.state.history.push(this.state.positions.slice())
+        this.state.positions = this.engine.applyMove(this.state.positions, this.selected, to)
+        this.state.outcome = this.engine.isSolved(this.state.positions) ? {ended: true, reason: 'escaped'} : null
+        this.selected = null
+        this.hintMove = null
+        this.hintDistance = null
+        this.hintError = false
+        this.save()
+        this.render()
+    }
+    undo() {
+        const previous = this.state.history.pop()
+        if (!previous) return
+        this.clearHint()
+        this.state.positions = previous
+        this.state.outcome = null
+        this.selected = null
+        this.save()
+        this.render()
+    }
+    newGame(difficulty = this.state.difficulty, force = false) {
+        if (!force && this.state.history.length && !this.state.outcome && !confirm(this.i18n.t('confirmNew'))) return
+        this.clearHint()
+        this.state = this.fresh(difficulty)
+        this.selected = null
+        this.save()
+        this.render()
+    }
+    requestHint() {
+        if (this.hinting || this.state.outcome) return
+        this.clearHint()
+        this.selected = null
+        this.hinting = true
+        const id = ++this.requestId
+        this.worker = OfflineGames.runtime.createWorker('huarong-worker-payload')
+        this.worker.onmessage = event => {
+            if (event.data.id !== id || !this.hinting) return
+            this.cancelHint(false)
+            this.hintMove = event.data.move
+            this.hintDistance = event.data.distance
+            this.hintError = !event.data.move
+            this.selected = this.hintMove ? this.state.positions.indexOf(this.hintMove.from) : null
+            this.render()
+        }
+        this.worker.onerror = error => {
+            console.error(error)
+            this.cancelHint(false)
+            this.hintError = true
+            this.render()
+        }
+        this.worker.postMessage({id, positions: this.state.positions})
+        this.render()
+    }
+    cancelHint(invalidate = true) {
+        if (invalidate) this.requestId++
+        if (this.worker) this.worker.terminate()
+        this.worker = null
+        this.hinting = false
+    }
+    direction(from, to) {
+        if (this.engine.rowOf(to) < this.engine.rowOf(from)) return this.i18n.t('huarongUp')
+        if (this.engine.rowOf(to) > this.engine.rowOf(from)) return this.i18n.t('huarongDown')
+        if (this.engine.columnOf(to) < this.engine.columnOf(from)) return this.i18n.t('huarongLeft')
+        return this.i18n.t('huarongRight')
+    }
+    format(template, values) {
+        return Object.entries(values).reduce((text, [key, value]) => text.replaceAll(`{${key}}`, value), template)
+    }
+    statusText() {
+        if (this.state.outcome) return this.format(this.i18n.t('huarongSolved'), {moves: this.state.history.length})
+        if (this.hinting) return this.i18n.t('huarongFindingHint')
+        if (this.hintError) return this.i18n.t('huarongHintUnavailable')
+        if (this.hintMove) {
+            const piece = this.state.positions.indexOf(this.hintMove.from)
+            return this.format(this.i18n.t('huarongHintReady'), {
+                piece: this.i18n.t(`huarongPiece${piece}`),
+                direction: this.direction(this.hintMove.from, this.hintMove.to),
+                moves: this.hintDistance,
+            })
+        }
+        if (this.selected != null) return this.i18n.t('huarongChooseDestination')
+        return this.i18n.t('huarongPrompt')
+    }
+    displayName(piece) {
+        const name = this.i18n.t(`huarongPiece${piece}`)
+        if (piece > 5) return this.i18n.locale === 'zh' ? '兵' : `S${piece - 5}`
+        if (this.i18n.locale === 'zh' || piece < 2) return name
+        return name.split(' ').map(part => `<span>${part}</span>`).join('<br>')
+    }
+    render() {
+        const s = this.shadowRoot, board = s.querySelector('.board')
+        const legal = this.selected == null ? [] : this.engine.legalMoves(this.state.positions, this.selected)
+        const pieces = this.state.positions.map((position, piece) => {
+            const [width, height] = this.engine.SIZES[piece]
+            const classes = ['piece', piece === 0 ? 'cao' : piece === 1 ? 'guan' : piece < 6 ? 'general' : 'soldier']
+            if (piece === this.selected) classes.push('selected')
+            if (this.hintMove?.from === position) classes.push('hinted')
+            const name = this.i18n.t(`huarongPiece${piece}`)
+            return `<button type="button" role="gridcell" class="${classes.join(' ')}" data-piece="${piece}" style="--x:${this.engine.columnOf(position)};--y:${this.engine.rowOf(position)};--w:${width};--h:${height}" aria-label="${name}"><span class="piece-name">${this.displayName(piece)}</span></button>`
+        }).join('')
+        const targets = legal.map(move => {
+            const hinted = this.hintMove?.to === move.to ? ' hinted' : ''
+            return `<button type="button" class="target${hinted}" data-to="${move.to}" style="--x:${this.engine.columnOf(move.to)};--y:${this.engine.rowOf(move.to)}" aria-label="${this.i18n.t('legalMove')}"></button>`
+        }).join('')
+        board.querySelectorAll('.piece, .target').forEach(element => element.remove())
+        board.insertAdjacentHTML('beforeend', pieces + targets)
+        board.classList.toggle('solved', Boolean(this.state.outcome))
+        s.querySelector('.move-count').textContent = this.state.history.length
+        s.querySelector('.status').textContent = this.statusText()
+        s.querySelector('.difficulty').value = this.state.difficulty
+        s.querySelector('.undo').disabled = !this.state.history.length || this.hinting
+        const hint = s.querySelector('.hint')
+        hint.disabled = this.hinting || Boolean(this.state.outcome)
+        hint.classList.toggle('thinking', this.hinting)
+    }
+})
+</script>

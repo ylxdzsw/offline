@@ -5,5 +5,6 @@
   {"id":"2048","element":"game-2048","worker":false},
   {"id":"junqi","element":"junqi-game","worker":true},
   {"id":"chess","element":"chess-game","worker":true},
-  {"id":"reversi","element":"reversi-game","worker":true}
+  {"id":"reversi","element":"reversi-game","worker":true},
+  {"id":"huarong","element":"huarong-game","worker":true}
 ]
