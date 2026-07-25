@@ -47,7 +47,7 @@
         }
         .square.hq::after { display: none; }
         .square.legal::before { width: 15px; height: 15px; border: 0; border-radius: 50%; background: var(--legal); }
-        .square.capture::before { width: 72%; height: 72%; border: 3px solid var(--capture); border-radius: 10px; background: transparent; }
+        .square.capture::before { z-index: 3; width: 94%; height: 86%; border: 3px solid var(--capture); border-radius: 10px; background: transparent; pointer-events: none; }
         .piece {
             position: relative; z-index: 2; display: grid; width: min(88%, 58px); height: min(80%, 37px);
             border: 2px solid currentColor; border-radius: 7px; place-items: center;

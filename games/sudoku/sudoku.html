@@ -18,7 +18,7 @@
         .warning { margin: 0 0 9px; color: var(--danger); font-size: .77rem; text-align: center; }
         .warning[hidden] { display: none; }
         .board {
-            display: grid; width: 100%; aspect-ratio: 1; grid-template-columns: repeat(9, 1fr);
+            display: grid; width: 100%; aspect-ratio: 1; grid-template: repeat(9, 1fr) / repeat(9, 1fr);
             overflow: hidden; border: 2px solid var(--board-paper-box); border-radius: var(--radius-sm);
             background: var(--board-paper); box-shadow: var(--shadow-soft); user-select: none;
         }
@@ -39,7 +39,7 @@
         .cell.conflict { color: var(--danger); background: var(--danger-soft); }
         .notes {
             position: absolute; inset: 2px; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
-            color: var(--ink-faint); font-size: clamp(.42rem, 2.3vw, .64rem); font-weight: 500; line-height: 1;
+            color: var(--ink-faint); font-size: clamp(.5rem, 2.7vw, .72rem); font-weight: 650; line-height: 1;
         }
         .notes i { display: grid; place-items: center; font-style: normal; }
         .pad { display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px; margin-top: 10px; }
