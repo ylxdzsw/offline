@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="360" viewBox="0 0 720 360" role="img" aria-labelledby="title desc">
+  <title id="title">Klondike tableau and foundations</title>
+  <desc id="desc">Alternating-color descending cards in the tableau and same-suit ascending cards in a foundation.</desc>
+  <rect width="720" height="360" rx="28" fill="#1c563d"/>
+  <g font-family="Georgia,serif" font-weight="700">
+    <g transform="translate(40 44)">
+      <rect width="96" height="134" rx="9" fill="#fffdf8" stroke="#17231d" stroke-width="3"/>
+      <text x="12" y="28" font-size="25" fill="#171918">10</text><text x="48" y="88" text-anchor="middle" font-size="44" fill="#171918">♣</text>
+    </g>
+    <g transform="translate(40 120)">
+      <rect width="96" height="134" rx="9" fill="#fffdf8" stroke="#17231d" stroke-width="3"/>
+      <text x="12" y="28" font-size="25" fill="#c52d32">9</text><text x="48" y="88" text-anchor="middle" font-size="44" fill="#c52d32">♥</text>
+    </g>
+    <g transform="translate(40 196)">
+      <rect width="96" height="134" rx="9" fill="#fffdf8" stroke="#17231d" stroke-width="3"/>
+      <text x="12" y="28" font-size="25" fill="#171918">8</text><text x="48" y="88" text-anchor="middle" font-size="44" fill="#171918">♠</text>
+    </g>
+    <path d="M165 178h160" stroke="#f7d86b" stroke-width="7" stroke-linecap="round"/>
+    <path d="m313 162 22 16-22 16" fill="none" stroke="#f7d86b" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <g transform="translate(365 44)">
+      <rect width="96" height="134" rx="9" fill="#fffdf8" stroke="#17231d" stroke-width="3"/>
+      <text x="12" y="28" font-size="25" fill="#c52d32">A</text><text x="48" y="88" text-anchor="middle" font-size="44" fill="#c52d32">♦</text>
+    </g>
+    <g transform="translate(474 44)">
+      <rect width="96" height="134" rx="9" fill="#fffdf8" stroke="#17231d" stroke-width="3"/>
+      <text x="12" y="28" font-size="25" fill="#c52d32">2</text><text x="48" y="88" text-anchor="middle" font-size="44" fill="#c52d32">♦</text>
+    </g>
+    <g transform="translate(583 44)">
+      <rect width="96" height="134" rx="9" fill="#fffdf8" stroke="#17231d" stroke-width="3"/>
+      <text x="12" y="28" font-size="25" fill="#c52d32">3</text><text x="48" y="88" text-anchor="middle" font-size="44" fill="#c52d32">♦</text>
+    </g>
+    <text x="520" y="238" text-anchor="middle" font-family="system-ui,sans-serif" font-size="23" fill="#fff">A → 2 → 3 … K</text>
+    <text x="199" y="318" text-anchor="middle" font-family="system-ui,sans-serif" font-size="21" fill="#d8eee4">alternate colors · descend</text>
+    <text x="520" y="318" text-anchor="middle" font-family="system-ui,sans-serif" font-size="21" fill="#d8eee4">same suit · ascend</text>
+  </g>
+</svg>

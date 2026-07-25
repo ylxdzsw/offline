@@ -37,6 +37,7 @@
     .game-gallery article[data-game="reversi"] .preview { color: var(--stone-white); background: color-mix(in srgb, var(--board-felt) 70%, var(--bg-elevated)); }
     .game-gallery article[data-game="huarong"] .preview { color: var(--piece-red); background: color-mix(in srgb, var(--board-wood) 62%, var(--bg-elevated)); }
     .game-gallery article[data-game="minesweeper"] .preview { color: var(--ink); background: color-mix(in srgb, var(--selected) 14%, var(--bg-elevated)); }
+    .game-gallery article[data-game="solitaire"] .preview { color: #fff; background: color-mix(in srgb, #246449 78%, var(--bg-elevated)); }
     /* Preview marks — unchanged */
     .game-gallery .xiangqi-mark {
         display: grid; width: 56px; height: 56px;
@@ -151,6 +152,24 @@
     .game-gallery .minesweeper-mark i.one { color: #2567a8; }
     .game-gallery .minesweeper-mark i.two { color: #31713d; }
     .game-gallery .minesweeper-mark i.flag { color: var(--danger); }
+    .game-gallery .solitaire-mark {
+        position: relative; width: 66px; height: 64px;
+    }
+    .game-gallery .solitaire-mark i {
+        position: absolute; display: grid; width: 31px; height: 43px; box-sizing: border-box;
+        border: 1px solid rgba(20,25,23,.55); border-radius: 4px; place-items: center;
+        color: #161918; background: #faf8f2; box-shadow: 0 2px 4px rgba(0,0,0,.28);
+        font: 800 1.05rem/1 Georgia, serif;
+    }
+    .game-gallery .solitaire-mark i:nth-child(1) {
+        top: 2px; left: 5px; transform: rotate(-12deg); color: #c52d32;
+    }
+    .game-gallery .solitaire-mark i:nth-child(2) {
+        top: 8px; left: 20px; transform: rotate(2deg);
+    }
+    .game-gallery .solitaire-mark i:nth-child(3) {
+        top: 15px; left: 34px; transform: rotate(13deg); color: #c52d32;
+    }
     /* Card content */
     .game-gallery .content {
         display: grid;
@@ -226,6 +245,7 @@
             reversi: '<span class="reversi-mark">' + '<i></i>'.repeat(16) + '</span>',
             huarong: '<span class="huarong-mark"><i class="cao"></i><i class="guan"></i><i class="g1"></i><i class="g2"></i><i class="g3"></i><i class="g4"></i><i class="s1"></i><i class="s2"></i><i class="s3"></i><i class="s4"></i></span>',
             minesweeper: '<span class="minesweeper-mark"><i></i><i class="one">1</i><i class="covered"></i><i class="covered"></i><i></i><i class="one">1</i><i class="two">2</i><i class="covered flag">⚑</i><i></i><i></i><i class="one">1</i><i class="covered"></i><i></i><i></i><i class="one">1</i><i class="covered"></i></span>',
+            solitaire: '<span class="solitaire-mark"><i>♥</i><i>♣</i><i>♦</i></span>',
         }
         root.querySelector('.games').innerHTML = (OfflineGames.catalog || []).map(game => `
             <article data-game="${game.id}">

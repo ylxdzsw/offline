@@ -7,5 +7,6 @@
   {"id":"chess","element":"chess-game","worker":true},
   {"id":"reversi","element":"reversi-game","worker":true},
   {"id":"huarong","element":"huarong-game","worker":true},
-  {"id":"minesweeper","element":"minesweeper-game","worker":false}
+  {"id":"minesweeper","element":"minesweeper-game","worker":false},
+  {"id":"solitaire","element":"solitaire-game","worker":false}
 ]

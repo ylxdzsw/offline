@@ -1,0 +1,557 @@
+<template id="solitaire-game-template">
+    <style>
+        :host { display: block; color: var(--ink); }
+        .toolbar {
+            display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 7px;
+            align-items: end; margin-bottom: 9px;
+        }
+        label {
+            display: grid; min-width: 0; gap: 3px; color: var(--ink-muted);
+            font-size: .7rem; font-weight: 600; letter-spacing: .02em;
+        }
+        select, .toolbar button {
+            min-height: var(--control-h, 42px); border: 1px solid var(--border-strong);
+            border-radius: var(--radius-sm); color: var(--ink); background: var(--bg-surface);
+        }
+        select { width: 100%; min-width: 0; padding: 0 27px 0 9px; text-overflow: ellipsis; }
+        .toolbar button { padding: 0 12px; font-weight: 650; touch-action: manipulation; }
+        .toolbar button:disabled { opacity: .42; }
+        .warning { margin: 0 0 9px; color: var(--danger); font-size: .77rem; text-align: center; }
+        .warning[hidden] { display: none; }
+        .dashboard {
+            display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;
+            margin-bottom: 9px;
+        }
+        .meter {
+            display: grid; min-height: 45px; align-content: center; justify-content: center; gap: 2px;
+            border: 1px solid var(--border); border-radius: var(--radius-sm);
+            background: var(--bg-surface); box-shadow: var(--shadow-soft); text-align: center;
+        }
+        .meter span {
+            color: var(--ink-faint); font-size: .61rem; font-weight: 700;
+            letter-spacing: .055em; text-transform: uppercase;
+        }
+        .meter strong {
+            color: var(--ink); font-family: var(--font-mono); font-size: 1.12rem;
+            font-variant-numeric: tabular-nums; line-height: 1;
+        }
+        .status {
+            display: flex; min-height: 42px; align-items: center; justify-content: center;
+            margin: 0 0 9px; padding: 6px 10px; border-radius: var(--radius-sm);
+            color: var(--status-ink); font-size: .81rem; font-weight: 700; line-height: 1.35;
+            text-align: center; background: var(--status-bg);
+        }
+        .status.won { color: var(--success); background: var(--success-soft); }
+        .table {
+            --gap: clamp(2px, 1vw, 5px);
+            position: relative; width: min(100%, 452px); min-height: clamp(350px, 112vw, 540px);
+            margin: 0 auto; box-sizing: border-box; padding: clamp(6px, 2vw, 10px);
+            overflow: hidden; border: 1px solid color-mix(in srgb, #173e2c 65%, var(--border-strong));
+            border-radius: var(--radius-md); color: #fff;
+            background:
+                radial-gradient(circle at 35% 15%, rgba(255,255,255,.055), transparent 42%),
+                linear-gradient(145deg, #246449, #174633 70%, #123a2a);
+            box-shadow: inset 0 0 24px rgba(0,0,0,.18), var(--shadow-soft);
+            user-select: none; -webkit-touch-callout: none;
+        }
+        .top, .tableau {
+            display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--gap);
+        }
+        .top { align-items: start; margin-bottom: clamp(12px, 4vw, 20px); }
+        .tableau { align-items: start; }
+        .pile {
+            display: flex; min-width: 0; min-height: 260px; flex-direction: column;
+            border-radius: 5px;
+        }
+        .pile.drop-target, .foundation.drop-target {
+            outline: 2px solid rgba(255,255,255,.82); outline-offset: 2px;
+        }
+        .card, .slot {
+            position: relative; display: block; width: 100%; min-width: 0; aspect-ratio: 5 / 7;
+            box-sizing: border-box; padding: 0; overflow: hidden;
+            border: 1px solid rgba(20,28,25,.58); border-radius: clamp(3px, 1.2vw, 7px);
+            touch-action: manipulation;
+        }
+        button.card, button.slot { cursor: pointer; }
+        .slot {
+            border: 1px solid rgba(255,255,255,.34); color: rgba(255,255,255,.42);
+            background: rgba(0,0,0,.08);
+        }
+        .foundation.slot {
+            display: grid; place-items: center; font-family: Georgia, serif;
+            font-size: clamp(1rem, 6vw, 1.7rem);
+        }
+        .card.face {
+            color: #151918; background: linear-gradient(145deg, #fff, #f4f1e9);
+            box-shadow: 0 2px 4px rgba(0,0,0,.28);
+        }
+        .card.face.red { color: #c52d32; }
+        .card.back {
+            background:
+                linear-gradient(135deg, rgba(255,255,255,.14) 25%, transparent 25%) 0 0 / 8px 8px,
+                linear-gradient(315deg, rgba(255,255,255,.14) 25%, transparent 25%) 0 0 / 8px 8px,
+                linear-gradient(145deg, #355ea5, #23427d);
+            box-shadow: inset 0 0 0 2px #ecf0f7, inset 0 0 0 4px #31558e, 0 2px 4px rgba(0,0,0,.26);
+        }
+        .card .corner {
+            position: absolute; top: clamp(2px, .8vw, 5px); left: clamp(2px, .8vw, 5px);
+            display: grid; justify-items: center; font-family: Georgia, serif; font-weight: 800;
+            font-size: clamp(.54rem, 2.8vw, .88rem); line-height: .82;
+        }
+        .card .corner .suit { font-size: 1.05em; }
+        .card .pip {
+            position: absolute; inset: 17% 5% 5%; display: grid; place-items: center;
+            font-family: Georgia, serif; font-size: clamp(1rem, 6.2vw, 2rem); line-height: 1;
+        }
+        .card.selected {
+            z-index: 30; transform: translateY(-3px);
+            outline: 3px solid #ffd66b; outline-offset: -2px;
+            box-shadow: 0 5px 11px rgba(0,0,0,.42);
+        }
+        .card:focus-visible, .slot:focus-visible {
+            z-index: 40; outline: 3px solid #fff; outline-offset: 1px;
+        }
+        .pile > .card + .card {
+            margin-top: clamp(-55px, -11.5vw, -31px);
+        }
+        .pile > .card.back + .card {
+            margin-top: clamp(-61px, -12.8vw, -35px);
+        }
+        .stock-count {
+            position: absolute; right: 4px; bottom: 3px; display: grid; min-width: 16px; height: 16px;
+            padding: 0 3px; box-sizing: border-box; border-radius: 8px; place-items: center;
+            color: #fff; background: rgba(0,0,0,.48); font: 700 .58rem/1 var(--font-mono);
+        }
+        .gesture-note {
+            margin: 9px auto 0; max-width: 440px; color: var(--ink-faint);
+            font-size: .7rem; line-height: 1.45; text-align: center;
+        }
+        .celebration { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 50; }
+        .celebration i {
+            --delay: calc(var(--i) * 55ms);
+            position: absolute; top: -42px; left: var(--x); width: 22px; aspect-ratio: 5 / 7;
+            border: 1px solid rgba(0,0,0,.38); border-radius: 3px; background: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,.28);
+            animation: fall 1.45s cubic-bezier(.22,.7,.48,1) var(--delay) both;
+        }
+        .celebration i:nth-child(odd) { background: #f6e8e8; }
+        @keyframes fall {
+            0% { transform: translate3d(0,-30px,0) rotate(0deg); }
+            65% { transform: translate3d(calc((var(--i) - 7) * 2px), 380px,0) rotate(calc(var(--i) * 32deg)); }
+            100% { transform: translate3d(calc((var(--i) - 7) * 4px), 580px,0) rotate(calc(var(--i) * 50deg)); opacity: .18; }
+        }
+        @media (max-width: 340px) {
+            .toolbar { gap: 5px; }
+            .toolbar button { padding-inline: 8px; }
+            .table { padding: 5px; }
+            .pile { min-height: 230px; }
+            .card .pip { display: none; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .celebration { display: none; }
+            .card.selected { transform: none; }
+        }
+    </style>
+    <div class="toolbar">
+        <label><span class="draw-label"></span><select class="draw-count">
+            <option value="1"></option>
+            <option value="3"></option>
+        </select></label>
+        <button class="undo" type="button"></button>
+        <button class="new" type="button"></button>
+    </div>
+    <p class="warning" hidden></p>
+    <div class="dashboard">
+        <div class="meter"><span class="moves-label"></span><strong class="moves">0</strong></div>
+        <div class="meter"><span class="time-label"></span><strong class="timer">00:00</strong></div>
+    </div>
+    <div class="status" role="status" aria-live="polite"></div>
+    <div class="table" role="group">
+        <div class="top"></div>
+        <div class="tableau"></div>
+        <div class="celebration" hidden></div>
+    </div>
+    <p class="gesture-note"></p>
+</template>
+
+<script>
+OfflineGames.wasm.defineElement('solitaire', 'solitaire-game', class extends HTMLElement {
+    constructor() {
+        super()
+        this.attachShadow({mode: 'open'}).append(
+            document.getElementById('solitaire-game-template').content.cloneNode(true)
+        )
+        this.selected = null
+        this.notice = null
+        this.dragSource = null
+        this.lastTap = null
+        this.timerOrigin = null
+        this.timerInterval = null
+        this.visibilityHandler = () => this.visibilityChanged()
+    }
+
+    connectedCallback() {
+        this.engine = OfflineGames.Solitaire
+        this.i18n = OfflineGames.i18n
+        this.storage = OfflineGames.storage
+        this.load()
+        this.bind()
+        this.localize()
+        this.render()
+        this.resumeTimer()
+        document.addEventListener('visibilitychange', this.visibilityHandler)
+    }
+
+    disconnectedCallback() {
+        document.removeEventListener('visibilitychange', this.visibilityHandler)
+        this.pauseTimer(true)
+    }
+
+    fresh(drawCount = 1) {
+        return {
+            schema: 1,
+            game: 'solitaire',
+            drawCount,
+            deal: this.engine.newGame(OfflineGames.runtime.randomSeed(), drawCount),
+            moves: 0,
+            elapsedMs: 0,
+            history: [],
+            progress: false,
+            outcome: null,
+        }
+    }
+
+    valid(saved) {
+        return saved
+            && [1, 3].includes(saved.drawCount)
+            && saved.deal?.drawCount === saved.drawCount
+            && this.engine.validate(saved.deal)
+            && Number.isInteger(saved.moves) && saved.moves >= 0
+            && Number.isFinite(saved.elapsedMs) && saved.elapsedMs >= 0
+            && Array.isArray(saved.history)
+    }
+
+    load() {
+        const saved = this.storage.read('solitaire')
+        this.state = this.valid(saved) ? saved : this.fresh()
+        this.state.outcome = this.state.deal.won ? 'won' : null
+        this.state.progress = this.state.moves > 0 && !this.state.outcome
+    }
+
+    bind() {
+        const s = this.shadowRoot
+        const table = s.querySelector('.table')
+        table.addEventListener('click', event => this.clicked(event))
+        table.addEventListener('dragstart', event => this.dragStarted(event))
+        table.addEventListener('dragend', () => this.clearDropTargets())
+        table.addEventListener('dragover', event => this.draggedOver(event))
+        table.addEventListener('drop', event => this.dropped(event))
+        s.querySelector('.undo').addEventListener('click', () => this.undo())
+        s.querySelector('.new').addEventListener('click', () => this.newGame())
+        s.querySelector('.draw-count').addEventListener('change', event => {
+            const next = Number(event.target.value)
+            if (!this.newGame(next, true)) event.target.value = String(this.state.drawCount)
+        })
+    }
+
+    localize() {
+        const s = this.shadowRoot, t = key => this.i18n.t(key)
+        s.querySelector('.draw-label').textContent = t('solitaireDraw')
+        s.querySelector('.draw-count option[value="1"]').textContent = t('solitaireDrawOne')
+        s.querySelector('.draw-count option[value="3"]').textContent = t('solitaireDrawThree')
+        s.querySelector('.undo').textContent = t('undo')
+        s.querySelector('.new').textContent = t('newGame')
+        s.querySelector('.moves-label').textContent = t('solitaireMoves')
+        s.querySelector('.time-label').textContent = t('solitaireTime')
+        s.querySelector('.warning').textContent = t('storageWarning')
+        s.querySelector('.gesture-note').textContent = t('solitaireGesture')
+        s.querySelector('.table').setAttribute('aria-label', t('solitaireTable'))
+    }
+
+    sourceFrom(element) {
+        if (!element?.classList.contains('face')) return null
+        const kind = element.dataset.kind
+        if (kind === 'waste') return {kind}
+        if (kind === 'foundation') return {kind, suit: Number(element.dataset.suit)}
+        if (kind === 'tableau') {
+            return {kind, column: Number(element.dataset.column), card: Number(element.dataset.card)}
+        }
+        return null
+    }
+
+    sameSource(left, right) {
+        return left && right
+            && left.kind === right.kind
+            && left.suit === right.suit
+            && left.column === right.column
+            && left.card === right.card
+    }
+
+    clicked(event) {
+        const target = event.target.closest('.card, .slot, .pile')
+        if (!target || this.state.outcome) return
+        if (target.dataset.action === 'draw') {
+            this.selected = null
+            this.lastTap = null
+            this.apply(this.engine.draw(this.state.deal))
+            return
+        }
+
+        const source = this.sourceFrom(target)
+        const tableau = target.closest('.pile')
+        const foundation = target.closest('[data-foundation]')
+        const now = performance.now()
+        if (source && source.kind !== 'foundation'
+            && this.sameSource(source, this.lastTap?.source)
+            && now - this.lastTap.time < 420) {
+            this.lastTap = null
+            this.selected = null
+            this.move(source, {kind: 'foundation', suit: this.engine.suit(Number(target.dataset.value))})
+            return
+        }
+        this.lastTap = source ? {source, time: now} : null
+        if (this.selected) {
+            if (source && this.sameSource(source, this.selected)) {
+                this.selected = null
+                this.notice = null
+                this.render()
+                return
+            }
+            if (foundation) {
+                this.move(this.selected, {kind: 'foundation', suit: Number(foundation.dataset.foundation)})
+                return
+            }
+            if (tableau) {
+                this.move(this.selected, {kind: 'tableau', column: Number(tableau.dataset.column)})
+                return
+            }
+        }
+        if (source) {
+            this.selected = source
+            this.notice = null
+            this.render()
+        }
+    }
+
+    move(source, destination) {
+        const result = this.engine.move(this.state.deal, source, destination)
+        if (!result.moved) {
+            this.notice = 'solitaireInvalidMove'
+            this.selected = source
+            this.render()
+            return
+        }
+        this.selected = null
+        this.lastTap = null
+        this.apply(result)
+    }
+
+    apply(result) {
+        if (!result.moved) return
+        this.snapshotElapsed()
+        this.state.history.push({
+            deal: this.state.deal,
+            moves: this.state.moves,
+            elapsedMs: this.state.elapsedMs,
+        })
+        if (this.state.history.length > 200) this.state.history.shift()
+        this.state.deal = result.game
+        this.state.moves += 1
+        this.state.progress = !result.game.won
+        this.state.outcome = result.game.won ? 'won' : null
+        this.notice = null
+        if (this.state.outcome) this.pauseTimer(false)
+        else this.resumeTimer()
+        this.save()
+        this.render()
+    }
+
+    undo() {
+        const previous = this.state.history.pop()
+        if (!previous) return
+        this.pauseTimer(false)
+        Object.assign(this.state, previous, {
+            outcome: previous.deal.won ? 'won' : null,
+            progress: this.state.history.length > 0 || previous.moves > 0,
+        })
+        this.selected = null
+        this.lastTap = null
+        this.notice = null
+        this.save()
+        this.render()
+        this.resumeTimer()
+    }
+
+    newGame(drawCount = this.state.drawCount, forced = false) {
+        if (this.state.progress && !this.state.outcome && !confirm(this.i18n.t('confirmNew'))) return false
+        this.pauseTimer(false)
+        this.state = this.fresh(drawCount)
+        this.selected = null
+        this.lastTap = null
+        this.notice = null
+        this.storage.clear('solitaire')
+        this.render()
+        if (!forced) this.shadowRoot.querySelector('.draw-count').value = String(drawCount)
+        return true
+    }
+
+    save() {
+        this.state.progress = this.state.moves > 0 && !this.state.outcome
+        this.storage.write('solitaire', this.state)
+        this.shadowRoot.querySelector('.warning').hidden = this.storage.isAvailable()
+    }
+
+    snapshotElapsed() {
+        if (this.timerOrigin == null) return
+        this.state.elapsedMs += performance.now() - this.timerOrigin
+        this.timerOrigin = performance.now()
+    }
+
+    resumeTimer() {
+        if (!this.state.progress || this.state.outcome || document.hidden || this.timerOrigin != null) return
+        this.timerOrigin = performance.now()
+        this.timerInterval = setInterval(() => this.renderTimer(), 1000)
+    }
+
+    pauseTimer(persist) {
+        this.snapshotElapsed()
+        this.timerOrigin = null
+        clearInterval(this.timerInterval)
+        this.timerInterval = null
+        if (persist && this.state?.progress) this.save()
+    }
+
+    visibilityChanged() {
+        if (document.hidden) this.pauseTimer(true)
+        else this.resumeTimer()
+    }
+
+    elapsed() {
+        return this.state.elapsedMs + (this.timerOrigin == null ? 0 : performance.now() - this.timerOrigin)
+    }
+
+    renderTimer() {
+        const seconds = Math.floor(this.elapsed() / 1000)
+        const minutes = Math.floor(seconds / 60)
+        this.shadowRoot.querySelector('.timer').textContent =
+            `${String(minutes).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
+    }
+
+    cardName(card) {
+        const rank = this.engine.RANKS[this.engine.rank(card)]
+        const suit = this.i18n.t(`solitaireSuit${this.engine.SUITS[this.engine.suit(card)][0].toUpperCase()}${this.engine.SUITS[this.engine.suit(card)].slice(1)}`)
+        return this.i18n.locale === 'zh' ? `${suit}${rank}` : `${rank} of ${suit}`
+    }
+
+    card(card, source, selected = false, foundation = null) {
+        const rank = this.engine.RANKS[this.engine.rank(card)]
+        const suit = this.engine.suit(card)
+        const mark = this.engine.SUIT_MARKS[suit]
+        const attributes = source.kind === 'tableau'
+            ? `data-kind="tableau" data-column="${source.column}" data-card="${source.card}"`
+            : source.kind === 'foundation'
+                ? `data-kind="foundation" data-suit="${source.suit}"`
+                : 'data-kind="waste"'
+        const foundationAttr = foundation == null ? '' : `data-foundation="${foundation}"`
+        return `<button class="card face ${this.engine.color(card)}${selected ? ' selected' : ''}" type="button"
+            ${attributes} ${foundationAttr} data-value="${card}" draggable="true" aria-label="${this.cardName(card)}">
+            <span class="corner"><span>${rank}</span><span class="suit">${mark}</span></span>
+            <span class="pip">${mark}</span>
+        </button>`
+    }
+
+    renderTop() {
+        const game = this.state.deal
+        const stock = game.stock.length
+            ? `<button class="card back" type="button" data-action="draw" aria-label="${this.i18n.t('solitaireStock')}"><span class="stock-count">${game.stock.length}</span></button>`
+            : `<button class="slot" type="button" data-action="draw" aria-label="${this.i18n.t('solitaireRedeal')}">↻</button>`
+        const waste = game.waste.length
+            ? this.card(game.waste.at(-1), {kind: 'waste'}, this.selected?.kind === 'waste')
+            : '<span class="slot" aria-hidden="true"></span>'
+        const foundations = game.foundations.map((pile, suit) => pile.length
+            ? this.card(pile.at(-1), {kind: 'foundation', suit}, this.selected?.kind === 'foundation' && this.selected.suit === suit, suit)
+            : `<button class="foundation slot" type="button" data-foundation="${suit}" aria-label="${this.i18n.t('solitaireFoundation')} ${this.engine.SUIT_MARKS[suit]}">${this.engine.SUIT_MARKS[suit]}</button>`
+        ).join('')
+        this.shadowRoot.querySelector('.top').innerHTML = stock + waste + '<span></span>' + foundations
+    }
+
+    renderTableau() {
+        this.shadowRoot.querySelector('.tableau').innerHTML = this.state.deal.tableau.map((pile, column) => {
+            const hidden = pile.hidden.map(() => '<span class="card back" aria-hidden="true"></span>').join('')
+            const visible = pile.visible.map((card, index) => this.card(
+                card,
+                {kind: 'tableau', column, card: index},
+                this.selected?.kind === 'tableau'
+                    && this.selected.column === column
+                    && index >= this.selected.card,
+            )).join('')
+            const empty = hidden || visible ? '' : `<button class="slot" type="button" aria-label="${this.i18n.t('solitaireEmptyColumn')}">K</button>`
+            return `<div class="pile" data-column="${column}" role="group" aria-label="${this.i18n.t('column')} ${column + 1}">${hidden}${visible}${empty}</div>`
+        }).join('')
+    }
+
+    renderCelebration() {
+        const celebration = this.shadowRoot.querySelector('.celebration')
+        celebration.hidden = !this.state.outcome
+        celebration.innerHTML = this.state.outcome
+            ? Array.from({length: 15}, (_, index) => `<i style="--i:${index};--x:${(index * 37) % 94}%"></i>`).join('')
+            : ''
+    }
+
+    render() {
+        const s = this.shadowRoot
+        s.querySelector('.draw-count').value = String(this.state.drawCount)
+        s.querySelector('.undo').disabled = this.state.history.length === 0
+        s.querySelector('.moves').textContent = String(this.state.moves)
+        s.querySelector('.warning').hidden = this.storage.isAvailable()
+        const status = s.querySelector('.status')
+        status.classList.toggle('won', Boolean(this.state.outcome))
+        if (this.state.outcome) status.textContent = this.i18n.t('solitaireWon')
+        else if (this.notice) status.textContent = this.i18n.t(this.notice)
+        else if (this.selected) status.textContent = this.i18n.t('solitaireSelected')
+        else status.textContent = this.i18n.t('solitairePrompt')
+        this.renderTimer()
+        this.renderTop()
+        this.renderTableau()
+        this.renderCelebration()
+    }
+
+    dragStarted(event) {
+        const source = this.sourceFrom(event.target.closest('.card'))
+        if (!source || this.state.outcome) {
+            event.preventDefault()
+            return
+        }
+        this.dragSource = source
+        event.dataTransfer.effectAllowed = 'move'
+        event.dataTransfer.setData('text/plain', JSON.stringify(source))
+    }
+
+    draggedOver(event) {
+        const destination = event.target.closest('.pile, [data-foundation]')
+        if (!destination || !this.dragSource) return
+        event.preventDefault()
+        for (const element of this.shadowRoot.querySelectorAll('.drop-target')) element.classList.remove('drop-target')
+        destination.classList.add('drop-target')
+        event.dataTransfer.dropEffect = 'move'
+    }
+
+    dropped(event) {
+        const target = event.target.closest('.pile, [data-foundation]')
+        if (!target || !this.dragSource) return
+        event.preventDefault()
+        const destination = target.matches('[data-foundation]')
+            ? {kind: 'foundation', suit: Number(target.dataset.foundation)}
+            : {kind: 'tableau', column: Number(target.dataset.column)}
+        const source = this.dragSource
+        this.dragSource = null
+        this.clearDropTargets()
+        this.move(source, destination)
+    }
+
+    clearDropTargets() {
+        this.dragSource = null
+        for (const element of this.shadowRoot.querySelectorAll('.drop-target')) element.classList.remove('drop-target')
+    }
+})
+</script>

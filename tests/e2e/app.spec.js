@@ -13,6 +13,7 @@ const guideAssets = [
     'guides/reversi-bracket.webp',
     'guides/huarong-escape.svg',
     'guides/minesweeper-counts.svg',
+    'guides/solitaire-layout.svg',
 ]
 
 test('build is self-contained and contains the complete PWA shell', async () => {
@@ -47,7 +48,7 @@ test('gallery and sidebar localize from query and preserve the override', async 
     await expect(page.locator('offline-shell h1')).toHaveText('经典游戏')
     await expect(page.locator('.game-gallery h2').first()).toHaveText('中国象棋')
     await expect(page.locator('.game-gallery article')).toHaveCount(catalog.length)
-    await expect(page.locator('.game-gallery h2').last()).toHaveText('扫雷')
+    await expect(page.locator('.game-gallery h2').last()).toHaveText('纸牌')
     await page.locator('offline-shell .menu-btn').click()
     await expect(page.locator('offline-shell aside')).toHaveAttribute('aria-hidden', 'false')
     await expect(page.locator('offline-shell offline-drawer .brand')).toHaveAttribute('href', /index\.html\?lang=zh$/)
@@ -428,6 +429,74 @@ test('Minesweeper confirms reveals, keeps flags reversible, persists, and has no
     await expect(page.locator('.game-gallery article[data-game="minesweeper"] a')).toHaveText('Continue')
 })
 
+test('Solitaire draws, moves a tableau card, persists, reloads, and undoes', async ({page}) => {
+    await page.goto('/solitaire.html?lang=en')
+    await expect(page.locator('solitaire-game .pile')).toHaveCount(7)
+    await expect(page.locator('solitaire-game [data-action="draw"] .stock-count')).toHaveText('24')
+    await expect(page.locator('solitaire-game .timer')).toHaveText('00:00')
+
+    await page.locator('solitaire-game [data-action="draw"]').click()
+    await expect(page.locator('solitaire-game .top .card.face[data-kind="waste"]')).toHaveCount(1)
+    await expect(page.locator('solitaire-game .moves')).toHaveText('1')
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:solitaire')).history.length)).toBe(1)
+    await page.reload()
+    await expect(page.locator('solitaire-game .top .card.face[data-kind="waste"]')).toHaveCount(1)
+    await page.locator('solitaire-game .undo').click()
+    await expect(page.locator('solitaire-game [data-action="draw"] .stock-count')).toHaveText('24')
+
+    const move = await page.locator('solitaire-game').evaluate(game => {
+        const engine = OfflineGames.Solitaire
+        for (let seed = 0; seed < 500; seed++) {
+            const deal = engine.newGame(seed, 1)
+            for (let from = 1; from < 7; from++) {
+                const card = deal.tableau[from].visible[0]
+                for (let to = 0; to < 7; to++) {
+                    if (from === to) continue
+                    const top = deal.tableau[to].visible.at(-1)
+                    if (engine.rank(card) + 1 === engine.rank(top) && engine.color(card) !== engine.color(top)) {
+                        Object.assign(game.state, {
+                            drawCount: 1, deal, moves: 0, elapsedMs: 0,
+                            history: [], progress: false, outcome: null,
+                        })
+                        game.render()
+                        return {from, to, hidden: deal.tableau[from].hidden.length}
+                    }
+                }
+            }
+        }
+        throw new Error('No deterministic tableau fixture found')
+    })
+    await page.locator(`solitaire-game .card[data-kind="tableau"][data-column="${move.from}"][data-card="0"]`).click()
+    await expect(page.locator('solitaire-game .status')).toContainText('selected')
+    await page.locator(`solitaire-game .pile[data-column="${move.to}"]`).click({position: {x: 2, y: 220}})
+    await expect(page.locator('solitaire-game .moves')).toHaveText('1')
+    expect(await page.locator(`solitaire-game .pile[data-column="${move.from}"] .card.back`).count()).toBe(move.hidden - 1)
+    await page.reload()
+    await expect(page.locator('solitaire-game .moves')).toHaveText('1')
+
+    await page.locator('offline-shell .guide-btn').click()
+    await expect(page.locator('offline-shell .guide-image')).toHaveAttribute('src', './guides/solitaire-layout.svg')
+    await expect(page.locator('offline-shell .rule-group')).toHaveCount(3)
+    await page.keyboard.press('Escape')
+
+    await page.locator('solitaire-game').evaluate(game => {
+        const foundations = Array.from({length: 4}, (_, suit) =>
+            Array.from({length: suit === 3 ? 12 : 13}, (_, rank) => suit * 13 + rank))
+        const tableau = Array.from({length: 7}, () => ({hidden: [], visible: []}))
+        tableau[0].visible.push(51)
+        Object.assign(game.state, {
+            drawCount: 1,
+            deal: {drawCount: 1, stock: [], waste: [], foundations, tableau, won: false},
+            moves: 0, elapsedMs: 0, history: [], progress: false, outcome: null,
+        })
+        game.render()
+    })
+    await page.locator('solitaire-game .card[data-value="51"]').dblclick()
+    await expect(page.locator('solitaire-game .status')).toHaveText('All four suits complete — you win!')
+    await expect(page.locator('solitaire-game .celebration')).toBeVisible()
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:solitaire')).outcome)).toBe('won')
+})
+
 for (const viewport of [{width: 320, height: 568}, {width: 390, height: 844}, {width: 430, height: 932}]) {
     test(`all pages fit a ${viewport.width}x${viewport.height} mobile viewport`, async ({page}) => {
         await page.setViewportSize(viewport)
@@ -460,5 +529,8 @@ test('the installed app reloads and navigates completely offline', async ({brows
     await page.goto('/minesweeper.html?lang=zh')
     await expect(page.locator('offline-shell h1')).toHaveText('扫雷')
     await expect(page.locator('minesweeper-game .cell')).toHaveCount(256)
+    await page.goto('/solitaire.html?lang=en')
+    await expect(page.locator('offline-shell h1')).toHaveText('Solitaire')
+    await expect(page.locator('solitaire-game .pile')).toHaveCount(7)
     await context.close()
 })
