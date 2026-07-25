@@ -31,6 +31,7 @@
     .game-gallery article[data-game="xiangqi"] .preview { color: var(--piece-red); background: color-mix(in srgb, var(--board-wood) 55%, var(--bg-elevated)); }
     .game-gallery article[data-game="wuziqi"]  .preview { color: var(--board-wood-line); background: color-mix(in srgb, var(--board-wood) 50%, var(--bg-elevated)); }
     .game-gallery article[data-game="sudoku"]  .preview { color: var(--ink); background: var(--board-paper); }
+    .game-gallery article[data-game="2048"]    .preview { color: #776e65; background: color-mix(in srgb, #8f7a66 55%, var(--bg-elevated)); }
     .game-gallery article[data-game="junqi"]   .preview { color: var(--piece-red); background: color-mix(in srgb, var(--board-wood) 40%, var(--bg-elevated)); }
     .game-gallery article[data-game="chess"]   .preview { color: var(--ink); background: color-mix(in srgb, var(--board-dark) 35%, var(--bg-elevated)); }
     .game-gallery article[data-game="reversi"] .preview { color: var(--stone-white); background: color-mix(in srgb, var(--board-felt) 70%, var(--bg-elevated)); }
@@ -65,6 +66,20 @@
         display: grid; border: 1px solid var(--board-paper-line); place-items: center;
         font-family: var(--font-display); font-size: .95rem; font-style: normal; font-weight: 700; color: var(--ink);
     }
+    .game-gallery .game2048-mark {
+        display: grid; width: 64px; height: 64px; box-sizing: border-box;
+        grid-template-columns: repeat(4, 1fr); gap: 3px; padding: 5px;
+        border-radius: 6px; background: #8f7a66;
+    }
+    .game-gallery .game2048-mark i {
+        display: grid; min-width: 0; border-radius: 3px; place-items: center;
+        color: #776e65; background: rgba(238, 228, 218, .35);
+        font-family: var(--font-display); font-size: .52rem; font-style: normal; font-weight: 800;
+    }
+    .game-gallery .game2048-mark i[data-value="2"] { background: #eee4da; }
+    .game-gallery .game2048-mark i[data-value="4"] { background: #ede0c8; }
+    .game-gallery .game2048-mark i[data-value="8"] { color: #f9f6f2; background: #f2b179; }
+    .game-gallery .game2048-mark i[data-value="16"] { color: #f9f6f2; background: #f59563; font-size: .45rem; }
     .game-gallery .junqi-mark {
         display: grid; width: 68px; height: 58px;
         grid-template-columns: repeat(3, 1fr); gap: 4px;
@@ -170,6 +185,7 @@
             xiangqi: '<span class="xiangqi-mark">棋</span>',
             wuziqi:  '<span class="gomoku-mark"></span>',
             sudoku:  '<span class="sudoku-mark"><i>8</i><i></i><i>2</i><i></i><i>5</i><i></i><i>1</i><i></i><i>9</i></span>',
+            '2048':  '<span class="game2048-mark"><i></i><i data-value="2">2</i><i></i><i data-value="4">4</i><i data-value="2">2</i><i></i><i data-value="8">8</i><i></i><i></i><i data-value="4">4</i><i></i><i></i><i data-value="16">16</i><i></i><i></i><i></i></span>',
             junqi:   '<span class="junqi-mark"><i>司</i><i>旗</i><i>工</i><i>弹</i><i>师</i><i>雷</i></span>',
             chess:   '<span class="chess-mark"><i></i><i></i><i></i><i></i></span>',
             reversi: '<span class="reversi-mark">' + '<i></i>'.repeat(16) + '</span>',

@@ -1,10 +1,11 @@
-# Offline Classical Games
+# Offline Classic Games
 
-A mobile-first bilingual collection of classical board games that remains fully playable after the first load. The collection contains:
+A mobile-first bilingual collection of classic board and puzzle games that remains fully playable after the first load. The collection contains:
 
 - Chinese Xiangqi against an on-device AI
 - 15×15 Freestyle Wuziqi against an on-device AI
 - Uniquely solvable Sudoku puzzles in three difficulty levels
+- Seeded 2048 with swipe, keyboard, undo, and persistent best score
 - Hidden-rank Junqi (Luzhanqi) against an on-device AI
 - Full orthodox Chess against an on-device AI
 - Reversi with legal-move hints and a mobility-aware on-device AI

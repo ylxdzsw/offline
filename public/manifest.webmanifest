@@ -1,8 +1,8 @@
 {
   "id": "./",
-  "name": "Offline Classical Games / 离线棋局",
-  "short_name": "棋局 Games",
-  "description": "Offline classical board and puzzle games / 离线经典棋类与益智游戏",
+  "name": "Offline Classic Games / 离线经典游戏",
+  "short_name": "经典游戏",
+  "description": "Offline classic board and puzzle games / 离线经典棋盘与益智游戏",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

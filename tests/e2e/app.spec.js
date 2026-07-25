@@ -25,14 +25,14 @@ test('build is self-contained and contains the complete PWA shell', async () => 
 
 test('gallery and sidebar localize from query and preserve the override', async ({page}) => {
     await page.goto('/index.html?lang=zh')
-    await expect(page.locator('offline-shell h1')).toHaveText('经典棋类')
+    await expect(page.locator('offline-shell h1')).toHaveText('经典游戏')
     await expect(page.locator('.game-gallery h2').first()).toHaveText('中国象棋')
-    await expect(page.locator('.game-gallery article')).toHaveCount(6)
+    await expect(page.locator('.game-gallery article')).toHaveCount(7)
     await expect(page.locator('.game-gallery h2').last()).toHaveText('黑白棋')
-    await page.locator('offline-shell .menu').click()
+    await page.locator('offline-shell .menu-btn').click()
     await expect(page.locator('offline-shell aside')).toHaveAttribute('aria-hidden', 'false')
-    await expect(page.locator('offline-shell a[data-page="xiangqi"]')).toHaveAttribute('href', /xiangqi\.html\?lang=zh$/)
-    await expect(page.locator('offline-shell a[data-page="reversi"]')).toHaveAttribute('href', /reversi\.html\?lang=zh$/)
+    await expect(page.locator('offline-shell offline-drawer a[href*="xiangqi.html"]')).toHaveAttribute('href', /xiangqi\.html\?lang=zh$/)
+    await expect(page.locator('offline-shell offline-drawer a[href*="reversi.html"]')).toHaveAttribute('href', /reversi\.html\?lang=zh$/)
     await page.locator('offline-shell .backdrop').click({position: {x: 380, y: 400}})
     await expect(page.locator('offline-shell aside')).toHaveAttribute('aria-hidden', 'true')
 })
@@ -40,24 +40,24 @@ test('gallery and sidebar localize from query and preserve the override', async 
 test('theme preference switches and persists across pages', async ({page}) => {
     await page.goto('/index.html?lang=en')
     await expect(page.locator('html')).toHaveAttribute('data-theme', /light|dark/)
-    await page.locator('offline-shell .menu').click()
-    await page.locator('offline-shell [data-theme="dark"]').click()
+    await page.locator('offline-shell .menu-btn').click()
+    await page.locator('offline-shell [data-value="dark"]').click()
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
-    await expect(page.locator('offline-shell [data-theme="dark"]')).toHaveAttribute('aria-pressed', 'true')
+    await expect(page.locator('offline-shell [data-value="dark"]')).toHaveAttribute('aria-pressed', 'true')
     await page.goto('/chess.html?lang=en')
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
-    await page.locator('offline-shell .menu').click()
-    await page.locator('offline-shell [data-theme="system"]').click()
-    await expect(page.locator('offline-shell [data-theme="system"]')).toHaveAttribute('aria-pressed', 'true')
+    await page.locator('offline-shell .menu-btn').click()
+    await page.locator('offline-shell [data-value="system"]').click()
+    await expect(page.locator('offline-shell [data-value="system"]')).toHaveAttribute('aria-pressed', 'true')
 })
 
 test('drawer controls remain reachable on a short phone viewport', async ({page}) => {
     await page.setViewportSize({width: 320, height: 568})
     await page.goto('/index.html?lang=en')
-    const menu = page.locator('offline-shell .menu')
+    const menu = page.locator('offline-shell .menu-btn')
     const layout = page.locator('offline-shell .layout')
     const drawer = page.locator('offline-shell aside')
-    const darkTheme = page.locator('offline-shell [data-theme="dark"]')
+    const darkTheme = page.locator('offline-shell [data-value="dark"]')
 
     await expect(drawer).toHaveAttribute('inert', '')
     await expect(menu).toHaveAttribute('aria-expanded', 'false')
@@ -72,7 +72,7 @@ test('drawer controls remain reachable on a short phone viewport', async ({page}
     await darkTheme.click()
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
 
-    await page.locator('offline-shell .close').click()
+    await page.locator('offline-shell offline-drawer .close-btn').click()
     await expect(drawer).toHaveAttribute('inert', '')
     await expect(layout).not.toHaveAttribute('inert', '')
     await expect(menu).toHaveAttribute('aria-expanded', 'false')
@@ -83,25 +83,25 @@ test('navigator language auto-detects Chinese without a query override', async (
     const context = await browser.newContext({locale: 'zh-CN', viewport: {width: 390, height: 844}})
     const page = await context.newPage()
     await page.goto('/index.html')
-    await expect(page.locator('offline-shell h1')).toHaveText('经典棋类')
+    await expect(page.locator('offline-shell h1')).toHaveText('经典游戏')
     expect(await page.locator('html').getAttribute('lang')).toBe('zh-CN')
     await context.close()
 })
 
 test('game intro opens localized rules and tips without appearing in the gallery', async ({page}) => {
     await page.goto('/index.html?lang=en')
-    await expect(page.locator('offline-shell .guide-trigger')).toBeHidden()
+    await expect(page.locator('offline-shell .guide-btn')).toBeHidden()
 
     await page.setViewportSize({width: 320, height: 568})
     await page.goto('/wuziqi.html?lang=en')
-    const intro = page.locator('offline-shell .guide-trigger')
+    const intro = page.locator('offline-shell .guide-btn')
     await expect(intro).toHaveAttribute('aria-label', 'How to play')
     await intro.click()
-    const dialog = page.locator('offline-shell .guide-dialog')
+    const dialog = page.locator('offline-shell offline-guide dialog')
     await expect(dialog).toBeVisible()
-    await expect(dialog.locator('.guide-intro')).toContainText('Black stones')
-    await expect(dialog.locator('.guide-rules li')).toHaveCount(3)
-    await expect(dialog.locator('.guide-tips li')).toHaveCount(3)
+    await expect(dialog.locator('.intro')).toContainText('Black stones')
+    await expect(dialog.locator('.rules-list li')).toHaveCount(3)
+    await expect(dialog.locator('.tips-list li')).toHaveCount(3)
     expect(await dialog.evaluate(element => {
         const rect = element.getBoundingClientRect()
         return rect.left >= 0 && rect.right <= innerWidth && rect.top >= 0 && rect.bottom <= innerHeight
@@ -111,10 +111,10 @@ test('game intro opens localized rules and tips without appearing in the gallery
     await expect(intro).toBeFocused()
 
     await page.goto('/sudoku.html?lang=zh')
-    await page.locator('offline-shell .guide-trigger').click()
-    await expect(page.locator('offline-shell #guide-title')).toHaveText('怎么玩')
+    await page.locator('offline-shell .guide-btn').click()
+    await expect(page.locator('offline-shell #guide-heading')).toHaveText('怎么玩')
     await expect(page.locator('offline-shell .rules-title')).toHaveText('基本规则')
-    await expect(page.locator('offline-shell .guide-done')).toHaveText('知道了')
+    await expect(page.locator('offline-shell .done-btn')).toHaveText('知道了')
 })
 
 test('Xiangqi plays an AI reply, persists, reloads, and undoes a full turn', async ({page}) => {
@@ -152,6 +152,39 @@ test('Sudoku supports entries, notes, hints, undo, and persistence', async ({pag
     await page.reload()
     await expect(page.locator('sudoku-game .undo')).toBeEnabled()
     await page.locator('sudoku-game .undo').click()
+})
+
+test('2048 merges, scores, persists, reloads, undoes, and accepts a swipe', async ({page}) => {
+    await page.goto('/2048.html?lang=en')
+    await expect(page.locator('game-2048 .cell:not([data-value="0"])')).toHaveCount(2)
+    await page.locator('game-2048').evaluate(game => {
+        Object.assign(game.state, {
+            seed: 7,
+            board: [2,2,0,0, 0,0,0,0, 0,0,0,0, 0,0,0,0],
+            score: 0,
+            best: 0,
+            spawnCount: 2,
+            history: [],
+            reached2048: false,
+            outcome: null,
+        })
+        game.render()
+    })
+    const board = page.locator('game-2048 .board')
+    await board.press('ArrowLeft')
+    await expect(page.locator('game-2048 .current-score')).toHaveText('4')
+    await expect(page.locator('game-2048 .cell[data-value="4"]')).toHaveCount(1)
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:2048')).history.length)).toBe(1)
+
+    await page.reload()
+    await expect(page.locator('game-2048 .best-score')).toHaveText('4')
+    await page.locator('game-2048 .undo').click()
+    await expect(page.locator('game-2048 .current-score')).toHaveText('0')
+    await expect(page.locator('game-2048 .cell[data-value="2"]')).toHaveCount(2)
+
+    await board.dispatchEvent('pointerdown', {pointerId: 1, pointerType: 'touch', clientX: 240, clientY: 120})
+    await board.dispatchEvent('pointerup', {pointerId: 1, pointerType: 'touch', clientX: 40, clientY: 120})
+    await expect(page.locator('game-2048 .current-score')).toHaveText('4')
 })
 
 test('Junqi conceals the opponent, makes an AI reply, persists, and undoes', async ({page}) => {

@@ -1,0 +1,283 @@
+<template id="game-2048-template">
+    <style>
+        :host { display: block; color: var(--ink); }
+        .toolbar {
+            display: grid; grid-template-columns: 1fr 1fr auto auto; gap: 8px;
+            align-items: stretch; margin-bottom: 10px;
+        }
+        .score {
+            display: grid; min-width: 0; min-height: var(--control-h, 42px); padding: 5px 9px;
+            border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+            place-content: center; text-align: center; background: var(--bg-elevated);
+        }
+        .score span {
+            color: var(--ink-muted); font-size: .62rem; font-weight: 700;
+            letter-spacing: .07em; line-height: 1; text-transform: uppercase;
+        }
+        .score strong { margin-top: 3px; font-family: var(--font-display); font-size: 1rem; line-height: 1; }
+        button {
+            min-height: var(--control-h, 42px); padding: 0 12px;
+            border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+            color: var(--ink); background: var(--bg-surface); font-weight: 650;
+            touch-action: manipulation;
+        }
+        button:disabled { opacity: .4; }
+        .status {
+            display: flex; min-height: 38px; align-items: center; justify-content: center;
+            margin: 0 0 9px; padding: 0 8px; border-radius: var(--radius-sm);
+            color: var(--status-ink); font-size: .88rem; font-weight: 700;
+            text-align: center; background: var(--status-bg);
+        }
+        .warning { margin: 0 0 9px; color: var(--danger); font-size: .77rem; text-align: center; }
+        .warning[hidden] { display: none; }
+        .board {
+            display: grid; width: 100%; aspect-ratio: 1; box-sizing: border-box;
+            grid-template-columns: repeat(4, 1fr); gap: clamp(6px, 2.2vw, 10px);
+            padding: clamp(7px, 2.4vw, 11px); overflow: hidden;
+            border: 2px solid color-mix(in srgb, var(--ink) 18%, var(--border-strong));
+            border-radius: var(--radius-lg); background: color-mix(in srgb, #8f7a66 76%, var(--bg-elevated));
+            box-shadow: var(--shadow-soft); outline: none; touch-action: none; user-select: none;
+        }
+        .board:focus-visible { box-shadow: 0 0 0 3px var(--focus), var(--shadow-soft); }
+        .cell {
+            display: grid; min-width: 0; min-height: 0; aspect-ratio: 1;
+            border-radius: clamp(5px, 1.7vw, 8px); place-items: center;
+            color: #776e65; background: rgba(238, 228, 218, .35);
+            font-family: var(--font-display); font-size: clamp(1.7rem, 9.5vw, 2.65rem);
+            font-weight: 800; letter-spacing: -.055em; line-height: 1;
+        }
+        .cell[data-value="2"] { background: #eee4da; }
+        .cell[data-value="4"] { background: #ede0c8; }
+        .cell[data-value="8"] { color: #f9f6f2; background: #f2b179; }
+        .cell[data-value="16"] { color: #f9f6f2; background: #f59563; }
+        .cell[data-value="32"] { color: #f9f6f2; background: #f67c5f; }
+        .cell[data-value="64"] { color: #f9f6f2; background: #f65e3b; }
+        .cell[data-value="128"] { color: #f9f6f2; background: #edcf72; font-size: clamp(1.4rem, 7.8vw, 2.25rem); }
+        .cell[data-value="256"] { color: #f9f6f2; background: #edcc61; font-size: clamp(1.4rem, 7.8vw, 2.25rem); }
+        .cell[data-value="512"] { color: #f9f6f2; background: #edc850; font-size: clamp(1.4rem, 7.8vw, 2.25rem); }
+        .cell[data-value="1024"] { color: #f9f6f2; background: #edc53f; font-size: clamp(1.15rem, 6.3vw, 1.9rem); }
+        .cell[data-value="2048"] { color: #f9f6f2; background: #edc22e; font-size: clamp(1.15rem, 6.3vw, 1.9rem); box-shadow: 0 0 16px rgba(237, 194, 46, .5); }
+        .cell.beyond { color: #f9f6f2; background: #3c3a32; font-size: clamp(.92rem, 5.2vw, 1.55rem); }
+        .cell.spawn { animation: spawn .18s ease-out; }
+        .cell.merged { animation: merge .22s ease-out; }
+        @keyframes spawn { from { opacity: 0; transform: scale(.45); } }
+        @keyframes merge { 45% { transform: scale(1.13); } }
+        .directions {
+            display: grid; width: min(230px, 72%); grid-template-columns: repeat(3, 1fr);
+            gap: 6px; margin: 10px auto 0;
+        }
+        .direction {
+            min-height: 40px; padding: 0; color: var(--ink-muted);
+            background: var(--bg-elevated); font-size: 1.05rem;
+        }
+        .direction[data-direction="up"] { grid-column: 2; }
+        .direction[data-direction="left"] { grid-column: 1; grid-row: 2; }
+        .direction[data-direction="down"] { grid-column: 2; grid-row: 2; }
+        .direction[data-direction="right"] { grid-column: 3; grid-row: 2; }
+        @media (max-width: 340px) {
+            .toolbar { gap: 4px; }
+            .score { padding-inline: 5px; }
+            button { padding-inline: 8px; font-size: .8rem; }
+            .directions { margin-top: 8px; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .cell.spawn, .cell.merged { animation: none; }
+        }
+    </style>
+    <div class="toolbar">
+        <div class="score"><span class="score-label"></span><strong class="current-score">0</strong></div>
+        <div class="score"><span class="best-label"></span><strong class="best-score">0</strong></div>
+        <button class="undo" type="button"></button>
+        <button class="new" type="button"></button>
+    </div>
+    <p class="warning" hidden></p>
+    <div class="status" role="status" aria-live="polite"></div>
+    <div class="board" role="grid" tabindex="0"></div>
+    <div class="directions">
+        <button class="direction" data-direction="up" type="button" aria-keyshortcuts="ArrowUp W">▲</button>
+        <button class="direction" data-direction="left" type="button" aria-keyshortcuts="ArrowLeft A">◀</button>
+        <button class="direction" data-direction="down" type="button" aria-keyshortcuts="ArrowDown S">▼</button>
+        <button class="direction" data-direction="right" type="button" aria-keyshortcuts="ArrowRight D">▶</button>
+    </div>
+</template>
+
+<script>
+OfflineGames.wasm.defineElement('2048', 'game-2048', class extends HTMLElement {
+    constructor() {
+        super()
+        this.attachShadow({mode: 'open'}).append(document.getElementById('game-2048-template').content.cloneNode(true))
+        this.announcement = null
+        this.animation = null
+        this.pointer = null
+    }
+    connectedCallback() {
+        this.engine = OfflineGames.Game2048
+        this.i18n = OfflineGames.i18n
+        this.storage = OfflineGames.storage
+        this.load()
+        this.bind()
+        this.localize()
+        this.render()
+    }
+    fresh(best = 0) {
+        const seed = OfflineGames.runtime.randomSeed()
+        const started = this.engine.newGame(seed)
+        return {
+            schema: 1,
+            game: '2048',
+            seed,
+            board: started.board,
+            score: 0,
+            best,
+            spawnCount: started.spawned.length,
+            history: [],
+            reached2048: false,
+            outcome: null,
+        }
+    }
+    valid(saved) {
+        if (!saved || !Array.isArray(saved.board) || saved.board.length !== 16 ||
+            !saved.board.every(value => Number.isInteger(value) && value >= 0) ||
+            !Number.isInteger(saved.seed) || !Number.isFinite(saved.score) || saved.score < 0 ||
+            !Number.isFinite(saved.best) || saved.best < 0 ||
+            !Number.isInteger(saved.spawnCount) || saved.spawnCount < 2 ||
+            !Array.isArray(saved.history) || typeof saved.reached2048 !== 'boolean' ||
+            ![null, 'over'].includes(saved.outcome)) return false
+        try { this.engine.status(saved.board); return true } catch { return false }
+    }
+    load() {
+        const saved = this.storage.read('2048')
+        this.state = this.valid(saved) ? saved : this.fresh()
+    }
+    bind() {
+        const s = this.shadowRoot
+        s.querySelector('.undo').addEventListener('click', () => this.undo())
+        s.querySelector('.new').addEventListener('click', () => this.newGame())
+        for (const button of s.querySelectorAll('.direction')) {
+            button.addEventListener('click', () => this.move(button.dataset.direction))
+        }
+        const board = s.querySelector('.board')
+        board.addEventListener('keydown', event => {
+            const direction = {
+                ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+                w: 'up', W: 'up', s: 'down', S: 'down', a: 'left', A: 'left', d: 'right', D: 'right',
+            }[event.key]
+            if (!direction) return
+            event.preventDefault()
+            this.move(direction)
+        })
+        board.addEventListener('pointerdown', event => {
+            this.pointer = {id: event.pointerId, x: event.clientX, y: event.clientY}
+            try { board.setPointerCapture(event.pointerId) } catch {}
+        })
+        board.addEventListener('pointerup', event => {
+            if (!this.pointer || this.pointer.id !== event.pointerId) return
+            const dx = event.clientX - this.pointer.x
+            const dy = event.clientY - this.pointer.y
+            this.pointer = null
+            const threshold = Math.max(24, board.clientWidth * .08)
+            if (Math.max(Math.abs(dx), Math.abs(dy)) < threshold) return
+            this.move(Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up'))
+        })
+        board.addEventListener('pointercancel', () => { this.pointer = null })
+    }
+    localize() {
+        const s = this.shadowRoot, t = key => this.i18n.t(key)
+        s.querySelector('.score-label').textContent = t('game2048Score')
+        s.querySelector('.best-label').textContent = t('game2048Best')
+        s.querySelector('.undo').textContent = t('undo')
+        s.querySelector('.new').textContent = t('newGame')
+        s.querySelector('.warning').textContent = t('storageWarning')
+        const labels = {up: 'game2048Up', down: 'game2048Down', left: 'game2048Left', right: 'game2048Right'}
+        for (const button of s.querySelectorAll('.direction')) button.setAttribute('aria-label', t(labels[button.dataset.direction]))
+        s.querySelector('.board').setAttribute('aria-label', t('game2048Board'))
+    }
+    save() {
+        if (!this.storage.write('2048', this.state)) this.shadowRoot.querySelector('.warning').hidden = false
+    }
+    move(direction) {
+        if (this.state.outcome) return
+        const seed = OfflineGames.runtime.moveSeed(this.state.seed, this.state.spawnCount)
+        const result = this.engine.move(this.state.board, direction, seed)
+        if (!result.moved) {
+            if (result.gameOver) {
+                this.state.outcome = 'over'
+                this.announcement = 'game2048Over'
+                this.save()
+            } else {
+                this.announcement = 'game2048NoMove'
+            }
+            this.animation = null
+            this.render()
+            return
+        }
+        this.state.history.push({
+            board: this.state.board.slice(),
+            score: this.state.score,
+            spawnCount: this.state.spawnCount,
+            reached2048: this.state.reached2048,
+            outcome: this.state.outcome,
+        })
+        const firstWin = !this.state.reached2048 && result.reached2048
+        this.state.board = result.board
+        this.state.score += result.scoreGain
+        this.state.best = Math.max(this.state.best, this.state.score)
+        this.state.spawnCount += 1
+        this.state.reached2048 = this.state.reached2048 || result.reached2048
+        this.state.outcome = result.gameOver ? 'over' : null
+        this.announcement = this.state.outcome ? 'game2048Over' : firstWin ? 'game2048Reached' : null
+        this.animation = {spawned: result.spawned?.index, merged: result.merged}
+        this.save()
+        this.render()
+        setTimeout(() => {
+            for (const cell of this.shadowRoot.querySelectorAll('.spawn, .merged')) cell.classList.remove('spawn', 'merged')
+        }, 260)
+    }
+    undo() {
+        const previous = this.state.history.pop()
+        if (!previous) return
+        const best = this.state.best
+        Object.assign(this.state, previous, {best})
+        this.announcement = null
+        this.animation = null
+        this.save()
+        this.render()
+    }
+    newGame() {
+        if (this.state.history.length && !this.state.outcome && !confirm(this.i18n.t('confirmNew'))) return
+        this.state = this.fresh(Math.max(this.state.best, this.state.score))
+        this.announcement = null
+        this.animation = null
+        this.save()
+        this.render()
+        this.shadowRoot.querySelector('.board').focus()
+    }
+    render() {
+        const s = this.shadowRoot
+        const formatter = new Intl.NumberFormat(this.i18n.locale === 'zh' ? 'zh-CN' : 'en')
+        s.querySelector('.current-score').textContent = formatter.format(this.state.score)
+        s.querySelector('.best-score').textContent = formatter.format(this.state.best)
+        s.querySelector('.undo').disabled = this.state.history.length === 0
+        for (const button of s.querySelectorAll('.direction')) button.disabled = Boolean(this.state.outcome)
+        s.querySelector('.status').textContent = this.i18n.t(
+            this.announcement || (this.state.outcome ? 'game2048Over' : 'game2048Prompt')
+        )
+        const board = s.querySelector('.board')
+        board.setAttribute('aria-disabled', String(Boolean(this.state.outcome)))
+        board.replaceChildren(...this.state.board.map((value, index) => {
+            const cell = document.createElement('div')
+            cell.className = 'cell'
+            cell.dataset.index = index
+            cell.dataset.value = value
+            cell.setAttribute('role', 'gridcell')
+            const row = Math.floor(index / 4) + 1, column = index % 4 + 1
+            cell.setAttribute('aria-label', `${this.i18n.t('row')} ${row}, ${this.i18n.t('column')} ${column}, ${value || this.i18n.t('empty')}`)
+            if (value) cell.textContent = String(value)
+            if (value > 2048) cell.classList.add('beyond')
+            if (this.animation?.spawned === index) cell.classList.add('spawn')
+            if (this.animation?.merged?.includes(index)) cell.classList.add('merged')
+            return cell
+        }))
+    }
+})
+</script>

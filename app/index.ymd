@@ -9,7 +9,7 @@
 <meta name="github" content="https://github.com/ylxdzsw/offline">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
-<title>Offline Classical Games / 离线棋局</title>
+<title>Offline Classic Games / 离线经典游戏</title>
 [require](./tokens.css)
 [require](./theme.js)
 [require](./i18n.js)

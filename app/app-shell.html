@@ -135,7 +135,13 @@ customElements.define('offline-shell', class extends HTMLElement {
         )
     }
 
-    connectedCallback() {
+    async connectedCallback() {
+        await Promise.all([
+            customElements.whenDefined('offline-drawer'),
+            customElements.whenDefined('offline-guide'),
+        ])
+        await new Promise(resolve => setTimeout(resolve, 0))
+        if (!this.isConnected) return
         const {i18n, theme} = OfflineGames
         const page = this.getAttribute('page') || 'gallery'
         const s = this.shadowRoot

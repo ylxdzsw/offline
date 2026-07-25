@@ -48,19 +48,28 @@
 </template>
 <script>
 customElements.define('offline-segmented', class extends HTMLElement {
+    static observedAttributes = ['options', 'value']
+
     connectedCallback() {
         if (this._ready) return
         this._ready = true
         const tmpl = document.getElementById('offline-segmented-template')
         this.attachShadow({mode: 'open'}).append(tmpl.content.cloneNode(true))
-        const opts = JSON.parse(this.getAttribute('options') || '[]')
-        const current = this.getAttribute('value') || opts[0]?.value
-        this._build(opts, current)
+        this._render()
     }
 
-    _build(opts, current) {
+    attributeChangedCallback(name, oldValue, newValue) {
+        if (!this._ready || oldValue === newValue) return
+        if (name === 'options') this._render()
+        else this._setSelected(newValue, false)
+    }
+
+    _render() {
+        const opts = JSON.parse(this.getAttribute('options') || '[]')
+        const current = this.getAttribute('value') || opts[0]?.value
         const track = this.shadowRoot.querySelector('.track')
         const indicator = track.querySelector('.indicator')
+        track.replaceChildren(indicator)
         track.style.gridTemplateColumns = `repeat(${opts.length}, 1fr)`
         opts.forEach((opt, i) => {
             const btn = document.createElement('button')
@@ -71,15 +80,19 @@ customElements.define('offline-segmented', class extends HTMLElement {
             btn.addEventListener('click', () => this._select(opt.value))
             track.append(btn)
         })
-        this._updateIndicator(current)
+        this._setSelected(current, false)
     }
 
     _select(value) {
+        this._setSelected(value, true)
+    }
+
+    _setSelected(value, emit) {
         for (const btn of this.shadowRoot.querySelectorAll('button')) {
             btn.setAttribute('aria-pressed', String(btn.dataset.value === value))
         }
         this._updateIndicator(value)
-        this.dispatchEvent(new CustomEvent('change', {detail: {value}, bubbles: true}))
+        if (emit) this.dispatchEvent(new CustomEvent('change', {detail: {value}, bubbles: true}))
     }
 
     _updateIndicator(value) {
@@ -93,7 +106,7 @@ customElements.define('offline-segmented', class extends HTMLElement {
     }
 
     setValue(value) {
-        this._select(value)
+        this._setSelected(value, false)
     }
 })
 </script>
