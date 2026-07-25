@@ -14,6 +14,25 @@ test('deployment contains the standard armies and obeys restricted squares', () 
     assert([...engine.CAMPS].every(index => board[index] === null))
 })
 
+test('setup validation rejects pieces outside home and restricted piece positions', () => {
+    const initial = engine.initialBoard(seeded(21))
+    const invalidAt = (type, target) => {
+        const board = structuredClone(initial)
+        const source = board.findIndex(piece => piece?.side === engine.RED && piece.type === type)
+        ;[board[source], board[target]] = [board[target], board[source]]
+        return board
+    }
+    assert.equal(engine.validateSetup(invalidAt(engine.FLAG, engine.at(6,0)), engine.RED), false)
+    assert.equal(engine.validateSetup(invalidAt(engine.MINE, engine.at(6,0)), engine.RED), false)
+    assert.equal(engine.validateSetup(invalidAt(engine.BOMB, engine.at(6,0)), engine.RED), false)
+
+    const outsideHome = structuredClone(initial)
+    const source = outsideHome.findIndex(piece => piece?.side === engine.RED)
+    outsideHome[engine.at(4,1)] = outsideHome[source]
+    outsideHome[source] = null
+    assert.equal(engine.validateSetup(outsideHome, engine.RED), false)
+})
+
 test('railways allow straight travel and engineers can turn around corners', () => {
     const board = Array(60).fill(null)
     board[engine.at(5,2)] = token(engine.RED, '5')

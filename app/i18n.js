@@ -87,6 +87,12 @@
             junqiYourSide: 'Your army',
             junqiEnemySide: 'Opponent',
             hiddenPiece: 'hidden enemy piece',
+            junqiArrange: 'Arrange your army, then start the battle',
+            junqiChooseSwap: 'Select another piece to swap',
+            junqiInvalidSwap: 'That swap breaks the placement rules',
+            junqiPlacementRules: 'Flag: headquarters · Mines: back two rows · Bombs: off front row',
+            junqiShuffle: 'Shuffle',
+            junqiStartBattle: 'Start battle',
             junqiBattleAttacker: 'The attacking piece won — your turn',
             junqiBattleDefender: 'The defending piece held — your turn',
             junqiBattleBoth: 'Both pieces were removed — your turn',
@@ -216,6 +222,12 @@
             junqiYourSide: '我方',
             junqiEnemySide: '对方',
             hiddenPiece: '未揭晓的敌方棋子',
+            junqiArrange: '布置我方棋子，然后开始对局',
+            junqiChooseSwap: '再选择一枚棋子交换位置',
+            junqiInvalidSwap: '此次交换不符合布阵规则',
+            junqiPlacementRules: '军旗在大本营 · 地雷在后两排 · 炸弹不在前排',
+            junqiShuffle: '随机布阵',
+            junqiStartBattle: '开始对局',
             junqiBattleAttacker: '进攻方胜——请走棋',
             junqiBattleDefender: '防守方胜——请走棋',
             junqiBattleBoth: '双方同归于尽——请走棋',
@@ -319,9 +331,9 @@
             junqi: {
                 intro: 'You command the red army; enemy ranks stay hidden until they fight.',
                 rules: [
-                    'Capture the enemy flag, or leave the enemy with no legal move, to win. Flags, mines, and pieces inside headquarters cannot move.',
+                    'Before play, tap two red pieces to swap them, then start the battle. The Flag stays in headquarters, Mines in the back two rows, and Bombs off the front row.',
                     'Most pieces move one road step. On railways they can travel straight until blocked; engineers may also turn along connected rails.',
-                    'Higher rank wins a battle. Equal ranks and bombs remove both pieces; only an engineer defeats a mine. Occupied camps cannot be attacked.',
+                    'Capture the enemy flag, or leave the enemy with no legal move, to win. Higher rank wins a battle; equal ranks and bombs remove both pieces, and only an engineer defeats a mine.',
                 ],
                 tips: [
                     'Keep engineers available for mines and their flexible railway movement.',
@@ -412,9 +424,9 @@
             junqi: {
                 intro: '你指挥红方部队；敌方棋子的等级在交战前保密。',
                 rules: [
-                    '夺取敌方军旗，或使敌方无子可走即获胜。军旗、地雷和进入大本营的棋子不能移动。',
+                    '开局前，依次点选两枚红方棋子可交换位置，布阵完成后开始对局。军旗须在大本营，地雷须在后两排，炸弹不能在前排。',
                     '大多数棋子每次沿公路走一步；在铁路上可沿直线走到被阻挡为止，工兵还可沿相连铁路转弯。',
-                    '战斗时等级高者胜；同级或炸弹交战时同归于尽；只有工兵能排除地雷。行营内有棋时不能被攻击。',
+                    '夺取敌方军旗，或使敌方无子可走即获胜。战斗时等级高者胜；同级或炸弹交战时同归于尽，只有工兵能排除地雷。',
                 ],
                 tips: [
                     '留住工兵用来排雷，并利用它们灵活的铁路移动。',
@@ -584,7 +596,8 @@
                         title: 'Army and hidden information',
                         items: [
                             'Each side has 25 pieces: one Flag; three Mines; two Bombs; one Commander and Army Commander; two each of Division, Brigade, Regiment, and Battalion; and three each of Company, Platoon, and Engineer.',
-                            'This version creates a new random legal deployment for both armies. Your red ranks are visible; enemy ranks remain hidden until those pieces fight. Red moves first.',
+                            'A new game opens in placement. Tap two red pieces to swap them, use Shuffle for another legal formation, then choose Start battle. The Flag must stay in a headquarters, Mines in the back two rows, and Bombs off the front row.',
+                            'Your red ranks are visible; the computer receives a hidden legal deployment, and its ranks remain hidden until those pieces fight. Red moves first.',
                             'From highest to lowest, movable ranks are Commander, Army Commander, Division, Brigade, Regiment, Battalion, Company, Platoon, and Engineer.',
                         ],
                     },
@@ -817,7 +830,8 @@
                         title: '棋子与暗棋',
                         items: [
                             '双方各有 25 枚棋子：军旗 1、地雷 3、炸弹 2；司令和军长各 1；师长、旅长、团长、营长各 2；连长、排长、工兵各 3。',
-                            '本版本会为双方随机生成一套合法布阵。你的红方等级始终可见；敌方等级在交战前保密。红方先行。',
+                            '新局先进入布阵阶段：依次点选两枚红方棋子可交换位置，也可选择“随机布阵”，完成后点击“开始对局”。军旗须在大本营，地雷须在后两排，炸弹不能在前排。',
+                            '你的红方等级始终可见；电脑会获得一套隐藏的合法布阵，敌方等级在交战前保密。红方先行。',
                             '可移动棋子的等级由高到低是：司令、军长、师长、旅长、团长、营长、连长、排长、工兵。',
                         ],
                     },

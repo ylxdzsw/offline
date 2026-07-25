@@ -422,6 +422,8 @@ pub fn status(board: &[Option<Piece>], turn: &str) -> Status {
 }
 
 pub fn validate_setup(board: &[Option<Piece>], side: &str) -> bool {
+    let deployment: HashSet<_> = deployment_squares(side).into_iter().collect();
+    let forward = if side == BLACK { 5 } else { 6 };
     let values: Vec<_> = board
         .iter()
         .enumerate()
@@ -442,7 +444,7 @@ pub fn validate_setup(board: &[Option<Piece>], side: &str) -> bool {
     }
     values.iter().all(|(index, value)| {
         let piece = value.as_ref().unwrap();
-        !is_camp(*index)
+        deployment.contains(index)
             && (piece.kind != FLAG || is_hq(*index))
             && (piece.kind != MINE
                 || if side == BLACK {
@@ -450,6 +452,7 @@ pub fn validate_setup(board: &[Option<Piece>], side: &str) -> bool {
                 } else {
                     row_of(*index) >= 10
                 })
+            && (piece.kind != BOMB || row_of(*index) != forward)
     })
 }
 
@@ -472,6 +475,33 @@ mod tests {
         assert!(validate_setup(&board, RED));
         assert!(validate_setup(&board, BLACK));
         assert!(camps().into_iter().all(|index| board[index].is_none()));
+    }
+
+    #[test]
+    fn setup_validation_enforces_home_rows_and_piece_restrictions() {
+        let board = initial_board(21);
+
+        let mut outside_home = board.clone();
+        let source = outside_home
+            .iter()
+            .position(|value| value.as_ref().is_some_and(|piece| piece.side == RED))
+            .unwrap();
+        outside_home[at(4, 1)] = outside_home[source].take();
+        assert!(!validate_setup(&outside_home, RED));
+
+        for (kind, target) in [(FLAG, at(6, 0)), (MINE, at(6, 0)), (BOMB, at(6, 0))] {
+            let mut invalid = board.clone();
+            let source = invalid
+                .iter()
+                .position(|value| {
+                    value
+                        .as_ref()
+                        .is_some_and(|piece| piece.side == RED && piece.kind == kind)
+                })
+                .unwrap();
+            invalid.swap(source, target);
+            assert!(!validate_setup(&invalid, RED));
+        }
     }
 
     #[test]

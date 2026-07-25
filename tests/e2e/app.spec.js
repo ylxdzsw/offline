@@ -205,9 +205,28 @@ test('2048 merges, scores, persists, reloads, undoes, and accepts a swipe', asyn
     await expect(page.locator('game-2048 .current-score')).toHaveText('4')
 })
 
-test('Junqi conceals the opponent, makes an AI reply, persists, and undoes', async ({page}) => {
+test('Junqi places the army, conceals the opponent, plays, persists, and undoes', async ({page}) => {
     await page.goto('/junqi.html?lang=en')
     await expect(page.locator('junqi-game .piece.hidden').first()).toHaveText('◆')
+    await expect(page.locator('junqi-game .new')).toHaveText('Start battle')
+    const swap = await page.locator('junqi-game').evaluate(game => {
+        const engine = OfflineGames.Junqi
+        return game.state.board
+            .map((piece,index) => ({piece,index}))
+            .filter(({piece}) => piece?.side === engine.RED && ![engine.FLAG,engine.MINE,engine.BOMB].includes(piece.type))
+            .slice(0,2)
+            .map(({index}) => index)
+    })
+    const before = await page.locator('junqi-game').evaluate((game, swap) => swap.map(index => game.state.board[index].id), swap)
+    await page.locator(`junqi-game .square[data-index="${swap[0]}"]`).click()
+    await expect(page.locator('junqi-game .status')).toHaveText('Select another piece to swap')
+    await page.locator(`junqi-game .square[data-index="${swap[1]}"]`).click()
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:junqi')).phase)).toBe('placement')
+    await page.reload()
+    expect(await page.locator('junqi-game').evaluate((game, swap) => swap.map(index => game.state.board[index].id), swap)).toEqual(before.reverse())
+    await page.locator('junqi-game .new').click()
+    await expect(page.locator('junqi-game .status')).toHaveText('Your turn')
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:junqi')).phase)).toBe('playing')
     const move = await page.locator('junqi-game').evaluate(game => {
         const engine = OfflineGames.Junqi
         return engine.legalMoves(game.state.board, engine.RED)[0]

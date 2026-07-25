@@ -22,6 +22,11 @@
         @keyframes pulse { to { opacity: .2; transform: scale(.7); } }
         .warning { margin: 0 0 9px; color: var(--danger); font-size: .77rem; text-align: center; }
         .warning[hidden] { display: none; }
+        .placement-note {
+            margin: -2px 0 9px; color: var(--ink-muted); font-size: .72rem;
+            line-height: 1.35; text-align: center;
+        }
+        .placement-note[hidden] { display: none; }
         .board {
             position: relative; display: grid; width: 100%; aspect-ratio: 5 / 7.35;
             grid-template: repeat(12, 1fr) / repeat(5, 1fr); overflow: hidden;
@@ -60,6 +65,7 @@
             color: color-mix(in srgb, var(--ink) 55%, var(--board-wood-line));
             background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--board-wood-line) 70%, transparent) 0 4px, color-mix(in srgb, var(--board-wood) 70%, var(--piece-face)) 4px 8px);
         }
+        .square.setup-zone { background: color-mix(in srgb, var(--piece-red) 5%, transparent); }
         .square.selected .piece { outline: 3px solid var(--selected); outline-offset: 1px; transform: translateY(-1px); }
         .square.last { background: color-mix(in srgb, var(--status-bg) 55%, transparent); }
         .river { position: absolute; z-index: 1; top: 50%; left: 20%; width: 60%; border-top: 2px dashed color-mix(in srgb, var(--board-wood-line) 60%, transparent); pointer-events: none; }
@@ -74,6 +80,7 @@
     </div>
     <p class="warning" hidden></p>
     <div class="status" role="status" aria-live="polite"></div>
+    <p class="placement-note" hidden></p>
     <div class="board" role="grid"><i class="river"></i></div>
     <div class="legend"><span class="your-side"></span><span class="enemy-side"></span></div>
 </template>
@@ -82,37 +89,56 @@
 OfflineGames.wasm.defineElement('junqi', 'junqi-game', class extends HTMLElement {
     constructor() {
         super(); this.attachShadow({mode: 'open'}).append(document.getElementById('junqi-game-template').content.cloneNode(true))
-        this.selected = null; this.thinking = false; this.worker = null; this.requestId = 0
+        this.selected = null; this.setupError = false; this.thinking = false; this.worker = null; this.requestId = 0
     }
     connectedCallback() {
         this.engine = OfflineGames.Junqi; this.i18n = OfflineGames.i18n; this.storage = OfflineGames.storage
         this.load(); this.bind(); this.localize(); this.render()
-        if (this.state.turn === this.engine.BLACK && !this.state.outcome) this.requestAI()
+        if (this.state.phase === 'playing' && this.state.turn === this.engine.BLACK && !this.state.outcome) this.requestAI()
     }
     disconnectedCallback() { this.cancelAI() }
-    fresh(difficulty = 'medium') { const seed=OfflineGames.runtime.randomSeed();return {schema: 1, game: 'junqi', seed, difficulty, board: this.engine.initialBoard(seed), turn: this.engine.RED, revealed: [], history: [], lastMove: null, message: null, outcome: null} }
-    valid(saved) { return saved && Array.isArray(saved.board) && saved.board.length === 60 && [this.engine.RED,this.engine.BLACK].includes(saved.turn) && ['easy','medium','hard'].includes(saved.difficulty) && Array.isArray(saved.revealed) && Array.isArray(saved.history) }
-    load() { const saved = this.storage.read('junqi'); this.state = this.valid(saved) ? saved : this.fresh();if(!Number.isInteger(this.state.seed))this.state.seed=OfflineGames.runtime.randomSeed() }
+    fresh(difficulty = 'medium') { const seed=OfflineGames.runtime.randomSeed();return {schema: 1, game: 'junqi', seed, difficulty, phase: 'placement', board: this.engine.initialBoard(seed), turn: this.engine.RED, revealed: [], history: [], lastMove: null, message: null, outcome: null} }
+    valid(saved) { return saved && Array.isArray(saved.board) && saved.board.length === 60 && [this.engine.RED,this.engine.BLACK].includes(saved.turn) && ['easy','medium','hard'].includes(saved.difficulty) && (!saved.phase||['placement','playing'].includes(saved.phase)) && Array.isArray(saved.revealed) && Array.isArray(saved.history) }
+    load() { const saved = this.storage.read('junqi'); this.state = this.valid(saved) ? saved : this.fresh();if(!this.state.phase)this.state.phase='playing';if(!Number.isInteger(this.state.seed))this.state.seed=OfflineGames.runtime.randomSeed() }
     bind() {
         const s = this.shadowRoot
         s.querySelector('.board').addEventListener('click', event => { const square = event.target.closest('.square'); if (square) this.tap(Number(square.dataset.index)) })
-        s.querySelector('.undo').addEventListener('click', () => this.undo())
-        s.querySelector('.new').addEventListener('click', () => this.newGame())
+        s.querySelector('.undo').addEventListener('click', () => this.state.phase === 'placement' ? this.shuffleSetup() : this.undo())
+        s.querySelector('.new').addEventListener('click', () => this.state.phase === 'placement' ? this.startBattle() : this.newGame())
         s.querySelector('.difficulty').addEventListener('change', event => { this.state.difficulty = event.target.value; this.save() })
     }
     localize() {
         const s = this.shadowRoot, t = key => this.i18n.t(key)
         s.querySelector('.difficulty-label').textContent = t('difficulty'); for (const option of s.querySelectorAll('option')) option.textContent = t(option.value)
-        s.querySelector('.undo').textContent = t('undo'); s.querySelector('.new').textContent = t('newGame'); s.querySelector('.warning').textContent = t('storageWarning')
+        s.querySelector('.warning').textContent = t('storageWarning'); s.querySelector('.placement-note').textContent = t('junqiPlacementRules')
         s.querySelector('.your-side').textContent = t('junqiYourSide'); s.querySelector('.enemy-side').textContent = t('junqiEnemySide')
     }
     save() { if (!this.storage.write('junqi', this.state)) this.shadowRoot.querySelector('.warning').hidden = false }
     tap(index) {
         if (this.thinking || this.state.outcome || this.state.turn !== this.engine.RED) return
+        if (this.state.phase === 'placement') { this.place(index); return }
         const value = this.state.board[index]
         if (value?.side === this.engine.RED) { this.selected = this.engine.movesFor(this.state.board,index).length ? index : null; this.render(); return }
         if (this.selected != null && this.engine.movesFor(this.state.board,this.selected).some(move => move.to === index)) this.commit({from:this.selected,to:index}, this.engine.RED)
         else { this.selected = null; this.render() }
+    }
+    place(index) {
+        const value = this.state.board[index]
+        if (value?.side !== this.engine.RED) return
+        this.setupError = false
+        if (this.selected == null) { this.selected = index; this.render(); return }
+        if (this.selected === index) { this.selected = null; this.render(); return }
+        const board = this.state.board.slice()
+        ;[board[this.selected],board[index]]=[board[index],board[this.selected]]
+        if (!this.engine.validateSetup(board,this.engine.RED)) { this.setupError = true; this.render(); return }
+        this.state.board = board; this.selected = null; this.save(); this.render()
+    }
+    shuffleSetup() {
+        const difficulty=this.state.difficulty; this.cancelAI(); this.state=this.fresh(difficulty); this.selected=null; this.setupError=false; this.save(); this.render()
+    }
+    startBattle() {
+        if (!this.engine.validateSetup(this.state.board,this.engine.RED)) { this.setupError=true; this.render(); return }
+        this.state.phase='playing'; this.state.turn=this.engine.RED; this.selected=null; this.setupError=false; this.save(); this.render()
     }
     snapshot(mover) { return {mover, board:this.state.board, turn:this.state.turn, revealed:this.state.revealed, lastMove:this.state.lastMove, message:this.state.message, outcome:this.state.outcome} }
     commit(move, side) {
@@ -138,9 +164,13 @@ OfflineGames.wasm.defineElement('junqi', 'junqi-game', class extends HTMLElement
         if (previous) Object.assign(this.state,{board:previous.board,turn:previous.turn,revealed:previous.revealed,lastMove:previous.lastMove,message:previous.message,outcome:previous.outcome})
         this.selected=null; this.save(); this.render()
     }
-    newGame() { if (this.state.history.length && !confirm(this.i18n.t('confirmNew'))) return; const difficulty=this.state.difficulty; this.cancelAI(); this.state=this.fresh(difficulty); this.selected=null; this.save(); this.render() }
+    newGame() { if (this.state.history.length && !confirm(this.i18n.t('confirmNew'))) return; const difficulty=this.state.difficulty; this.cancelAI(); this.state=this.fresh(difficulty); this.selected=null; this.setupError=false; this.save(); this.render() }
     pieceLabel(value, visible) { return visible ? this.i18n.t('junqiPiece'+value.type) : '◆' }
     statusText() {
+        if (this.state.phase === 'placement') {
+            if (this.setupError) return this.i18n.t('junqiInvalidSwap')
+            return this.i18n.t(this.selected == null ? 'junqiArrange' : 'junqiChooseSwap')
+        }
         if (this.state.outcome) return this.i18n.t(this.state.outcome.winner === this.engine.RED ? 'youWin' : 'aiWins')
         if (this.thinking || this.state.turn === this.engine.BLACK) return this.i18n.t('aiThinking')
         if (this.state.message) return this.i18n.t('junqiBattle'+this.state.message[0].toUpperCase()+this.state.message.slice(1))
@@ -152,6 +182,7 @@ OfflineGames.wasm.defineElement('junqi', 'junqi-game', class extends HTMLElement
             const row=this.engine.rowOf(index), column=this.engine.columnOf(index), classes=['square']
             if ([1,5,6,10].includes(row)) classes.push('rail-h'); if ([0,4].includes(column)&&row>=1&&row<=10) classes.push('rail-v')
             if (this.engine.isCamp(index)) classes.push('camp'); if (this.engine.isHQ(index)) classes.push('hq'); if (index===this.selected) classes.push('selected')
+            if (this.state.phase==='placement'&&value?.side===this.engine.RED) classes.push('setup-zone')
             if (targets.has(index)) classes.push(targets.get(index)?'capture':'legal'); if (this.state.lastMove&&(index===this.state.lastMove.from||index===this.state.lastMove.to)) classes.push('last')
             const visible=value&&(value.side===this.engine.RED||revealed.has(value.id)||this.state.outcome)
             const token=value?`<span class="piece ${value.side===this.engine.RED?'red':'black'} ${visible?'':'hidden'}">${this.pieceLabel(value,visible)}</span>`:''
@@ -159,7 +190,10 @@ OfflineGames.wasm.defineElement('junqi', 'junqi-game', class extends HTMLElement
             return `<button type="button" role="gridcell" class="${classes.join(' ')}" data-index="${index}" aria-label="${name}, ${this.i18n.t('row')} ${row+1}, ${this.i18n.t('column')} ${column+1}">${token}</button>`
         }).join('')
         s.querySelector('.board').innerHTML=squares+'<i class="river"></i>'; const status=s.querySelector('.status'); status.textContent=this.statusText(); status.classList.toggle('thinking',this.thinking)
-        s.querySelector('.difficulty').value=this.state.difficulty; s.querySelector('.undo').disabled=!this.state.history.length
+        const placement=this.state.phase==='placement', undo=s.querySelector('.undo'), next=s.querySelector('.new')
+        s.querySelector('.placement-note').hidden=!placement; s.querySelector('.difficulty').value=this.state.difficulty
+        undo.textContent=this.i18n.t(placement?'junqiShuffle':'undo'); undo.disabled=!placement&&!this.state.history.length
+        next.textContent=this.i18n.t(placement?'junqiStartBattle':'newGame')
     }
 })
 </script>
