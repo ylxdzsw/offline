@@ -71,6 +71,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "offline-spider"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "offline-sudoku"
 version = "0.1.0"
 dependencies = [

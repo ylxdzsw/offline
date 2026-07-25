@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+[offline-pwa-head]
+<meta name="author" content="ylxdzsw">
+<meta name="license" content="MIT">
+<meta name="github" content="https://github.com/ylxdzsw/offline">
+<title>Spider Solitaire</title>
+[require](../../app/tokens.css)
+[require](../../app/theme.js)
+[require](../../app/i18n.js)
+[require](../../app/storage.js)
+[require](../../app/runtime.js)
+[require](../../app/wasm.js)
+[offline-wasm](spider)(../target/wasm32-unknown-unknown/release/offline_spider.wasm)
+[require](./api.js)
+</head>
+<body>
+[offline-catalog](../catalog.json)
+[require](../../app/segmented-control.html)
+[require](../../app/guide-dialog.html)
+[require](../../app/side-drawer.html)
+[require](../../app/app-shell.html)
+[require](./spider.html)
+<offline-shell page="spider"><spider-game></spider-game></offline-shell>
+</body>
+</html>
+
+[mixin] ../../app/macros.ymd
+[mixin] common.ymd

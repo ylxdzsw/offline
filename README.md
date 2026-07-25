@@ -11,6 +11,8 @@ A mobile-first bilingual collection of classic board and puzzle games that remai
 - Reversi with legal-move hints and a mobility-aware on-device AI
 - Huarong Dao with three layouts and optimal on-device path hints
 - Minesweeper with confirmation-first mobile controls and irreversible reveals
+- Klondike Solitaire with draw-one and draw-three play
+- Spider Solitaire with one-, two-, and four-suit modes
 
 Every game is compiled by [Nattoppet](https://github.com/ylxdzsw/nattoppet) into a self-contained HTML page. The PWA uses no gameplay server, CDN, remote font, analytics service, or downloadable AI model.
 

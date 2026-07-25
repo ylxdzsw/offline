@@ -38,6 +38,7 @@
     .game-gallery article[data-game="huarong"] .preview { color: var(--piece-red); background: color-mix(in srgb, var(--board-wood) 62%, var(--bg-elevated)); }
     .game-gallery article[data-game="minesweeper"] .preview { color: var(--ink); background: color-mix(in srgb, var(--selected) 14%, var(--bg-elevated)); }
     .game-gallery article[data-game="solitaire"] .preview { color: #fff; background: color-mix(in srgb, #246449 78%, var(--bg-elevated)); }
+    .game-gallery article[data-game="spider"] .preview { color: #fff; background: color-mix(in srgb, #174633 82%, var(--bg-elevated)); }
     /* Preview marks — unchanged */
     .game-gallery .xiangqi-mark {
         display: grid; width: 56px; height: 56px;
@@ -170,6 +171,24 @@
     .game-gallery .solitaire-mark i:nth-child(3) {
         top: 15px; left: 34px; transform: rotate(13deg); color: #c52d32;
     }
+    .game-gallery .spider-mark {
+        position: relative; width: 66px; height: 66px;
+    }
+    .game-gallery .spider-mark i {
+        position: absolute; display: grid; width: 29px; height: 40px; box-sizing: border-box;
+        border: 1px solid rgba(20,25,23,.55); border-radius: 4px; place-items: start center;
+        padding-top: 5px; color: #161918; background: #faf8f2;
+        box-shadow: 0 2px 4px rgba(0,0,0,.28); font: 800 .76rem/1 Georgia, serif;
+    }
+    .game-gallery .spider-mark i:nth-child(1) { top: 2px; left: 4px; }
+    .game-gallery .spider-mark i:nth-child(2) { top: 9px; left: 20px; color: #c52d32; }
+    .game-gallery .spider-mark i:nth-child(3) { top: 16px; left: 36px; }
+    .game-gallery .spider-mark::after {
+        position: absolute; right: 0; bottom: 0; display: grid; width: 25px; height: 25px;
+        border: 1px solid rgba(255,255,255,.52); border-radius: 50%; place-items: center;
+        color: #fff; background: #174633; content: "8";
+        font: 800 .68rem/1 var(--font-mono);
+    }
     /* Card content */
     .game-gallery .content {
         display: grid;
@@ -246,6 +265,7 @@
             huarong: '<span class="huarong-mark"><i class="cao"></i><i class="guan"></i><i class="g1"></i><i class="g2"></i><i class="g3"></i><i class="g4"></i><i class="s1"></i><i class="s2"></i><i class="s3"></i><i class="s4"></i></span>',
             minesweeper: '<span class="minesweeper-mark"><i></i><i class="one">1</i><i class="covered"></i><i class="covered"></i><i></i><i class="one">1</i><i class="two">2</i><i class="covered flag">⚑</i><i></i><i></i><i class="one">1</i><i class="covered"></i><i></i><i></i><i class="one">1</i><i class="covered"></i></span>',
             solitaire: '<span class="solitaire-mark"><i>♥</i><i>♣</i><i>♦</i></span>',
+            spider: '<span class="spider-mark"><i>K♠</i><i>Q♥</i><i>J♣</i></span>',
         }
         root.querySelector('.games').innerHTML = (OfflineGames.catalog || []).map(game => `
             <article data-game="${game.id}">

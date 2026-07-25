@@ -14,6 +14,7 @@ const guideAssets = [
     'guides/huarong-escape.svg',
     'guides/minesweeper-counts.svg',
     'guides/solitaire-layout.svg',
+    'guides/spider-runs.svg',
 ]
 
 test('build is self-contained and contains the complete PWA shell', async () => {
@@ -48,7 +49,7 @@ test('gallery and sidebar localize from query and preserve the override', async 
     await expect(page.locator('offline-shell h1')).toHaveText('经典游戏')
     await expect(page.locator('.game-gallery h2').first()).toHaveText('中国象棋')
     await expect(page.locator('.game-gallery article')).toHaveCount(catalog.length)
-    await expect(page.locator('.game-gallery h2').last()).toHaveText('纸牌')
+    await expect(page.locator('.game-gallery h2').last()).toHaveText('蜘蛛纸牌')
     await page.locator('offline-shell .menu-btn').click()
     await expect(page.locator('offline-shell aside')).toHaveAttribute('aria-hidden', 'false')
     await expect(page.locator('offline-shell offline-drawer .brand')).toHaveAttribute('href', /index\.html\?lang=zh$/)
@@ -497,6 +498,66 @@ test('Solitaire draws, moves a tableau card, persists, reloads, and undoes', asy
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:solitaire')).outcome)).toBe('won')
 })
 
+test('Spider deals, persists, blocks empty-column deals, and completes the final run', async ({page}) => {
+    await page.goto('/spider.html?lang=en')
+    await expect(page.locator('spider-game .pile')).toHaveCount(10)
+    await expect(page.locator('spider-game .tableau .card.back')).toHaveCount(44)
+    await expect(page.locator('spider-game .stock-count')).toHaveText('5')
+    await expect(page.locator('spider-game .runs')).toHaveText('0/8')
+    await expect(page.locator('spider-game .timer')).toHaveText('00:00')
+
+    await page.locator('spider-game .stock').click()
+    await expect(page.locator('spider-game .stock-count')).toHaveText('4')
+    await expect(page.locator('spider-game .moves')).toHaveText('1')
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:spider')).history.length)).toBe(1)
+    await page.reload()
+    await expect(page.locator('spider-game .stock-count')).toHaveText('4')
+    await page.locator('spider-game .undo').click()
+    await expect(page.locator('spider-game .stock-count')).toHaveText('5')
+
+    await page.locator('offline-shell .guide-btn').click()
+    await expect(page.locator('offline-shell .guide-image')).toHaveAttribute('src', './guides/spider-runs.svg')
+    await expect(page.locator('offline-shell .rule-group')).toHaveCount(3)
+    await page.keyboard.press('Escape')
+
+    await page.locator('spider-game').evaluate(game => {
+        const deal = OfflineGames.Spider.newGame(11, 1)
+        deal.tableau[1].visible.push(deal.tableau[0].visible.pop())
+        deal.tableau[1].hidden.push(...deal.tableau[0].hidden.splice(0))
+        game.state = {
+            schema: 1, game: 'spider', suitCount: 1, deal,
+            moves: 0, elapsedMs: 0, history: [], progress: false, outcome: null,
+        }
+        game.render()
+    })
+    await page.locator('spider-game .stock').click()
+    await expect(page.locator('spider-game .status')).toHaveText('Fill every empty column before dealing from the stock')
+    await expect(page.locator('spider-game .moves')).toHaveText('0')
+
+    await page.locator('spider-game').evaluate(game => {
+        const completed = Array.from({length: 7}, (_, group) =>
+            Array.from({length: 13}, (_, index) => group * 13 + 12 - index))
+        const tableau = Array.from({length: 10}, () => ({hidden: [], visible: []}))
+        tableau[0].visible = Array.from({length: 12}, (_, index) => 7 * 13 + 12 - index)
+        tableau[1].visible = [7 * 13]
+        game.state = {
+            schema: 1, game: 'spider', suitCount: 1,
+            deal: {suitCount: 1, stock: [], completed, tableau, won: false},
+            moves: 0, elapsedMs: 0, history: [], progress: false, outcome: null,
+        }
+        game.selected = null
+        game.notice = null
+        game.render()
+    })
+    await page.locator('spider-game .card[data-column="1"][data-card="0"]').click()
+    await expect(page.locator('spider-game .status')).toContainText('selected')
+    await page.locator('spider-game .card[data-column="0"][data-card="11"]').click()
+    await expect(page.locator('spider-game .status')).toHaveText('All eight suited runs complete — you win!')
+    await expect(page.locator('spider-game .runs')).toHaveText('8/8')
+    await expect(page.locator('spider-game .celebration')).toBeVisible()
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:spider')).outcome)).toBe('won')
+})
+
 for (const viewport of [{width: 320, height: 568}, {width: 390, height: 844}, {width: 430, height: 932}]) {
     test(`all pages fit a ${viewport.width}x${viewport.height} mobile viewport`, async ({page}) => {
         await page.setViewportSize(viewport)
@@ -532,5 +593,8 @@ test('the installed app reloads and navigates completely offline', async ({brows
     await page.goto('/solitaire.html?lang=en')
     await expect(page.locator('offline-shell h1')).toHaveText('Solitaire')
     await expect(page.locator('solitaire-game .pile')).toHaveCount(7)
+    await page.goto('/spider.html?lang=zh')
+    await expect(page.locator('offline-shell h1')).toHaveText('蜘蛛纸牌')
+    await expect(page.locator('spider-game .pile')).toHaveCount(10)
     await context.close()
 })

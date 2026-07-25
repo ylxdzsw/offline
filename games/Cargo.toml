@@ -8,6 +8,7 @@ members = [
     "minesweeper",
     "reversi",
     "solitaire",
+    "spider",
     "sudoku",
     "wuziqi",
     "xiangqi",

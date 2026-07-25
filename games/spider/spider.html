@@ -1,0 +1,586 @@
+<template id="spider-game-template">
+    <style>
+        :host { display: block; color: var(--ink); }
+        .toolbar {
+            display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 7px;
+            align-items: end; margin-bottom: 9px;
+        }
+        label {
+            display: grid; min-width: 0; gap: 3px; color: var(--ink-muted);
+            font-size: .7rem; font-weight: 600; letter-spacing: .02em;
+        }
+        select, .toolbar button {
+            min-height: var(--control-h, 42px); border: 1px solid var(--border-strong);
+            border-radius: var(--radius-sm); color: var(--ink); background: var(--bg-surface);
+        }
+        select { width: 100%; min-width: 0; padding: 0 27px 0 9px; text-overflow: ellipsis; }
+        .toolbar button { padding: 0 12px; font-weight: 650; touch-action: manipulation; }
+        .toolbar button:disabled { opacity: .42; }
+        .warning { margin: 0 0 9px; color: var(--danger); font-size: .77rem; text-align: center; }
+        .warning[hidden] { display: none; }
+        .dashboard {
+            display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px;
+            margin-bottom: 9px;
+        }
+        .meter {
+            display: grid; min-height: 45px; align-content: center; justify-content: center; gap: 2px;
+            border: 1px solid var(--border); border-radius: var(--radius-sm);
+            background: var(--bg-surface); box-shadow: var(--shadow-soft); text-align: center;
+        }
+        .meter span {
+            color: var(--ink-faint); font-size: .56rem; font-weight: 700;
+            letter-spacing: .045em; text-transform: uppercase;
+        }
+        .meter strong {
+            color: var(--ink); font-family: var(--font-mono); font-size: 1rem;
+            font-variant-numeric: tabular-nums; line-height: 1;
+        }
+        .status {
+            display: flex; min-height: 42px; align-items: center; justify-content: center;
+            margin: 0 0 9px; padding: 6px 10px; border-radius: var(--radius-sm);
+            color: var(--status-ink); font-size: .79rem; font-weight: 700; line-height: 1.35;
+            text-align: center; background: var(--status-bg);
+        }
+        .status.won { color: var(--success); background: var(--success-soft); }
+        .table {
+            --gap: clamp(1px, .65vw, 3px);
+            position: relative; width: min(100%, 452px); min-height: clamp(440px, 142vw, 680px);
+            margin: 0 auto; box-sizing: border-box; padding: clamp(4px, 1.5vw, 8px);
+            overflow-x: clip; border: 1px solid color-mix(in srgb, #173e2c 65%, var(--border-strong));
+            border-radius: var(--radius-md); color: #fff;
+            background:
+                radial-gradient(circle at 35% 12%, rgba(255,255,255,.055), transparent 42%),
+                linear-gradient(145deg, #246449, #174633 70%, #123a2a);
+            box-shadow: inset 0 0 24px rgba(0,0,0,.18), var(--shadow-soft);
+            user-select: none; -webkit-touch-callout: none;
+        }
+        .board-top {
+            display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 8.65fr);
+            gap: var(--gap); align-items: start; margin-bottom: clamp(13px, 4vw, 21px);
+        }
+        .completed-rack {
+            display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: var(--gap);
+            align-items: start;
+        }
+        .tableau {
+            display: grid; grid-template-columns: repeat(10, minmax(0, 1fr));
+            gap: var(--gap); align-items: start;
+        }
+        .pile {
+            display: flex; min-width: 0; min-height: 350px; flex-direction: column;
+            border-radius: 4px;
+        }
+        .pile.drop-target {
+            outline: 2px solid rgba(255,255,255,.82); outline-offset: 1px;
+            background: rgba(255,255,255,.06);
+        }
+        .card, .slot, .run-slot {
+            position: relative; display: block; width: 100%; min-width: 0; aspect-ratio: 5 / 7;
+            box-sizing: border-box; padding: 0; overflow: hidden;
+            border: 1px solid rgba(20,28,25,.58); border-radius: clamp(2px, .75vw, 5px);
+            touch-action: manipulation;
+        }
+        button.card, button.slot { cursor: pointer; }
+        .slot, .run-slot {
+            border-color: rgba(255,255,255,.28); color: rgba(255,255,255,.48);
+            background: rgba(0,0,0,.08);
+        }
+        .slot { display: grid; place-items: center; font-size: clamp(.68rem, 3vw, 1rem); }
+        .run-slot {
+            display: grid; place-items: center; font-family: Georgia, serif;
+            font-size: clamp(.5rem, 2.5vw, .9rem);
+        }
+        .run-slot.complete {
+            border-color: rgba(255,255,255,.75); color: #151918;
+            background: linear-gradient(145deg, #fff, #f4f1e9);
+            box-shadow: 0 2px 4px rgba(0,0,0,.24);
+        }
+        .run-slot.complete.red { color: #c52d32; }
+        .stock {
+            background:
+                linear-gradient(135deg, rgba(255,255,255,.14) 25%, transparent 25%) 0 0 / 7px 7px,
+                linear-gradient(315deg, rgba(255,255,255,.14) 25%, transparent 25%) 0 0 / 7px 7px,
+                linear-gradient(145deg, #355ea5, #23427d);
+            box-shadow: inset 0 0 0 2px #ecf0f7, inset 0 0 0 3px #31558e, 0 2px 4px rgba(0,0,0,.26);
+        }
+        .stock:disabled { cursor: default; opacity: .34; }
+        .stock-count {
+            position: absolute; right: 2px; bottom: 2px; display: grid; min-width: 15px; height: 15px;
+            padding: 0 2px; box-sizing: border-box; border-radius: 8px; place-items: center;
+            color: #fff; background: rgba(0,0,0,.52); font: 700 .53rem/1 var(--font-mono);
+        }
+        .card.face {
+            color: #151918; background: linear-gradient(145deg, #fff, #f4f1e9);
+            box-shadow: 0 2px 4px rgba(0,0,0,.28);
+        }
+        .card.face.red { color: #c52d32; }
+        .card.back {
+            background:
+                linear-gradient(135deg, rgba(255,255,255,.14) 25%, transparent 25%) 0 0 / 7px 7px,
+                linear-gradient(315deg, rgba(255,255,255,.14) 25%, transparent 25%) 0 0 / 7px 7px,
+                linear-gradient(145deg, #355ea5, #23427d);
+            box-shadow: inset 0 0 0 1px #ecf0f7, inset 0 0 0 3px #31558e, 0 2px 3px rgba(0,0,0,.24);
+        }
+        .card .corner {
+            position: absolute; top: clamp(1px, .5vw, 3px); left: clamp(1px, .5vw, 3px);
+            display: grid; justify-items: center; font-family: Georgia, serif; font-weight: 800;
+            font-size: clamp(.48rem, 2vw, .72rem); line-height: .82;
+        }
+        .card .corner .suit { font-size: 1.04em; }
+        .card .pip {
+            position: absolute; inset: 20% 3% 3%; display: grid; place-items: center;
+            font-family: Georgia, serif; font-size: clamp(.85rem, 4.4vw, 1.55rem); line-height: 1;
+        }
+        .card.selected {
+            z-index: 30; transform: translateY(-2px);
+            outline: 2px solid #ffd66b; outline-offset: -1px;
+            box-shadow: 0 4px 9px rgba(0,0,0,.42);
+        }
+        .card:focus-visible, .slot:focus-visible, .stock:focus-visible {
+            z-index: 40; outline: 2px solid #fff; outline-offset: 1px;
+        }
+        .pile > .card + .card {
+            margin-top: clamp(-49px, -10vw, -27px);
+        }
+        .pile > .card.face + .card {
+            margin-top: clamp(-43px, -8.5vw, -23px);
+        }
+        .gesture-note {
+            margin: 9px auto 0; max-width: 440px; color: var(--ink-faint);
+            font-size: .7rem; line-height: 1.45; text-align: center;
+        }
+        .celebration {
+            position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 50;
+        }
+        .celebration i {
+            --delay: calc(var(--i) * 55ms);
+            position: absolute; top: -42px; left: var(--x); width: 20px; aspect-ratio: 5 / 7;
+            border: 1px solid rgba(0,0,0,.38); border-radius: 3px; background: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,.28);
+            animation: fall 1.55s cubic-bezier(.22,.7,.48,1) var(--delay) both;
+        }
+        .celebration i:nth-child(odd) { background: #f6e8e8; }
+        @keyframes fall {
+            0% { transform: translate3d(0,-30px,0) rotate(0deg); }
+            65% { transform: translate3d(calc((var(--i) - 7) * 2px), 430px,0) rotate(calc(var(--i) * 32deg)); }
+            100% { transform: translate3d(calc((var(--i) - 7) * 4px), 680px,0) rotate(calc(var(--i) * 50deg)); opacity: .18; }
+        }
+        @media (max-width: 380px) {
+            .card .pip { display: none; }
+            .pile { min-height: 310px; }
+            .toolbar { gap: 5px; }
+            .toolbar button { padding-inline: 8px; }
+            .meter { min-height: 42px; }
+        }
+        @media (max-width: 300px) {
+            .dashboard { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .celebration { display: none; }
+            .card.selected { transform: none; }
+        }
+    </style>
+    <div class="toolbar">
+        <label><span class="difficulty-label"></span><select class="suit-count">
+            <option value="1"></option>
+            <option value="2"></option>
+            <option value="4"></option>
+        </select></label>
+        <button class="undo" type="button"></button>
+        <button class="new" type="button"></button>
+    </div>
+    <p class="warning" hidden></p>
+    <div class="dashboard">
+        <div class="meter"><span class="moves-label"></span><strong class="moves">0</strong></div>
+        <div class="meter"><span class="time-label"></span><strong class="timer">00:00</strong></div>
+        <div class="meter"><span class="runs-label"></span><strong class="runs">0/8</strong></div>
+        <div class="meter"><span class="deals-label"></span><strong class="deals">5</strong></div>
+    </div>
+    <div class="status" role="status" aria-live="polite"></div>
+    <div class="table" role="group">
+        <div class="board-top">
+            <button class="card stock" type="button" data-action="deal"><span class="stock-count">5</span></button>
+            <div class="completed-rack"></div>
+        </div>
+        <div class="tableau"></div>
+        <div class="celebration" hidden></div>
+    </div>
+    <p class="gesture-note"></p>
+</template>
+
+<script>
+OfflineGames.wasm.defineElement('spider', 'spider-game', class extends HTMLElement {
+    constructor() {
+        super()
+        this.attachShadow({mode: 'open'}).append(
+            document.getElementById('spider-game-template').content.cloneNode(true)
+        )
+        this.selected = null
+        this.notice = null
+        this.dragSource = null
+        this.timerOrigin = null
+        this.timerInterval = null
+        this.visibilityHandler = () => this.visibilityChanged()
+    }
+
+    connectedCallback() {
+        this.engine = OfflineGames.Spider
+        this.i18n = OfflineGames.i18n
+        this.storage = OfflineGames.storage
+        this.load()
+        this.bind()
+        this.localize()
+        this.render()
+        this.resumeTimer()
+        document.addEventListener('visibilitychange', this.visibilityHandler)
+    }
+
+    disconnectedCallback() {
+        document.removeEventListener('visibilitychange', this.visibilityHandler)
+        this.pauseTimer(true)
+    }
+
+    fresh(suitCount = 1) {
+        return {
+            schema: 1,
+            game: 'spider',
+            suitCount,
+            deal: this.engine.newGame(OfflineGames.runtime.randomSeed(), suitCount),
+            moves: 0,
+            elapsedMs: 0,
+            history: [],
+            progress: false,
+            outcome: null,
+        }
+    }
+
+    valid(saved) {
+        return saved
+            && [1, 2, 4].includes(saved.suitCount)
+            && saved.deal?.suitCount === saved.suitCount
+            && this.engine.validate(saved.deal)
+            && Number.isInteger(saved.moves) && saved.moves >= 0
+            && Number.isFinite(saved.elapsedMs) && saved.elapsedMs >= 0
+            && Array.isArray(saved.history)
+    }
+
+    load() {
+        const saved = this.storage.read('spider')
+        this.state = this.valid(saved) ? saved : this.fresh()
+        this.state.outcome = this.state.deal.won ? 'won' : null
+        this.state.progress = this.state.moves > 0 && !this.state.outcome
+    }
+
+    bind() {
+        const s = this.shadowRoot
+        const table = s.querySelector('.table')
+        table.addEventListener('click', event => this.clicked(event))
+        table.addEventListener('dragstart', event => this.dragStarted(event))
+        table.addEventListener('dragend', () => this.clearDropTargets())
+        table.addEventListener('dragover', event => this.draggedOver(event))
+        table.addEventListener('drop', event => this.dropped(event))
+        s.querySelector('.undo').addEventListener('click', () => this.undo())
+        s.querySelector('.new').addEventListener('click', () => this.newGame())
+        s.querySelector('.suit-count').addEventListener('change', event => {
+            const next = Number(event.target.value)
+            if (!this.newGame(next, true)) event.target.value = String(this.state.suitCount)
+        })
+    }
+
+    localize() {
+        const s = this.shadowRoot, t = key => this.i18n.t(key)
+        s.querySelector('.difficulty-label').textContent = t('difficulty')
+        s.querySelector('.suit-count option[value="1"]').textContent = t('spiderOneSuit')
+        s.querySelector('.suit-count option[value="2"]').textContent = t('spiderTwoSuits')
+        s.querySelector('.suit-count option[value="4"]').textContent = t('spiderFourSuits')
+        s.querySelector('.undo').textContent = t('undo')
+        s.querySelector('.new').textContent = t('newGame')
+        s.querySelector('.moves-label').textContent = t('spiderMoves')
+        s.querySelector('.time-label').textContent = t('spiderTime')
+        s.querySelector('.runs-label').textContent = t('spiderRuns')
+        s.querySelector('.deals-label').textContent = t('spiderDeals')
+        s.querySelector('.warning').textContent = t('storageWarning')
+        s.querySelector('.gesture-note').textContent = t('spiderGesture')
+        s.querySelector('.table').setAttribute('aria-label', t('spiderTable'))
+    }
+
+    sourceFrom(element) {
+        if (!element?.classList.contains('face')) return null
+        return {column: Number(element.dataset.column), card: Number(element.dataset.card)}
+    }
+
+    sameSource(left, right) {
+        return left && right && left.column === right.column && left.card === right.card
+    }
+
+    isMovable(source) {
+        const cards = this.state.deal.tableau[source.column].visible.slice(source.card)
+        return this.engine.movable(cards, this.state.suitCount)
+    }
+
+    select(source) {
+        if (!this.isMovable(source)) {
+            this.selected = null
+            this.notice = 'spiderMixedRun'
+        } else {
+            this.selected = source
+            this.notice = null
+        }
+        this.render()
+    }
+
+    clicked(event) {
+        const target = event.target.closest('.card, .slot, .pile')
+        if (!target || this.state.outcome) return
+        if (target.dataset.action === 'deal') {
+            this.selected = null
+            this.apply(this.engine.deal(this.state.deal))
+            return
+        }
+
+        const source = this.sourceFrom(target)
+        const pile = target.closest('.pile')
+        if (this.selected) {
+            if (source && this.sameSource(source, this.selected)) {
+                this.selected = null
+                this.notice = null
+                this.render()
+                return
+            }
+            if (pile) {
+                this.move(this.selected, {column: Number(pile.dataset.column)})
+                return
+            }
+        }
+        if (source) this.select(source)
+    }
+
+    move(source, destination) {
+        const result = this.engine.move(this.state.deal, source, destination)
+        if (!result.moved) {
+            this.notice = result.reason === 'mixedRun' ? 'spiderMixedRun' : 'spiderInvalidMove'
+            this.selected = result.reason === 'mixedRun' ? null : source
+            this.render()
+            return
+        }
+        this.selected = null
+        this.apply(result)
+    }
+
+    apply(result) {
+        if (!result.moved) {
+            this.notice = result.reason === 'emptyColumn'
+                ? 'spiderEmptyDeal'
+                : result.reason === 'stockEmpty'
+                    ? 'spiderStockEmpty'
+                    : 'spiderInvalidMove'
+            this.render()
+            return
+        }
+        this.snapshotElapsed()
+        this.state.history.push({
+            deal: this.state.deal,
+            moves: this.state.moves,
+            elapsedMs: this.state.elapsedMs,
+        })
+        if (this.state.history.length > 200) this.state.history.shift()
+        this.state.deal = result.game
+        this.state.moves += 1
+        this.state.progress = !result.game.won
+        this.state.outcome = result.game.won ? 'won' : null
+        this.notice = result.completed ? 'spiderCompleted' : null
+        if (this.state.outcome) this.pauseTimer(false)
+        else this.resumeTimer()
+        this.save()
+        this.render()
+    }
+
+    undo() {
+        const previous = this.state.history.pop()
+        if (!previous) return
+        this.pauseTimer(false)
+        Object.assign(this.state, previous, {
+            outcome: previous.deal.won ? 'won' : null,
+            progress: this.state.history.length > 0 || previous.moves > 0,
+        })
+        this.selected = null
+        this.notice = null
+        this.save()
+        this.render()
+        this.resumeTimer()
+    }
+
+    newGame(suitCount = this.state.suitCount, changedMode = false) {
+        if (this.state.progress && !this.state.outcome && !confirm(this.i18n.t('confirmNew'))) return false
+        this.pauseTimer(false)
+        this.state = this.fresh(suitCount)
+        this.selected = null
+        this.notice = null
+        this.storage.clear('spider')
+        this.render()
+        if (!changedMode) this.shadowRoot.querySelector('.suit-count').value = String(suitCount)
+        return true
+    }
+
+    save() {
+        this.state.progress = this.state.moves > 0 && !this.state.outcome
+        this.storage.write('spider', this.state)
+        this.shadowRoot.querySelector('.warning').hidden = this.storage.isAvailable()
+    }
+
+    snapshotElapsed() {
+        if (this.timerOrigin == null) return
+        this.state.elapsedMs += performance.now() - this.timerOrigin
+        this.timerOrigin = performance.now()
+    }
+
+    resumeTimer() {
+        if (!this.state.progress || this.state.outcome || document.hidden || this.timerOrigin != null) return
+        this.timerOrigin = performance.now()
+        this.timerInterval = setInterval(() => this.renderTimer(), 1000)
+    }
+
+    pauseTimer(persist) {
+        this.snapshotElapsed()
+        this.timerOrigin = null
+        clearInterval(this.timerInterval)
+        this.timerInterval = null
+        if (persist && this.state?.progress) this.save()
+    }
+
+    visibilityChanged() {
+        if (document.hidden) this.pauseTimer(true)
+        else this.resumeTimer()
+    }
+
+    elapsed() {
+        return this.state.elapsedMs + (this.timerOrigin == null ? 0 : performance.now() - this.timerOrigin)
+    }
+
+    renderTimer() {
+        const seconds = Math.floor(this.elapsed() / 1000)
+        const minutes = Math.floor(seconds / 60)
+        this.shadowRoot.querySelector('.timer').textContent =
+            `${String(minutes).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
+    }
+
+    cardName(card) {
+        const rank = this.engine.RANKS[this.engine.rank(card)]
+        const suitId = this.engine.suit(card, this.state.suitCount)
+        const suitName = this.engine.SUITS[suitId]
+        const suit = this.i18n.t(`solitaireSuit${suitName[0].toUpperCase()}${suitName.slice(1)}`)
+        return this.i18n.locale === 'zh' ? `${suit}${rank}` : `${rank} of ${suit}`
+    }
+
+    card(card, column, index, selected) {
+        const rank = this.engine.RANKS[this.engine.rank(card)]
+        const suit = this.engine.suit(card, this.state.suitCount)
+        const mark = this.engine.SUIT_MARKS[suit]
+        return `<button class="card face ${this.engine.color(card, this.state.suitCount)}${selected ? ' selected' : ''}"
+            type="button" data-column="${column}" data-card="${index}" data-value="${card}"
+            draggable="true" aria-label="${this.cardName(card)}">
+            <span class="corner"><span>${rank}</span><span class="suit">${mark}</span></span>
+            <span class="pip">${mark}</span>
+        </button>`
+    }
+
+    renderTop() {
+        const game = this.state.deal
+        const deals = game.stock.length / 10
+        const stock = this.shadowRoot.querySelector('.stock')
+        stock.disabled = deals === 0
+        stock.setAttribute('aria-label', deals
+            ? this.i18n.t('spiderStock')
+            : this.i18n.t('spiderStockEmpty'))
+        stock.querySelector('.stock-count').textContent = String(deals)
+        this.shadowRoot.querySelector('.completed-rack').innerHTML = Array.from({length: 8}, (_, index) => {
+            const run = game.completed[index]
+            if (!run) return '<span class="run-slot" aria-hidden="true">○</span>'
+            const suit = this.engine.suit(run[0], this.state.suitCount)
+            return `<span class="run-slot complete ${[1, 2].includes(suit) ? 'red' : 'black'}"
+                aria-label="${this.i18n.t('spiderCompletedRun')}">${this.engine.SUIT_MARKS[suit]}</span>`
+        }).join('')
+    }
+
+    renderTableau() {
+        this.shadowRoot.querySelector('.tableau').innerHTML = this.state.deal.tableau.map((pile, column) => {
+            const hidden = pile.hidden.map(() => '<span class="card back" aria-hidden="true"></span>').join('')
+            const visible = pile.visible.map((card, index) => this.card(
+                card,
+                column,
+                index,
+                this.selected?.column === column && index >= this.selected.card,
+            )).join('')
+            const empty = hidden || visible ? '' : `<button class="slot" type="button" aria-label="${this.i18n.t('spiderEmptyColumn')}">+</button>`
+            return `<div class="pile" data-column="${column}" role="group" aria-label="${this.i18n.t('column')} ${column + 1}">${hidden}${visible}${empty}</div>`
+        }).join('')
+    }
+
+    renderCelebration() {
+        const celebration = this.shadowRoot.querySelector('.celebration')
+        celebration.hidden = !this.state.outcome
+        celebration.innerHTML = this.state.outcome
+            ? Array.from({length: 15}, (_, index) => `<i style="--i:${index};--x:${(index * 37) % 94}%"></i>`).join('')
+            : ''
+    }
+
+    render() {
+        const s = this.shadowRoot
+        s.querySelector('.suit-count').value = String(this.state.suitCount)
+        s.querySelector('.undo').disabled = this.state.history.length === 0
+        s.querySelector('.moves').textContent = String(this.state.moves)
+        s.querySelector('.runs').textContent = `${this.state.deal.completed.length}/8`
+        s.querySelector('.deals').textContent = String(this.state.deal.stock.length / 10)
+        s.querySelector('.warning').hidden = this.storage.isAvailable()
+        const status = s.querySelector('.status')
+        status.classList.toggle('won', Boolean(this.state.outcome))
+        if (this.state.outcome) status.textContent = this.i18n.t('spiderWon')
+        else if (this.notice) status.textContent = this.i18n.t(this.notice)
+        else if (this.selected) status.textContent = this.i18n.t('spiderSelected')
+        else status.textContent = this.i18n.t('spiderPrompt')
+        this.renderTimer()
+        this.renderTop()
+        this.renderTableau()
+        this.renderCelebration()
+    }
+
+    dragStarted(event) {
+        const source = this.sourceFrom(event.target.closest('.card'))
+        if (!source || this.state.outcome || !this.isMovable(source)) {
+            event.preventDefault()
+            if (source && !this.isMovable(source)) {
+                this.notice = 'spiderMixedRun'
+                this.render()
+            }
+            return
+        }
+        this.dragSource = source
+        event.dataTransfer.effectAllowed = 'move'
+        event.dataTransfer.setData('text/plain', JSON.stringify(source))
+    }
+
+    draggedOver(event) {
+        const destination = event.target.closest('.pile')
+        if (!destination || !this.dragSource) return
+        event.preventDefault()
+        for (const element of this.shadowRoot.querySelectorAll('.drop-target')) element.classList.remove('drop-target')
+        destination.classList.add('drop-target')
+        event.dataTransfer.dropEffect = 'move'
+    }
+
+    dropped(event) {
+        const target = event.target.closest('.pile')
+        if (!target || !this.dragSource) return
+        event.preventDefault()
+        const source = this.dragSource
+        this.dragSource = null
+        this.clearDropTargets()
+        this.move(source, {column: Number(target.dataset.column)})
+    }
+
+    clearDropTargets() {
+        this.dragSource = null
+        for (const element of this.shadowRoot.querySelectorAll('.drop-target')) element.classList.remove('drop-target')
+    }
+})
+</script>

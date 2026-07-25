@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="360" viewBox="0 0 720 360" role="img" aria-labelledby="title desc">
+  <title id="title">Spider tableau building and movable suited runs</title>
+  <desc id="desc">Mixed suits may descend in the tableau, while a same-suit king through ace run moves together and clears.</desc>
+  <rect width="720" height="360" rx="28" fill="#1c563d"/>
+  <g font-family="Georgia,serif" font-weight="700">
+    <g transform="translate(42 38)">
+      <rect width="92" height="128" rx="9" fill="#fffdf8" stroke="#17231d" stroke-width="3"/>
+      <text x="11" y="29" font-size="25" fill="#171918">9</text><text x="46" y="84" text-anchor="middle" font-size="42" fill="#171918">♠</text>
+    </g>
+    <g transform="translate(42 112)">
+      <rect width="92" height="128" rx="9" fill="#fffdf8" stroke="#17231d" stroke-width="3"/>
+      <text x="11" y="29" font-size="25" fill="#c52d32">8</text><text x="46" y="84" text-anchor="middle" font-size="42" fill="#c52d32">♥</text>
+    </g>
+    <g transform="translate(42 186)">
+      <rect width="92" height="128" rx="9" fill="#fffdf8" stroke="#17231d" stroke-width="3"/>
+      <text x="11" y="29" font-size="25" fill="#171918">7</text><text x="46" y="84" text-anchor="middle" font-size="42" fill="#171918">♣</text>
+    </g>
+    <text x="181" y="153" font-family="system-ui,sans-serif" font-size="21" fill="#fff">build by rank</text>
+    <text x="181" y="181" font-family="system-ui,sans-serif" font-size="18" fill="#d8eee4">mixed suits allowed</text>
+    <path d="M286 178h74" stroke="#f7d86b" stroke-width="7" stroke-linecap="round"/>
+    <path d="m348 162 22 16-22 16" fill="none" stroke="#f7d86b" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+    <g transform="translate(403 38)">
+      <rect width="92" height="128" rx="9" fill="#fffdf8" stroke="#17231d" stroke-width="3"/>
+      <text x="11" y="29" font-size="25" fill="#171918">K</text><text x="46" y="84" text-anchor="middle" font-size="42" fill="#171918">♠</text>
+    </g>
+    <g transform="translate(403 112)">
+      <rect width="92" height="128" rx="9" fill="#fffdf8" stroke="#17231d" stroke-width="3"/>
+      <text x="11" y="29" font-size="25" fill="#171918">Q</text><text x="46" y="84" text-anchor="middle" font-size="42" fill="#171918">♠</text>
+    </g>
+    <g transform="translate(403 186)">
+      <rect width="92" height="128" rx="9" fill="#fffdf8" stroke="#17231d" stroke-width="3"/>
+      <text x="11" y="29" font-size="25" fill="#171918">J</text><text x="46" y="84" text-anchor="middle" font-size="42" fill="#171918">♠</text>
+    </g>
+    <text x="590" y="138" text-anchor="middle" font-family="system-ui,sans-serif" font-size="21" fill="#fff">move together</text>
+    <text x="590" y="168" text-anchor="middle" font-family="system-ui,sans-serif" font-size="18" fill="#d8eee4">same suit only</text>
+    <text x="590" y="215" text-anchor="middle" font-family="system-ui,sans-serif" font-size="25" fill="#f7d86b">K → … → A</text>
+    <text x="590" y="246" text-anchor="middle" font-family="system-ui,sans-serif" font-size="18" fill="#d8eee4">complete to clear</text>
+  </g>
+</svg>

@@ -62,4 +62,6 @@ test('variant-specific rules are documented rather than implied', () => {
     assert.match(allRules('reversi'), /passes automatically/i)
     assert.match(allRules('minesweeper'), /There is no Undo/i)
     assert.match(allRules('minesweeper'), /may sometimes require a guess/i)
+    assert.match(allRules('spider'), /same suit/i)
+    assert.match(allRules('spider'), /empty column/i)
 })
