@@ -42,11 +42,13 @@
             color: var(--ink-faint); font-size: clamp(.5rem, 2.7vw, .72rem); font-weight: 650; line-height: 1;
         }
         .notes i { display: grid; place-items: center; font-style: normal; }
-        .pad { display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px; margin-top: 10px; }
+        .pad {
+            display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px; margin-top: 10px;
+            user-select: none; -webkit-touch-callout: none;
+        }
         .digit { min-width: 0; min-height: 45px; padding: 0; border-color: var(--border-strong); color: var(--ink); background: var(--bg-elevated); font-size: 1.1rem; }
         .digit.complete { opacity: .36; }
-        .tools { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-top: 8px; }
-        .tool.active { border-color: var(--accent); color: var(--accent-ink); background: var(--accent); }
+        .tools { display: grid; margin-top: 8px; }
         @media (max-width: 340px) { .toolbar { gap: 4px; } button { padding-inline: 8px; font-size: .82rem; } select { min-width: 88px; } .digit { min-height: 41px; } }
     </style>
     <div class="toolbar">
@@ -60,8 +62,6 @@
     <div class="pad" aria-label="Number pad"></div>
     <div class="tools">
         <button class="tool erase" type="button"></button>
-        <button class="tool notes-toggle" type="button" aria-pressed="false"></button>
-        <button class="tool hint" type="button"></button>
     </div>
 </template>
 
@@ -71,7 +71,8 @@ OfflineGames.wasm.defineElement('sudoku', 'sudoku-game', class extends HTMLEleme
         super()
         this.attachShadow({mode: 'open'}).append(document.getElementById('sudoku-game-template').content.cloneNode(true))
         this.selected = null
-        this.noteMode = false
+        this.longPressTimer = null
+        this.longPressHandled = false
     }
     connectedCallback() {
         this.engine = OfflineGames.Sudoku
@@ -84,7 +85,7 @@ OfflineGames.wasm.defineElement('sudoku', 'sudoku-game', class extends HTMLEleme
     }
     fresh(difficulty = 'medium') {
         const seed = OfflineGames.runtime.randomSeed(), generated = this.engine.generate(difficulty, seed)
-        return {schema: 1, game: 'sudoku', seed, difficulty, puzzle: generated.puzzle, solution: generated.solution, board: generated.puzzle.slice(), notes: Array(81).fill(0), history: [], hints: 0, outcome: null}
+        return {schema: 1, game: 'sudoku', seed, difficulty, puzzle: generated.puzzle, solution: generated.solution, board: generated.puzzle.slice(), notes: Array(81).fill(0), history: [], outcome: null}
     }
     valid(saved) {
         return saved && ['easy', 'medium', 'hard'].includes(saved.difficulty) && [saved.puzzle, saved.solution, saved.board, saved.notes].every(value => Array.isArray(value) && value.length === 81) && Array.isArray(saved.history)
@@ -93,17 +94,40 @@ OfflineGames.wasm.defineElement('sudoku', 'sudoku-game', class extends HTMLEleme
     bind() {
         const shadow = this.shadowRoot
         shadow.querySelector('.board').addEventListener('click', event => { const cell = event.target.closest('.cell'); if (cell) { this.selected = Number(cell.dataset.index); this.render() } })
-        shadow.querySelector('.pad').addEventListener('click', event => { const digit = event.target.closest('.digit'); if (digit) this.enter(Number(digit.dataset.digit)) })
+        const pad = shadow.querySelector('.pad')
+        pad.addEventListener('pointerdown', event => {
+            const digit = event.target.closest('.digit')
+            if (!digit || event.button !== 0) return
+            clearTimeout(this.longPressTimer)
+            this.longPressHandled = false
+            this.longPressTimer = setTimeout(() => {
+                this.longPressHandled = true
+                this.enter(Number(digit.dataset.digit), true)
+            }, 500)
+        })
+        const endPress = () => { clearTimeout(this.longPressTimer); this.longPressTimer = null }
+        pad.addEventListener('pointerup', endPress)
+        pad.addEventListener('pointercancel', endPress)
+        pad.addEventListener('click', event => {
+            const digit = event.target.closest('.digit')
+            if (!digit) return
+            if (this.longPressHandled && event.detail > 0) {
+                this.longPressHandled = false
+                return
+            }
+            this.longPressHandled = false
+            this.enter(Number(digit.dataset.digit))
+        })
+        pad.addEventListener('contextmenu', event => {
+            if (event.target.closest('.digit')) event.preventDefault()
+        })
         shadow.querySelector('.erase').addEventListener('click', () => this.enter(0))
-        shadow.querySelector('.notes-toggle').addEventListener('click', () => { this.noteMode = !this.noteMode; this.render() })
-        shadow.querySelector('.hint').addEventListener('click', () => this.hint())
         shadow.querySelector('.undo').addEventListener('click', () => this.undo())
         shadow.querySelector('.new').addEventListener('click', () => this.newGame())
         shadow.querySelector('.difficulty').addEventListener('change', event => this.newGame(event.target.value, true))
         this.addEventListener('keydown', event => {
-            if (/^[1-9]$/.test(event.key)) this.enter(Number(event.key))
+            if (/^[1-9]$/.test(event.key)) this.enter(Number(event.key), event.shiftKey)
             else if (event.key === 'Backspace' || event.key === 'Delete') this.enter(0)
-            else if (event.key.toLowerCase() === 'n') { this.noteMode = !this.noteMode; this.render() }
         })
     }
     localize() {
@@ -111,15 +135,15 @@ OfflineGames.wasm.defineElement('sudoku', 'sudoku-game', class extends HTMLEleme
         s.querySelector('.difficulty-label').textContent = t('difficulty')
         for (const option of s.querySelectorAll('.difficulty option')) option.textContent = t(option.value)
         s.querySelector('.undo').textContent = t('undo'); s.querySelector('.new').textContent = t('newGame')
-        s.querySelector('.erase').textContent = t('erase'); s.querySelector('.notes-toggle').textContent = t('notes'); s.querySelector('.hint').textContent = t('hint')
+        s.querySelector('.erase').textContent = t('erase')
         s.querySelector('.warning').textContent = t('storageWarning')
     }
     save() { if (!this.storage.write('sudoku', this.state)) this.shadowRoot.querySelector('.warning').hidden = false }
-    enter(digit) {
+    enter(digit, asNote = false) {
         const index = this.selected
         if (index == null || this.state.outcome || this.state.puzzle[index]) return
         const before = {index, value: this.state.board[index], notes: this.state.notes[index], peerNotes: []}
-        if (this.noteMode && digit) {
+        if (asNote && digit) {
             if (this.state.board[index]) return
             this.state.notes[index] ^= 1 << digit
         } else {
@@ -132,15 +156,6 @@ OfflineGames.wasm.defineElement('sudoku', 'sudoku-game', class extends HTMLEleme
         if (this.engine.isComplete(this.state.board, this.state.solution)) this.state.outcome = {ended: true, reason: 'solved'}
         this.save(); this.render()
     }
-    hint() {
-        if (this.state.outcome) return
-        let index = this.selected
-        if (index == null || this.state.puzzle[index] || this.state.board[index] === this.state.solution[index]) index = this.state.board.findIndex((value, at) => !this.state.puzzle[at] && value !== this.state.solution[at])
-        if (index < 0) return
-        this.selected = index
-        const wasNoteMode = this.noteMode; this.noteMode = false; this.enter(this.state.solution[index]); this.noteMode = wasNoteMode
-        this.state.hints++; this.save(); this.render()
-    }
     undo() {
         const previous = this.state.history.pop(); if (!previous) return
         this.state.board[previous.index] = previous.value; this.state.notes[previous.index] = previous.notes
@@ -149,7 +164,7 @@ OfflineGames.wasm.defineElement('sudoku', 'sudoku-game', class extends HTMLEleme
     }
     newGame(difficulty = this.state.difficulty, force = false) {
         if (!force && this.state.history.length && !this.state.outcome && !confirm(this.i18n.t('confirmNew'))) return
-        this.state = this.fresh(difficulty); this.selected = null; this.noteMode = false; this.save(); this.render()
+        this.state = this.fresh(difficulty); this.selected = null; this.save(); this.render()
     }
     render() {
         const s = this.shadowRoot, selectedValue = this.selected == null ? 0 : this.state.board[this.selected]
@@ -165,13 +180,11 @@ OfflineGames.wasm.defineElement('sudoku', 'sudoku-game', class extends HTMLEleme
             return `<button type="button" role="gridcell" class="${classes.join(' ')}" data-index="${index}" aria-selected="${index === this.selected}" aria-label="${this.i18n.t('row')} ${row + 1}, ${this.i18n.t('column')} ${column + 1}, ${value || this.i18n.t('empty')}">${value || notes}</button>`
         }).join('')
         const counts = this.engine.DIGITS.map(digit => this.state.board.filter(value => value === digit).length)
-        s.querySelector('.pad').innerHTML = this.engine.DIGITS.map((digit, index) => `<button type="button" class="digit${counts[index] >= 9 ? ' complete' : ''}" data-digit="${digit}" ${counts[index] >= 9 ? 'disabled' : ''}>${digit}</button>`).join('')
+        s.querySelector('.pad').innerHTML = this.engine.DIGITS.map((digit, index) => `<button type="button" class="digit${counts[index] >= 9 ? ' complete' : ''}" data-digit="${digit}" aria-label="${digit}; ${this.i18n.t('longPressNote')}" ${counts[index] >= 9 ? 'disabled' : ''}>${digit}</button>`).join('')
         s.querySelector('.status').textContent = this.i18n.t(this.state.outcome ? 'sudokuSolved' : 'sudokuPrompt')
         s.querySelector('.difficulty').value = this.state.difficulty
         s.querySelector('.undo').disabled = !this.state.history.length
-        s.querySelector('.hint').disabled = Boolean(this.state.outcome)
-        s.querySelector('.notes-toggle').classList.toggle('active', this.noteMode)
-        s.querySelector('.notes-toggle').setAttribute('aria-pressed', String(this.noteMode))
     }
+    disconnectedCallback() { clearTimeout(this.longPressTimer) }
 })
 </script>

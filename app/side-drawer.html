@@ -52,6 +52,7 @@
             font-weight: 700;
             letter-spacing: -.02em;
             color: var(--ink);
+            text-decoration: none;
         }
         .close-btn {
             width: 30px;
@@ -105,7 +106,7 @@
     <button class="backdrop" type="button" tabindex="-1" aria-hidden="true"></button>
     <aside aria-hidden="true" inert>
         <div class="head">
-            <span class="brand"></span>
+            <a class="brand"></a>
             <button class="close-btn" type="button">✕</button>
         </div>
         <nav></nav>
@@ -137,17 +138,20 @@ customElements.define('offline-drawer', class extends HTMLElement {
         this._triggerEl = triggerEl
         this._layoutEl = layoutEl
         const s = this.shadowRoot
-        s.querySelector('.brand').textContent = i18n.t('siteName')
+        const brand = s.querySelector('.brand')
+        brand.href = i18n.href('./index.html')
+        brand.textContent = i18n.t('siteName')
+        if (currentPage === 'gallery') brand.setAttribute('aria-current', 'page')
         s.querySelector('.close-btn').setAttribute('aria-label', i18n.t('close'))
         s.querySelector('.lang-label').textContent = i18n.t('language')
         s.querySelector('.theme-label').textContent = i18n.t('appearance')
 
         /* Navigation */
-        const pages = [{id: 'gallery', page: 'index.html'}, ...games.map(g => ({id: g.id, page: g.id + '.html'}))]
+        const pages = games.map(g => ({id: g.id, page: g.id + '.html'}))
         s.querySelector('nav').replaceChildren(...pages.map(item => {
             const a = document.createElement('a')
             a.href = i18n.href('./' + item.page)
-            a.textContent = i18n.t(item.id === 'gallery' ? 'gallery' : item.id)
+            a.textContent = i18n.t(item.id)
             if (item.id === currentPage) a.setAttribute('aria-current', 'page')
             return a
         }))
