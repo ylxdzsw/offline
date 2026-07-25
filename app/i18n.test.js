@@ -10,25 +10,43 @@ const games = fs.readdirSync(gamesRoot, {withFileTypes: true})
     .map(entry => entry.name)
 const source = fs.readFileSync(path.join(__dirname, 'i18n.js'), 'utf8')
 
-function loadI18n(locale) {
+function loadI18n({preference, languages = ['en'], storageError = false} = {}) {
+    const store = new Map()
+    if (preference) store.set('offline-games:v1:language', preference)
+    let reloads = 0
     const location = {
-        href: `https://offline.example/index.html?lang=${locale}`,
-        search: `?lang=${locale}`,
+        reload() { reloads++ },
+    }
+    const documentElement = {lang: 'en'}
+    const localStorage = {
+        getItem(key) {
+            if (storageError) throw new Error('storage unavailable')
+            return store.has(key) ? store.get(key) : null
+        },
+        setItem(key, value) {
+            if (storageError) throw new Error('storage unavailable')
+            store.set(key, String(value))
+        },
     }
     const context = vm.createContext({
-        URL,
-        URLSearchParams,
+        document: {documentElement},
+        localStorage,
         location,
-        navigator: {languages: [locale]},
+        navigator: {languages},
     })
     context.globalThis = context
     vm.runInContext(source, context)
-    return context.OfflineGames.i18n
+    return {
+        i18n: context.OfflineGames.i18n,
+        documentElement,
+        store,
+        reloads: () => reloads,
+    }
 }
 
 test('every game has a complete guide in both languages', () => {
     for (const locale of ['en', 'zh']) {
-        const i18n = loadI18n(locale)
+        const {i18n} = loadI18n({preference: locale})
         assert.equal(i18n.locale, locale)
         for (const id of games) {
             const guide = i18n.guide(id)
@@ -49,7 +67,7 @@ test('every game has a complete guide in both languages', () => {
 })
 
 test('variant-specific rules are documented rather than implied', () => {
-    const en = loadI18n('en')
+    const {i18n: en} = loadI18n({preference: 'en'})
     const allRules = id => en.guide(id).sections.flatMap(section => section.items).join(' ')
 
     assert.match(allRules('xiangqi'), /horse leg/i)
@@ -67,4 +85,35 @@ test('variant-specific rules are documented rather than implied', () => {
     assert.match(allRules('minesweeper'), /may sometimes require a guess/i)
     assert.match(allRules('spider'), /same suit/i)
     assert.match(allRules('spider'), /empty column/i)
+})
+
+test('saved language overrides browser detection', () => {
+    const {i18n, documentElement} = loadI18n({preference: 'en', languages: ['zh-CN']})
+    assert.equal(i18n.locale, 'en')
+    assert.equal(documentElement.lang, 'en')
+})
+
+test('browser language is used when there is no saved preference', () => {
+    const {i18n, documentElement} = loadI18n({languages: ['zh-HK', 'en']})
+    assert.equal(i18n.locale, 'zh')
+    assert.equal(documentElement.lang, 'zh-CN')
+})
+
+test('changing language persists the preference and reloads without a URL rewrite', () => {
+    const {i18n, store, reloads} = loadI18n({languages: ['en']})
+    assert.equal(i18n.setLocale('en'), true)
+    assert.equal(store.get('offline-games:v1:language'), 'en')
+    assert.equal(reloads(), 0)
+    assert.equal(i18n.setLocale('zh'), true)
+    assert.equal(store.get('offline-games:v1:language'), 'zh')
+    assert.equal(reloads(), 1)
+    assert.equal(i18n.setLocale('fr'), false)
+    assert.equal(reloads(), 1)
+})
+
+test('storage failures retain the detected language', () => {
+    const {i18n, reloads} = loadI18n({languages: ['zh-CN'], storageError: true})
+    assert.equal(i18n.locale, 'zh')
+    assert.equal(i18n.setLocale('en'), false)
+    assert.equal(reloads(), 0)
 })

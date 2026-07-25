@@ -273,7 +273,7 @@
                 <div class="content">
                     <h2>${i18n.t(game)}</h2>
                     <p>${i18n.t(game + 'Desc')}</p>
-                    <a href="${i18n.href('./' + game + '.html')}">${i18n.t(storage.hasProgress(game) ? 'continue' : 'play')}</a>
+                    <a href="./${game}.html">${i18n.t(storage.hasProgress(game) ? 'continue' : 'play')}</a>
                 </div>
             </article>
         `).join('')

@@ -1482,12 +1482,19 @@
         },
     }
 
-    const params = new URLSearchParams(root.location ? root.location.search : '')
-    const explicit = params.get('lang')
+    const STORAGE_KEY = 'offline-games:v1:language'
+    const LOCALES = ['en', 'zh']
     const browserLanguages = root.navigator?.languages || [root.navigator?.language || 'en']
-    const locale = explicit === 'zh' || explicit === 'en'
-        ? explicit
-        : browserLanguages.some(language => String(language).toLowerCase().startsWith('zh')) ? 'zh' : 'en'
+    const browserLocale = browserLanguages.some(language => String(language).toLowerCase().startsWith('zh')) ? 'zh' : 'en'
+    const readLocale = () => {
+        try {
+            const saved = root.localStorage?.getItem(STORAGE_KEY)
+            return LOCALES.includes(saved) ? saved : browserLocale
+        } catch {
+            return browserLocale
+        }
+    }
+    const locale = readLocale()
 
     const t = key => messages[locale][key] || messages.en[key] || key
     const guide = game => {
@@ -1495,18 +1502,18 @@
         const details = guideDetails[locale][game] || guideDetails.en[game]
         return base && details ? {...base, quick: base.rules, ...details} : null
     }
-    const href = path => {
-        if (explicit !== 'zh' && explicit !== 'en') return path
-        const url = new URL(path, root.location.href)
-        url.searchParams.set('lang', explicit)
-        return url.pathname.split('/').pop() + url.search
-    }
     const setLocale = next => {
-        const url = new URL(root.location.href)
-        url.searchParams.set('lang', next)
-        root.location.href = url.href
+        if (!LOCALES.includes(next)) return false
+        try {
+            if (!root.localStorage) return false
+            root.localStorage.setItem(STORAGE_KEY, next)
+        } catch {
+            return false
+        }
+        if (next !== locale) root.location?.reload?.()
+        return true
     }
 
     if (root.document) root.document.documentElement.lang = locale === 'zh' ? 'zh-CN' : 'en'
-    root.OfflineGames = Object.assign(root.OfflineGames || {}, {i18n: {locale, explicit, t, guide, href, setLocale}})
+    root.OfflineGames = Object.assign(root.OfflineGames || {}, {i18n: {locale, t, guide, setLocale}})
 })(globalThis)

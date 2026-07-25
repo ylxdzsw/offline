@@ -144,7 +144,7 @@ customElements.define('offline-drawer', class extends HTMLElement {
         this._layoutEl = layoutEl
         const s = this.shadowRoot
         const brand = s.querySelector('.brand')
-        brand.href = i18n.href('./index.html')
+        brand.href = './index.html'
         brand.textContent = i18n.t('siteName')
         if (currentPage === 'gallery') brand.setAttribute('aria-current', 'page')
         s.querySelector('.close-btn').setAttribute('aria-label', i18n.t('close'))
@@ -155,7 +155,7 @@ customElements.define('offline-drawer', class extends HTMLElement {
         const pages = games.map(id => ({id, page: id + '.html'}))
         s.querySelector('nav').replaceChildren(...pages.map(item => {
             const a = document.createElement('a')
-            a.href = i18n.href('./' + item.page)
+            a.href = './' + item.page
             a.textContent = i18n.t(item.id)
             if (item.id === currentPage) a.setAttribute('aria-current', 'page')
             return a
@@ -168,7 +168,9 @@ customElements.define('offline-drawer', class extends HTMLElement {
             {value: 'en', label: 'English'},
         ]))
         langSeg.setAttribute('value', i18n.locale)
-        langSeg.addEventListener('change', e => i18n.setLocale(e.detail.value))
+        langSeg.addEventListener('change', e => {
+            if (!i18n.setLocale(e.detail.value)) langSeg.setValue(i18n.locale)
+        })
 
         /* Theme segmented */
         const themeSeg = s.querySelector('.theme-seg')

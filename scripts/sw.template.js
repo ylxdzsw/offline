@@ -24,10 +24,6 @@ self.addEventListener('fetch', event => {
     if (request.mode === 'navigate') {
         event.respondWith(
             fetch(request)
-                .then(response => {
-                    if (response.ok) caches.open(CACHE_NAME).then(cache => cache.put(request, response.clone()))
-                    return response
-                })
                 .catch(async () => {
                     const cached = await caches.match(request, {ignoreSearch: true})
                     return cached || caches.match('./index.html')

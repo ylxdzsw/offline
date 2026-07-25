@@ -59,12 +59,10 @@ Useful targets are `make wasm`, `make check-rust`, `make test-rust`,
 
 ## Language selection
 
-The UI chooses Chinese when a browser language starts with `zh`; otherwise it uses English. A query parameter overrides detection on every page:
-
-- `?lang=zh` — Simplified Chinese
-- `?lang=en` — English
-
-The sidebar language buttons use the same query contract and preserve it during navigation.
+The UI uses the saved local preference when present. On first use it chooses
+Chinese when a browser language starts with `zh`; otherwise it uses English.
+The sidebar language buttons save the preference for every page without
+changing the URL.
 
 ## GitHub Pages
 
