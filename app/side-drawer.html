@@ -19,7 +19,7 @@
             z-index: 41;
             top: 0;
             bottom: 0;
-            left: max(0px, calc((100vw - var(--shell-max)) / 2));
+            left: 0;
             width: min(82vw, 300px);
             display: flex;
             flex-direction: column;
@@ -31,7 +31,7 @@
             color: var(--ink);
             background: var(--bg-shell);
             overscroll-behavior: contain;
-            transform: translateX(calc(-100% - 8px));
+            transform: translateX(calc(-100% - 64px));
             transition: transform .26s cubic-bezier(.4,0,.2,1);
             /* iOS sheet edge radius */
             border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
@@ -39,6 +39,11 @@
         }
         :host([open]) .backdrop { opacity: 1; pointer-events: auto; }
         :host([open]) aside { transform: translateX(0); }
+        @media (min-width: 480px) {
+            :host([open]) aside {
+                transform: translateX(calc((100vw - var(--shell-max)) / 2));
+            }
+        }
 
         .head {
             display: flex;

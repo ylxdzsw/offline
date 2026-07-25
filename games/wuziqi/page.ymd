@@ -2,13 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#f5f4f2">
+[offline-pwa-head]
 <meta name="author" content="ylxdzsw">
 <meta name="license" content="MIT">
 <meta name="github" content="https://github.com/ylxdzsw/offline">
-<link rel="manifest" href="./manifest.webmanifest">
-<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
 <title>Wuziqi / 五子棋</title>
 [require](../../app/tokens.css)
 [require](../../app/theme.js)

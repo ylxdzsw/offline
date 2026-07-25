@@ -60,6 +60,7 @@
     /* Layout */
     --control-h:  44px;
     --shell-max:  480px;
+    --app-height: 100dvh;
     --safe-top:    env(safe-area-inset-top,    0px);
     --safe-right:  env(safe-area-inset-right,  0px);
     --safe-bottom: env(safe-area-inset-bottom, 0px);
@@ -174,12 +175,19 @@ html, body {
     margin: 0;
 }
 
+html {
+    background-color: var(--bg-page);
+    overscroll-behavior: none;
+    touch-action: pan-x pan-y;
+}
+
 body {
     min-width: 280px;
-    min-height: 100dvh;
+    min-height: var(--app-height);
     font-family: var(--font-ui);
     color: var(--ink);
-    overscroll-behavior-y: contain;
+    overflow-x: hidden;
+    overscroll-behavior: none;
     /* Quiet radial glow from accent at top */
     background:
         radial-gradient(
@@ -191,6 +199,12 @@ body {
     -webkit-tap-highlight-color: transparent;
     font-synthesis: none;
     text-rendering: optimizeLegibility;
+}
+
+/* WebKit standalone mode reports dynamic viewport heights without the safe
+   areas on some iPadOS/iOS releases; 100vh includes the full app canvas. */
+@media (display-mode: standalone) {
+    :root { --app-height: 100vh; }
 }
 
 button, select { font: inherit; color: inherit; }

@@ -3,7 +3,7 @@
         :host {
             display: block;
             width: min(100%, var(--shell-max));
-            min-height: 100dvh;
+            min-height: var(--app-height);
             margin: 0 auto;
             color: var(--ink);
             background: var(--bg-shell);
@@ -11,7 +11,7 @@
         }
         .layout {
             display: grid;
-            min-height: 100dvh;
+            min-height: var(--app-height);
             grid-template-rows: auto 1fr auto;
         }
         header {
@@ -84,6 +84,7 @@
             opacity: .7;
         }
         main {
+            min-height: calc(var(--app-height) - 48px);
             padding: 16px
                 max(14px, var(--safe-right))
                 24px

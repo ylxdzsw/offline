@@ -22,8 +22,14 @@ test('build is self-contained and contains the complete PWA shell', async () => 
     for (const page of pageFiles) {
         const html = fs.readFileSync(path.join(dist, page), 'utf8')
         expect(html).toContain('manifest.webmanifest')
+        expect(html).toContain('maximum-scale=1,user-scalable=no,viewport-fit=cover')
+        expect(html).toContain('name=apple-mobile-web-app-capable content=yes')
+        expect(html).toContain('name=apple-mobile-web-app-status-bar-style content=black-translucent')
         expect(html).not.toMatch(/<(?:script|link|img)[^>]+(?:src|href)=["']https?:\/\//i)
     }
+    const manifest = JSON.parse(fs.readFileSync(path.join(dist, 'manifest.webmanifest'), 'utf8'))
+    expect(manifest.background_color).toBe('#f5f4f2')
+    expect(manifest.theme_color).toBe('#f5f4f2')
     for (const game of catalog) {
         const html = fs.readFileSync(path.join(dist, `${game.id}.html`), 'utf8')
         expect(html).toContain(`<${game.element}`)
@@ -93,6 +99,51 @@ test('drawer controls remain reachable on a short phone viewport', async ({page}
     await expect(layout).not.toHaveAttribute('inert', '')
     await expect(menu).toHaveAttribute('aria-expanded', 'false')
     await expect(menu).toBeFocused()
+})
+
+test('closed drawer stays fully offscreen on iPad and desktop widths', async ({page}) => {
+    for (const viewport of [{width: 1024, height: 768}, {width: 1440, height: 900}]) {
+        await page.setViewportSize(viewport)
+        await page.goto('/index.html?lang=en')
+        const menu = page.locator('offline-shell .menu-btn')
+        const drawer = page.locator('offline-shell aside')
+
+        const closed = await drawer.boundingBox()
+        expect(closed.x + closed.width).toBeLessThanOrEqual(-60)
+
+        await menu.click()
+        await expect.poll(async () => (await drawer.boundingBox()).x)
+            .toBeCloseTo((viewport.width - 480) / 2, 0)
+
+        await page.locator('offline-shell offline-drawer .close-btn').click()
+        await expect(drawer).toHaveAttribute('inert', '')
+        await expect.poll(async () => {
+            const box = await drawer.boundingBox()
+            return box.x + box.width
+        }).toBeLessThanOrEqual(-60)
+    }
+})
+
+test('app shell suppresses page bounce and browser zoom gestures', async ({page}) => {
+    await page.goto('/index.html')
+    await expect(page.locator('html')).toHaveCSS('overscroll-behavior', 'none')
+    await expect(page.locator('body')).toHaveCSS('overscroll-behavior', 'none')
+    await expect(page.locator('html')).toHaveCSS('touch-action', 'pan-x pan-y')
+    await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(245, 244, 242)')
+})
+
+test('copyright stays below the first screen on every page', async ({page}) => {
+    for (const viewport of [{width: 390, height: 844}, {width: 1024, height: 768}]) {
+        await page.setViewportSize(viewport)
+        for (const url of pageFiles.map(file => '/' + file)) {
+            await page.goto(url)
+            const footer = page.locator('offline-shell footer')
+            expect(await footer.evaluate(element => element.getBoundingClientRect().top), url)
+                .toBeGreaterThanOrEqual(viewport.height)
+            await footer.scrollIntoViewIfNeeded()
+            await expect(footer).toBeInViewport()
+        }
+    }
 })
 
 test('navigator language auto-detects Chinese without a query override', async ({browser}) => {
