@@ -175,7 +175,7 @@
 </template>
 
 <script>
-OfflineGames.wasm.defineElement('solitaire', 'solitaire-game', class extends HTMLElement {
+customElements.define('solitaire-game', class extends HTMLElement {
     constructor() {
         super()
         this.attachShadow({mode: 'open'}).append(

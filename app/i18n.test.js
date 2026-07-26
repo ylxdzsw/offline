@@ -6,7 +6,7 @@ const vm = require('node:vm')
 
 const gamesRoot = path.join(__dirname, '../games')
 const games = fs.readdirSync(gamesRoot, {withFileTypes: true})
-    .filter(entry => entry.isDirectory() && fs.existsSync(path.join(gamesRoot, entry.name, 'Cargo.toml')))
+    .filter(entry => entry.isDirectory() && fs.existsSync(path.join(gamesRoot, entry.name, 'page.ymd')))
     .map(entry => entry.name)
 const source = fs.readFileSync(path.join(__dirname, 'i18n.js'), 'utf8')
 

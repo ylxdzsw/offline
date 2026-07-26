@@ -209,7 +209,7 @@
 </template>
 
 <script>
-OfflineGames.wasm.defineElement('spider', 'spider-game', class extends HTMLElement {
+customElements.define('spider-game', class extends HTMLElement {
     constructor() {
         super()
         this.attachShadow({mode: 'open'}).append(

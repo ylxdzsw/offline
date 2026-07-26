@@ -14,6 +14,8 @@ GAMES := \
 	minesweeper \
 	solitaire \
 	spider
+JS_GAMES := sudoku 2048 minesweeper solitaire spider
+WASM_GAMES := $(filter-out $(JS_GAMES),$(GAMES))
 PAGES := index $(GAMES)
 APP_SOURCES := $(shell find app -type f -not -name '*.test.js' -not -path 'app/icons/*')
 GAME_WEB_SOURCES := $(shell find games -maxdepth 2 -type f \( -name '*.js' -o -name '*.html' -o -name '*.ymd' \) -not -name '*.test.js')
@@ -29,10 +31,10 @@ STATIC_OUTPUTS := $(APP_PUBLIC_OUTPUTS) $(ICON_OUTPUTS) $(SVG_GUIDE_OUTPUTS) $(W
 WASM_TARGET := wasm32-unknown-unknown
 CARGO_TARGET_DIR := $(abspath games/target)
 WASM_DIR := games/target/$(WASM_TARGET)/release
-WASM_FILES := $(GAMES:%=$(WASM_DIR)/offline_%.wasm)
+WASM_FILES := $(WASM_GAMES:%=$(WASM_DIR)/offline_%.wasm)
 WASM_RUSTFLAGS ?=
-RUST_TEST_TARGETS := $(GAMES:%=test-rust-%)
-RUST_CHECK_TARGETS := $(GAMES:%=check-rust-%)
+RUST_TEST_TARGETS := $(WASM_GAMES:%=test-rust-%)
+RUST_CHECK_TARGETS := $(WASM_GAMES:%=check-rust-%)
 
 .PHONY: all deps wasm build serve check-rust test test-rust test-unit test-contract test-e2e clean
 
@@ -48,7 +50,12 @@ GAME_$(1)_RUST := $$(wildcard games/$(1)/*.rs)
 $(WASM_DIR)/offline_$(1).wasm: $$(GAME_$(1)_RUST) games/$(1)/Cargo.toml games/$(1)/Cargo.lock games/wasm_abi.rs
 	CARGO_TARGET_DIR='$(CARGO_TARGET_DIR)' RUSTFLAGS='$(WASM_RUSTFLAGS)' $(CARGO) build --manifest-path games/$(1)/Cargo.toml --release --target $(WASM_TARGET)
 endef
-$(foreach game,$(GAMES),$(eval $(call GAME_WASM_RULE,$(game))))
+$(foreach game,$(WASM_GAMES),$(eval $(call GAME_WASM_RULE,$(game))))
+
+define GAME_WASM_PAGE_DEPENDENCY
+$(DIST)/$(1).html: $(WASM_DIR)/offline_$(1).wasm
+endef
+$(foreach game,$(WASM_GAMES),$(eval $(call GAME_WASM_PAGE_DEPENDENCY,$(game))))
 
 build: wasm $(PAGES:%=$(DIST)/%.html) $(STATIC_OUTPUTS)
 	$(NODE) scripts/build-sw.mjs $(DIST)
@@ -57,7 +64,7 @@ $(DIST)/index.html: app/index.ymd app/macros.ymd $(APP_SOURCES)
 	mkdir -p $(DIST)
 	$(NATTOPPET) $< > $@
 
-$(DIST)/%.html: games/%/page.ymd app/macros.ymd $(APP_SOURCES) $(GAME_WEB_SOURCES) $(WASM_DIR)/offline_%.wasm
+$(DIST)/%.html: games/%/page.ymd app/macros.ymd $(APP_SOURCES) $(GAME_WEB_SOURCES)
 	mkdir -p $(DIST)
 	$(NATTOPPET) $< > $@
 
@@ -104,5 +111,5 @@ test-e2e: build
 test: test-rust test-unit test-contract test-e2e
 
 clean:
-	CARGO_TARGET_DIR='$(CARGO_TARGET_DIR)' $(CARGO) clean --manifest-path games/$(firstword $(GAMES))/Cargo.toml
+	CARGO_TARGET_DIR='$(CARGO_TARGET_DIR)' $(CARGO) clean --manifest-path games/$(firstword $(WASM_GAMES))/Cargo.toml
 	rm -rf $(DIST) test-results playwright-report

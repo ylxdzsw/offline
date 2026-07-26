@@ -136,7 +136,7 @@
 </template>
 
 <script>
-OfflineGames.wasm.defineElement('minesweeper', 'minesweeper-game', class extends HTMLElement {
+customElements.define('minesweeper-game', class extends HTMLElement {
     constructor() {
         super()
         this.attachShadow({mode: 'open'}).append(

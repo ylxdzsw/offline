@@ -3,7 +3,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 const gamesRoot = path.resolve('games')
 const games = fs.readdirSync(gamesRoot, {withFileTypes: true})
-    .filter(entry => entry.isDirectory() && fs.existsSync(path.join(gamesRoot, entry.name, 'Cargo.toml')))
+    .filter(entry => entry.isDirectory() && fs.existsSync(path.join(gamesRoot, entry.name, 'page.ymd')))
     .map(entry => entry.name)
 const pageFiles = ['index.html', ...games.map(game => `${game}.html`)]
 const guideAssets = games.map(game => {

@@ -102,7 +102,7 @@
 </template>
 
 <script>
-OfflineGames.wasm.defineElement('2048', 'game-2048', class extends HTMLElement {
+customElements.define('game-2048', class extends HTMLElement {
     constructor() {
         super()
         this.attachShadow({mode: 'open'}).append(document.getElementById('game-2048-template').content.cloneNode(true))

@@ -12,8 +12,6 @@
 [require](../../app/i18n.js)
 [require](../../app/storage.js)
 [require](../../app/runtime.js)
-[require](../../app/wasm.js)
-[offline-wasm](2048)(../target/wasm32-unknown-unknown/release/offline_2048.wasm)
 [require](./api.js)
 </head>
 <body>

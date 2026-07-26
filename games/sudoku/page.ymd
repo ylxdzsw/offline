@@ -12,8 +12,6 @@
 [require](../../app/i18n.js)
 [require](../../app/storage.js)
 [require](../../app/runtime.js)
-[require](../../app/wasm.js)
-[offline-wasm](sudoku)(../target/wasm32-unknown-unknown/release/offline_sudoku.wasm)
 [require](./api.js)
 </head>
 <body>

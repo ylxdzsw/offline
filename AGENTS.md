@@ -2,7 +2,7 @@
 
 This repository is a static, bilingual offline PWA. There is no gameplay
 server. Every page is assembled by Nattoppet and contains its own HTML, CSS,
-JavaScript, and compressed game Wasm module.
+and JavaScript. Search-heavy pages also contain a compressed game Wasm module.
 
 ## File structure
 
@@ -27,15 +27,15 @@ games/
   wasm_abi.rs     One source-included JSON ABI implementation
   target/         Shared generated Cargo target directory
   <game>/
-    Cargo.toml    Independent Rust crate manifest
-    Cargo.lock    Independent locked dependency graph
-    lib.rs        JSON dispatch and Wasm exports
-    game.rs       Rules and position representation
-    ai.rs         Search/policy code for chess, junqi, and xiangqi
-    search.rs     Search code for reversi, huarong, and wuziqi
+    Cargo.toml    Rust-backed games: independent crate manifest
+    Cargo.lock    Rust-backed games: independent dependency graph
+    lib.rs        Rust-backed games: JSON dispatch and Wasm exports
+    game.rs       Rust-backed games: rules and position representation
+    ai.rs         Rust-backed search/policy for chess, junqi, and xiangqi
+    search.rs     Rust-backed search for reversi, huarong, and wuziqi
     page.ymd      Nattoppet page entry point
     <game>.html   Game HTML/CSS/JS component bundle
-    api.js        Browser and Node adapter for the game's Wasm API
+    api.js        Browser and Node rules API or Wasm adapter
     worker.js     AI worker bundle, when the game has an AI worker
     contract.test.js
     guide.svg     Game-owned guide artwork; Reversi uses guide.webp
@@ -59,11 +59,12 @@ builds never write there.
 - `app/` is the platform. It owns behavior and deployment assets shared by
   multiple pages, plus the explicit navigation order in `OfflineGames.games`.
 - `games/<id>/` is an independent application. It owns everything specific to
-  that game, including Rust sources, dependency lockfile, page, worker, tests,
-  and guide artwork.
+  that game, including its rules implementation, page, worker, tests, and guide
+  artwork. Rust-backed games also own their crate and dependency lockfile.
 - `Makefile` explicitly lists the games included in the product and
-  orchestrates their independent builds. A game may override the common build
-  pattern when it needs a different toolchain.
+  identifies the JavaScript-backed subset while orchestrating independent
+  builds. A game may override the common build pattern when it needs a
+  different toolchain.
 - Keep the gallery as a plain HTML bundle. Use a custom element when a bundle
   owns reusable behavior or needs a Shadow DOM boundary, such as
   `offline-shell` and the game boards. Do not wrap every fragment in a custom
@@ -109,8 +110,9 @@ CHROME_PATH=/usr/bin/chromium make test-e2e
   root through `make`; page paths are resolved relative to the page file.
 - Project macros are loaded with `[mixin] ../../app/macros.ymd`. Bare mixins
   such as `common.ymd` come from the installed Nattoppet package.
-- Game pages use `../../app/...` for platform files, `./...` for their own
-  bundle, and `../target/...` for the platform-built Wasm artifact.
+- Game pages use `../../app/...` for platform files and `./...` for their own
+  bundle. Rust-backed pages use `../target/...` for the platform-built Wasm
+  artifact.
 - Keep raw HTML, macro calls, and definition lines at column zero when the
   Nattoppet parser requires them. Avoid introducing HTML syntax that the
   parser interprets as Markdown prose.
@@ -118,10 +120,15 @@ CHROME_PATH=/usr/bin/chromium make test-e2e
   runtime asset fetches that would break offline use. The manifest, icons, and
   game guides remain explicit service-worker-cached files.
 
-## Rust and Wasm
+## Game engines and Wasm
 
-Each game is an independent `cdylib` crate. Its `lib.rs` includes the shared
-ABI source with:
+Lightweight games implement their synchronous rules API directly in `api.js`.
+Keep that API usable in both browsers and Node contract tests, preserve saved
+JSON state shapes, and use `BigInt` internally when exact seeded `u64`
+arithmetic is required.
+
+Each Rust-backed game is an independent `cdylib` crate. Its `lib.rs` includes
+the shared ABI source with:
 
 ```rust
 mod wasm_abi {
@@ -130,30 +137,31 @@ mod wasm_abi {
 ```
 
 The ABI is synchronous and JSON-based. Keep the exported functions and ABI
-version compatible with `app/wasm.js`. Game crates own their request parsing,
-domain representation, dependency versions, lockfile, and release profile.
+version compatible with `app/wasm.js`. Rust-backed games own their request
+parsing, domain representation, dependency versions, lockfile, and release
+profile.
 `game.rs` owns rules and state; `ai.rs` or `search.rs` owns a genuinely separate
-search policy when the game needs one. Sudoku has no search module. Do not
-create empty symmetry files.
+search policy when the game needs one. Do not create empty symmetry files.
 
-The root Makefile builds each manifest separately while sharing the generated
-`games/target/` cache. The browser adapter must continue to work in both the
-browser and Node test process. It loads
+The root Makefile builds each Rust manifest separately while sharing the
+generated `games/target/` cache. A Rust-backed browser adapter loads
 `../target/wasm32-unknown-unknown/release/` in Node and the embedded module in a
 built page.
 
 ## Adding or changing a game
 
 1. Add the game ID to `GAMES` in `Makefile` and to `OfflineGames.games` in
-   `app/app-shell.html` when it should appear in navigation.
-2. Create an independent `games/<id>/Cargo.toml`, `Cargo.lock`, `lib.rs`, and
-   domain/search sources. Include `../wasm_abi.rs` from `lib.rs`.
+   `app/app-shell.html` when it should appear in navigation. Add lightweight
+   engines to `JS_GAMES`; other games must provide a Rust crate.
+2. For a Rust-backed game, create `games/<id>/Cargo.toml`, `Cargo.lock`,
+   `lib.rs`, and domain/search sources. Include `../wasm_abi.rs` from `lib.rs`.
+   For a JavaScript-backed game, implement the rules directly in `api.js`.
 3. Add `page.ymd`, `<id>.html`, `api.js`, `contract.test.js`, and `guide.svg` or
    `guide.webp`; add `worker.js` only when the game uses an AI worker.
 4. Keep page references relative to the game directory and pass the built
    guide URL to `offline-shell`.
-5. Run the Rust, contract, build, and browser tests before changing generated
-   output.
+5. Run the applicable Rust checks plus the contract, build, and browser tests
+   before changing generated output.
 
 Saved progress uses the `offline-games:v1:<game>` local-storage namespace and
 schema. Preserve that contract unless a deliberate migration is being made.
