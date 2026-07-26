@@ -10,6 +10,7 @@ GAMES := \
 	junqi \
 	chess \
 	reversi \
+	checkers \
 	huarong \
 	minesweeper \
 	solitaire \

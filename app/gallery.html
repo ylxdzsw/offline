@@ -35,6 +35,7 @@
     .game-gallery article[data-game="junqi"]   .preview { color: var(--piece-red); background: color-mix(in srgb, var(--board-wood) 40%, var(--bg-elevated)); }
     .game-gallery article[data-game="chess"]   .preview { color: var(--ink); background: color-mix(in srgb, var(--board-dark) 35%, var(--bg-elevated)); }
     .game-gallery article[data-game="reversi"] .preview { color: var(--stone-white); background: color-mix(in srgb, var(--board-felt) 70%, var(--bg-elevated)); }
+    .game-gallery article[data-game="checkers"] .preview { color: var(--piece-white); background: color-mix(in srgb, var(--board-dark) 48%, var(--bg-elevated)); }
     .game-gallery article[data-game="huarong"] .preview { color: var(--piece-red); background: color-mix(in srgb, var(--board-wood) 62%, var(--bg-elevated)); }
     .game-gallery article[data-game="minesweeper"] .preview { color: var(--ink); background: color-mix(in srgb, var(--selected) 14%, var(--bg-elevated)); }
     .game-gallery article[data-game="solitaire"] .preview { color: #fff; background: color-mix(in srgb, #246449 78%, var(--bg-elevated)); }
@@ -120,6 +121,23 @@
     { background: radial-gradient(circle at 35% 28%, #fff, var(--stone-white) 72%); }
     .game-gallery .reversi-mark i:not(:nth-child(1)):not(:nth-child(4)):not(:nth-child(6)):not(:nth-child(11)):not(:nth-child(13)):not(:nth-child(16))
     { background: radial-gradient(circle at 35% 28%, #555, var(--stone-black) 70%); }
+    .game-gallery .checkers-mark {
+        position: relative; width: 64px; height: 64px; overflow: hidden;
+        border: 2px solid var(--border-strong); border-radius: 5px;
+        background: conic-gradient(var(--board-light) 25%, var(--board-dark) 0 50%, var(--board-light) 0 75%, var(--board-dark) 0) 0 0 / 50% 50%;
+    }
+    .game-gallery .checkers-mark::before, .game-gallery .checkers-mark::after {
+        position: absolute; width: 20px; height: 20px; border-radius: 50%; content: "";
+        box-shadow: inset 0 0 0 2px rgba(255,255,255,.14), 0 2px 3px rgba(0,0,0,.34);
+    }
+    .game-gallery .checkers-mark::before {
+        top: 7px; right: 7px; border: 1px solid #75241f;
+        background: radial-gradient(circle at 35% 27%, #ed8b7f, #b73f38 70%);
+    }
+    .game-gallery .checkers-mark::after {
+        bottom: 7px; left: 7px; border: 1px solid #090b0b;
+        background: radial-gradient(circle at 35% 27%, #59605e, #111414 70%);
+    }
     .game-gallery .huarong-mark {
         position: relative; width: 52px; height: 64px; border: 2px solid var(--board-wood-edge);
         border-radius: 5px; background: var(--board-wood); box-shadow: inset 0 0 8px rgba(60,35,15,.16);
@@ -262,6 +280,7 @@
             junqi:   '<span class="junqi-mark"><i>司</i><i>旗</i><i>工</i><i>弹</i><i>师</i><i>雷</i></span>',
             chess:   '<span class="chess-mark"><i></i><i></i><i></i><i></i></span>',
             reversi: '<span class="reversi-mark">' + '<i></i>'.repeat(16) + '</span>',
+            checkers: '<span class="checkers-mark"></span>',
             huarong: '<span class="huarong-mark"><i class="cao"></i><i class="guan"></i><i class="g1"></i><i class="g2"></i><i class="g3"></i><i class="g4"></i><i class="s1"></i><i class="s2"></i><i class="s3"></i><i class="s4"></i></span>',
             minesweeper: '<span class="minesweeper-mark"><i></i><i class="one">1</i><i class="covered"></i><i class="covered"></i><i></i><i class="one">1</i><i class="two">2</i><i class="covered flag">⚑</i><i></i><i></i><i class="one">1</i><i class="covered"></i><i></i><i></i><i class="one">1</i><i class="covered"></i></span>',
             solitaire: '<span class="solitaire-mark"><i>♥</i><i>♣</i><i>♦</i></span>',

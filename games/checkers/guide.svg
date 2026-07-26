@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-labelledby="title desc">
+  <title id="title">English draughts captures and crowning</title>
+  <desc id="desc">A checker makes two compulsory forward jumps, while a second diagram shows a man reaching the far row and becoming a king.</desc>
+  <defs>
+    <pattern id="board" width="100" height="100" patternUnits="userSpaceOnUse">
+      <rect width="100" height="100" fill="#ebe4d4"/>
+      <rect x="50" width="50" height="50" fill="#73806a"/>
+      <rect y="50" width="50" height="50" fill="#73806a"/>
+    </pattern>
+    <radialGradient id="black" cx="35%" cy="27%" r="74%">
+      <stop stop-color="#626966"/>
+      <stop offset=".42" stop-color="#272c2a"/>
+      <stop offset="1" stop-color="#101312"/>
+    </radialGradient>
+    <radialGradient id="red" cx="35%" cy="27%" r="74%">
+      <stop stop-color="#ee8b80"/>
+      <stop offset=".42" stop-color="#c64b43"/>
+      <stop offset="1" stop-color="#8f2b27"/>
+    </radialGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%">
+      <feDropShadow dx="0" dy="5" stdDeviation="5" flood-opacity=".28"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0l10 5-10 5z" fill="#f4f1e8"/>
+    </marker>
+    <marker id="dark-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0l10 5-10 5z" fill="#2d6357"/>
+    </marker>
+  </defs>
+
+  <rect width="960" height="540" fill="#f5f4f2"/>
+  <g transform="translate(36 42)">
+    <rect width="450" height="450" rx="18" fill="url(#board)" stroke="#4f5849" stroke-width="7"/>
+    <g filter="url(#shadow)">
+      <g transform="translate(25 275)">
+        <circle r="21" fill="url(#black)" stroke="#090b0b" stroke-width="2"/>
+        <circle r="14" fill="none" stroke="#fff" stroke-opacity=".18"/>
+      </g>
+      <g transform="translate(75 225)">
+        <circle r="21" fill="url(#red)" stroke="#75241f" stroke-width="2"/>
+        <circle r="14" fill="none" stroke="#fff" stroke-opacity=".24"/>
+      </g>
+      <g transform="translate(175 125)">
+        <circle r="21" fill="url(#red)" stroke="#75241f" stroke-width="2"/>
+        <circle r="14" fill="none" stroke="#fff" stroke-opacity=".24"/>
+      </g>
+    </g>
+    <path d="M25 275L125 175L225 75" fill="none" stroke="#f4f1e8" stroke-width="9" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="13 10" marker-mid="url(#arrow)" marker-end="url(#arrow)"/>
+    <circle cx="125" cy="175" r="28" fill="none" stroke="#f4f1e8" stroke-width="4" opacity=".72"/>
+    <circle cx="225" cy="75" r="28" fill="none" stroke="#f4f1e8" stroke-width="4" opacity=".72"/>
+    <g stroke="#f7d9d5" stroke-width="5" stroke-linecap="round">
+      <path d="M60 210l30 30M90 210l-30 30"/>
+      <path d="M160 110l30 30M190 110l-30 30"/>
+    </g>
+  </g>
+
+  <g transform="translate(530 42)">
+    <rect width="394" height="450" rx="18" fill="#fff" stroke="#d3cec3" stroke-width="3"/>
+    <text x="197" y="62" text-anchor="middle" fill="#5e615d" font-family="system-ui,sans-serif" font-size="20" font-weight="700">CROWN · 升王</text>
+    <g transform="translate(47 88)">
+      <rect width="300" height="250" rx="12" fill="url(#board)" stroke="#4f5849" stroke-width="5"/>
+      <g transform="translate(125 175)" filter="url(#shadow)">
+        <circle r="27" fill="url(#black)" stroke="#090b0b" stroke-width="2"/>
+        <circle r="18" fill="none" stroke="#fff" stroke-opacity=".18" stroke-width="2"/>
+      </g>
+      <path d="M143 156L210 89" fill="none" stroke="#2d6357" stroke-width="8" stroke-linecap="round" marker-end="url(#dark-arrow)"/>
+      <g transform="translate(225 75)" filter="url(#shadow)">
+        <circle r="30" fill="url(#black)" stroke="#090b0b" stroke-width="2"/>
+        <circle r="20" fill="none" stroke="#f4f1e8" stroke-width="5"/>
+        <circle r="12" fill="none" stroke="#f4f1e8" stroke-width="2"/>
+      </g>
+    </g>
+    <g font-family="system-ui,sans-serif" text-anchor="middle">
+      <text x="197" y="376" fill="#292b29" font-size="19" font-weight="700">Kings move and capture both ways</text>
+      <text x="197" y="407" fill="#6b6968" font-size="18">王棋可以向前、向后走棋和吃子</text>
+    </g>
+  </g>
+</svg>

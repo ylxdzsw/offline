@@ -9,6 +9,7 @@ A mobile-first bilingual collection of classic board and puzzle games that remai
 - Hidden-rank Junqi (Luzhanqi) against an on-device AI
 - Full orthodox Chess against an on-device AI
 - Reversi with legal-move hints and a mobility-aware on-device AI
+- English Draughts with compulsory multi-jumps and an on-device AI
 - Huarong Dao with three layouts and optimal on-device path hints
 - Minesweeper with confirmation-first mobile controls and irreversible reveals
 - Klondike Solitaire with draw-one and draw-three play

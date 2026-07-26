@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+[offline-pwa-head]
+<meta name="author" content="ylxdzsw">
+<meta name="license" content="MIT">
+<meta name="github" content="https://github.com/ylxdzsw/offline">
+<title>English Draughts / 英式跳棋</title>
+[require](../../app/tokens.css)
+[require](../../app/theme.js)
+[require](../../app/i18n.js)
+[require](../../app/storage.js)
+[require](../../app/runtime.js)
+[require](../../app/wasm.js)
+[offline-wasm](checkers)(../target/wasm32-unknown-unknown/release/offline_checkers.wasm)
+[require](./api.js)
+</head>
+<body>
+[require](../../app/segmented-control.html)
+[require](../../app/guide-dialog.html)
+[require](../../app/side-drawer.html)
+[require](../../app/app-shell.html)
+[require](./checkers.html)
+[offline-worker](checkers-worker-payload)(checkers)(../../app/wasm.js)(./api.js)(./worker.js)
+<offline-shell page="checkers" guide="./guides/checkers.svg"><checkers-game></checkers-game></offline-shell>
+</body>
+</html>
+
+[mixin] ../../app/macros.ymd
+[mixin] common.ymd

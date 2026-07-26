@@ -56,6 +56,7 @@ test('language preference persists across pages without changing their URLs', as
     await expect(page.locator('offline-shell offline-drawer nav a[href*="index.html"]')).toHaveCount(0)
     await expect(page.locator('offline-shell offline-drawer a[href*="xiangqi.html"]')).toHaveAttribute('href', /xiangqi\.html$/)
     await expect(page.locator('offline-shell offline-drawer a[href*="reversi.html"]')).toHaveAttribute('href', /reversi\.html$/)
+    await expect(page.locator('offline-shell offline-drawer a[href*="checkers.html"]')).toHaveAttribute('href', /checkers\.html$/)
     await expect(page.locator('offline-shell offline-drawer a[href*="huarong.html"]')).toHaveAttribute('href', /huarong\.html$/)
     await page.locator('offline-shell offline-drawer a[href*="xiangqi.html"]').click()
     await expect(page).toHaveURL(/\/xiangqi\.html$/)
@@ -356,6 +357,55 @@ test('Reversi flips discs, plays an AI reply, persists, and undoes the turn', as
     await expect(page.locator('reversi-game .cell[data-index="3"]')).toHaveClass(/legal/)
 })
 
+test('English Draughts plays full turns and previews a compulsory multi-jump', async ({page}) => {
+    await page.goto('/checkers.html')
+    await expect(page.locator('checkers-game .square.movable')).toHaveCount(4)
+    await expect(page.locator('checkers-game .black-count')).toHaveText('12')
+    await page.locator('checkers-game').evaluate(game => {
+        const parent = game.parentNode
+        game.remove()
+        parent.append(game)
+    })
+    await page.locator('checkers-game .difficulty').selectOption('easy')
+    await page.locator('checkers-game .square[data-index="40"]').click()
+    await expect(page.locator('checkers-game .status')).toHaveText('Choose a highlighted destination')
+    await page.locator('checkers-game .square[data-index="33"]').click()
+    await expect(page.locator('checkers-game .status')).not.toHaveText('Opponent is thinking…', {timeout: 6000})
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:checkers')).history.length)).toBe(2)
+    await page.reload()
+    await page.locator('checkers-game .undo').click()
+    await expect(page.locator('checkers-game .black-count')).toHaveText('12')
+    await expect(page.locator('checkers-game .red-count')).toHaveText('12')
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:checkers')).history.length)).toBe(0)
+
+    await page.locator('checkers-game').evaluate(game => {
+        const engine = OfflineGames.Checkers
+        const board = Array(64).fill(engine.EMPTY)
+        board[42] = engine.BLACK_MAN
+        board[35] = engine.RED_MAN
+        board[19] = engine.RED_MAN
+        Object.assign(game.state, {
+            board,
+            turn: engine.BLACK,
+            halfmove: 0,
+            keys: [engine.positionKey(board, engine.BLACK)],
+            history: [],
+            outcome: null,
+            lastMove: null,
+        })
+        game.clearSelection()
+        game.render()
+    })
+    await page.locator('checkers-game .square[data-index="42"]').click()
+    await page.locator('checkers-game .square[data-index="28"]').click()
+    await expect(page.locator('checkers-game .status')).toHaveText('Continue jumping with the same piece')
+    await expect(page.locator('checkers-game .square[data-index="28"] .piece.black')).toHaveCount(1)
+    await expect(page.locator('checkers-game .square[data-index="35"] .piece')).toHaveCount(0)
+    await page.locator('checkers-game .square[data-index="10"]').click()
+    await expect(page.locator('checkers-game .status')).toHaveText('You win')
+    await expect(page.locator('checkers-game .red-count')).toHaveText('0')
+})
+
 test('Huarong Dao hints an optimal slide, moves, persists, reloads, and undoes', async ({page}) => {
     await page.goto('/huarong.html')
     await expect(page.locator('huarong-game .piece')).toHaveCount(10)
@@ -592,6 +642,9 @@ test('the installed app reloads and navigates completely offline', async ({brows
     await page.goto('/reversi.html')
     await expect(page.locator('offline-shell h1')).toHaveText('Reversi')
     await expect(page.locator('reversi-game .cell.legal')).toHaveCount(4)
+    await page.goto('/checkers.html')
+    await expect(page.locator('offline-shell h1')).toHaveText('English Draughts')
+    await expect(page.locator('checkers-game .square.movable')).toHaveCount(4)
     await page.goto('/huarong.html')
     await expect(page.locator('offline-shell h1')).toHaveText('Huarong Dao')
     await expect(page.locator('huarong-game .piece')).toHaveCount(10)

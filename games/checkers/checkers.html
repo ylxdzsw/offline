@@ -1,0 +1,535 @@
+<template id="checkers-game-template">
+    <style>
+        :host { display: block; color: var(--ink); }
+        .toolbar {
+            display: grid; grid-template-columns: 1fr auto auto; gap: 8px;
+            align-items: end; margin-bottom: 10px;
+        }
+        label {
+            display: grid; gap: 3px; color: var(--ink-muted);
+            font-size: .7rem; font-weight: 650; letter-spacing: 0;
+        }
+        select, .action {
+            min-height: var(--control-h, 42px); border: 1px solid var(--border-strong);
+            border-radius: var(--radius-sm); color: var(--ink); background: var(--bg-surface);
+        }
+        select { min-width: 96px; padding: 0 28px 0 10px; }
+        .action { padding: 0 12px; font-weight: 650; }
+        .action:disabled { opacity: .42; }
+        .warning { margin: 0 0 9px; color: var(--danger); font-size: .77rem; text-align: center; }
+        .warning[hidden] { display: none; }
+        .scoreboard {
+            display: grid; grid-template-columns: 1fr auto 1fr; align-items: stretch;
+            min-height: 52px; margin-bottom: 9px; overflow: hidden;
+            border: 1px solid var(--border); border-radius: var(--radius-md);
+            background: var(--bg-surface); box-shadow: var(--shadow-soft);
+        }
+        .score {
+            display: grid; grid-template-columns: auto 1fr auto; gap: 8px;
+            align-items: center; min-width: 0; padding: 7px 10px;
+        }
+        .score.red { grid-template-columns: auto 1fr auto; }
+        .score-copy { display: grid; min-width: 0; gap: 1px; }
+        .score.red .score-copy { text-align: right; }
+        .score-label {
+            overflow: hidden; color: var(--ink-muted); font-size: .76rem;
+            font-weight: 650; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .king-count { color: var(--ink-faint); font-size: .62rem; white-space: nowrap; }
+        .score strong {
+            min-width: 1.35em; color: var(--ink); font-family: var(--font-display);
+            font-size: 1.35rem; font-variant-numeric: tabular-nums; text-align: center;
+        }
+        .versus { align-self: center; color: var(--ink-faint); font-size: .65rem; font-weight: 800; }
+        .mini-piece, .piece {
+            position: relative; display: block; box-sizing: border-box; aspect-ratio: 1;
+            border-radius: 50%;
+        }
+        .mini-piece { width: 26px; }
+        .mini-piece.black, .piece.black {
+            border: 1px solid #090b0b;
+            background: radial-gradient(circle at 35% 27%, #59605e 0 8%, #262b2a 38%, #101313 76%);
+            box-shadow: inset 0 0 0 3px rgba(255,255,255,.055), 0 2px 4px rgba(0,0,0,.32);
+        }
+        .mini-piece.red, .piece.red {
+            border: 1px solid #75241f;
+            background: radial-gradient(circle at 35% 27%, #ed8b7f 0 8%, #c64b43 38%, #902c27 78%);
+            box-shadow: inset 0 0 0 3px rgba(255,255,255,.10), 0 2px 4px rgba(0,0,0,.28);
+        }
+        .status {
+            display: flex; min-height: 38px; align-items: center; justify-content: center;
+            margin: 0 0 9px; padding: 6px 10px; border-radius: var(--radius-sm);
+            color: var(--status-ink); font-size: .88rem; font-weight: 700;
+            text-align: center; background: var(--status-bg);
+        }
+        .status.thinking::after {
+            width: 5px; height: 5px; margin-left: 7px; border-radius: 50%; content: "";
+            background: currentColor; animation: pulse .8s ease-in-out infinite alternate;
+        }
+        @keyframes pulse { to { opacity: .2; transform: scale(.7); } }
+        .board {
+            display: grid; width: 100%; aspect-ratio: 1;
+            grid-template: repeat(8, minmax(0, 1fr)) / repeat(8, minmax(0, 1fr));
+            overflow: hidden; border: 3px solid color-mix(in srgb, var(--board-dark) 65%, #252721);
+            border-radius: var(--radius-md); background: var(--board-light);
+            box-shadow: inset 0 0 20px rgba(0,0,0,.12), var(--shadow-soft);
+            touch-action: manipulation; user-select: none;
+        }
+        .square {
+            position: relative; display: grid; min-width: 0; min-height: 0;
+            padding: 8%; border: 0; border-radius: 0; place-items: center;
+            background: var(--board-light);
+        }
+        .square.dark { background: var(--board-dark); }
+        .square.last.dark { background: var(--board-last-dark); }
+        .square.last:not(.dark) { background: var(--board-last-light); }
+        .square.path { box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--selected) 45%, transparent); }
+        .square:focus-visible { z-index: 4; outline: 3px solid var(--focus); outline-offset: -4px; }
+        .piece { z-index: 2; width: 82%; pointer-events: none; }
+        .piece::before {
+            position: absolute; inset: 16%; border: 1px solid rgba(255,255,255,.14);
+            border-radius: 50%; content: ""; box-shadow: 0 1px rgba(0,0,0,.18);
+        }
+        .piece.king::before {
+            inset: 13%; border: 4px double rgba(255,255,255,.64);
+            box-shadow: 0 0 0 2px rgba(0,0,0,.20), inset 0 0 0 2px rgba(0,0,0,.16);
+        }
+        .square.movable .piece {
+            box-shadow: inset 0 0 0 3px rgba(255,255,255,.08), 0 0 0 3px var(--legal), 0 3px 5px rgba(0,0,0,.32);
+        }
+        .square.selected .piece {
+            transform: translateY(-2px);
+            box-shadow: inset 0 0 0 3px rgba(255,255,255,.10), 0 0 0 4px var(--selected), 0 5px 8px rgba(0,0,0,.38);
+        }
+        .square.destination::after {
+            z-index: 1; width: 20%; aspect-ratio: 1; border-radius: 50%; content: "";
+            background: color-mix(in srgb, var(--piece-white) 82%, transparent);
+            box-shadow: 0 0 0 5px color-mix(in srgb, var(--legal) 22%, transparent);
+        }
+        .square.destination.capture-target::after {
+            width: 64%; border: 4px solid var(--capture); background: transparent;
+            box-shadow: inset 0 0 0 3px color-mix(in srgb, var(--piece-white) 34%, transparent), 0 0 0 2px rgba(255,255,255,.35);
+        }
+        .square.last-to .piece { animation: land .24s ease-out; }
+        @keyframes land { from { opacity: .55; transform: scale(.72); } to { opacity: 1; transform: scale(1); } }
+        .board[aria-disabled="true"] .square.dark { cursor: wait; }
+        @media (max-width: 340px) {
+            .toolbar { gap: 4px; }
+            .action { padding-inline: 8px; font-size: .82rem; }
+            select { min-width: 88px; }
+            .score { gap: 5px; padding-inline: 6px; }
+            .mini-piece { width: 23px; }
+            .score-label { font-size: .7rem; }
+        }
+    </style>
+    <div class="toolbar">
+        <label><span class="difficulty-label"></span><select class="difficulty"><option value="easy"></option><option value="medium"></option><option value="hard"></option></select></label>
+        <button class="action undo" type="button"></button>
+        <button class="action new" type="button"></button>
+    </div>
+    <p class="warning" hidden></p>
+    <div class="scoreboard" aria-live="polite">
+        <div class="score black">
+            <span class="mini-piece black" aria-hidden="true"></span>
+            <span class="score-copy"><span class="score-label you-label"></span><span class="king-count black-kings"></span></span>
+            <strong class="black-count">12</strong>
+        </div>
+        <span class="versus">VS</span>
+        <div class="score red">
+            <strong class="red-count">12</strong>
+            <span class="score-copy"><span class="score-label opponent-label"></span><span class="king-count red-kings"></span></span>
+            <span class="mini-piece red" aria-hidden="true"></span>
+        </div>
+    </div>
+    <div class="status" role="status" aria-live="polite"></div>
+    <div class="board" role="grid"></div>
+</template>
+
+<script>
+OfflineGames.wasm.defineElement('checkers', 'checkers-game', class extends HTMLElement {
+    constructor() {
+        super()
+        this.attachShadow({mode: 'open'}).append(document.getElementById('checkers-game-template').content.cloneNode(true))
+        this.thinking = false
+        this.aiFailed = false
+        this.worker = null
+        this.requestId = 0
+        this.selectedFrom = null
+        this.movePath = []
+        this.candidates = []
+        this.notice = null
+        this.initialized = false
+    }
+
+    connectedCallback() {
+        if (!this.initialized) {
+            this.initialized = true
+            this.engine = OfflineGames.Checkers
+            this.i18n = OfflineGames.i18n
+            this.storage = OfflineGames.storage
+            this.buildBoard()
+            this.load()
+            this.bind()
+            this.localize()
+        }
+        this.render()
+        if (this.state.turn === this.engine.RED && !this.state.outcome) this.requestAI()
+    }
+
+    disconnectedCallback() {
+        this.cancelAI()
+    }
+
+    fresh(difficulty = 'medium') {
+        const board = this.engine.initialBoard()
+        return {
+            schema: 1,
+            game: 'checkers',
+            seed: OfflineGames.runtime.randomSeed(),
+            difficulty,
+            board,
+            turn: this.engine.BLACK,
+            halfmove: 0,
+            keys: [this.engine.positionKey(board, this.engine.BLACK)],
+            history: [],
+            outcome: null,
+            lastMove: null,
+        }
+    }
+
+    valid(saved) {
+        return saved && saved.schema === 1 && saved.game === 'checkers'
+            && Array.isArray(saved.board) && saved.board.length === 64
+            && saved.board.every((piece, index) => Number.isInteger(piece)
+                && piece >= this.engine.EMPTY && piece <= this.engine.RED_KING
+                && (piece === this.engine.EMPTY || this.engine.playable(index)))
+            && this.engine.count(saved.board, this.engine.BLACK) <= 12
+            && this.engine.count(saved.board, this.engine.RED) <= 12
+            && [this.engine.BLACK, this.engine.RED].includes(saved.turn)
+            && ['easy', 'medium', 'hard'].includes(saved.difficulty)
+            && Number.isInteger(saved.halfmove) && saved.halfmove >= 0
+            && Array.isArray(saved.keys) && saved.keys.every(key => typeof key === 'string')
+            && Array.isArray(saved.history)
+            && (saved.outcome == null || typeof saved.outcome === 'object')
+    }
+
+    load() {
+        const saved = this.storage.read('checkers')
+        this.state = this.valid(saved) ? saved : this.fresh()
+        if (!Number.isInteger(this.state.seed)) this.state.seed = OfflineGames.runtime.randomSeed()
+        if (!this.state.keys.length) this.state.keys = [this.engine.positionKey(this.state.board, this.state.turn)]
+    }
+
+    buildBoard() {
+        const board = this.shadowRoot.querySelector('.board')
+        board.replaceChildren(...Array.from({length: 64}, (_, index) => {
+            const square = document.createElement('button')
+            square.type = 'button'
+            square.className = 'square'
+            square.dataset.index = String(index)
+            square.setAttribute('role', 'gridcell')
+            return square
+        }))
+    }
+
+    bind() {
+        const shadow = this.shadowRoot
+        shadow.querySelector('.board').addEventListener('click', event => {
+            const square = event.target.closest('.square')
+            if (square) this.tap(Number(square.dataset.index))
+        })
+        shadow.querySelector('.undo').addEventListener('click', () => this.undo())
+        shadow.querySelector('.new').addEventListener('click', () => this.newGame())
+        shadow.querySelector('.difficulty').addEventListener('change', event => {
+            this.state.difficulty = event.target.value
+            this.save()
+        })
+    }
+
+    localize() {
+        const shadow = this.shadowRoot
+        shadow.querySelector('.difficulty-label').textContent = this.i18n.t('difficulty')
+        for (const option of shadow.querySelectorAll('.difficulty option')) option.textContent = this.i18n.t(option.value)
+        shadow.querySelector('.undo').textContent = this.i18n.t('undo')
+        shadow.querySelector('.new').textContent = this.i18n.t('newGame')
+        shadow.querySelector('.warning').textContent = this.i18n.t('storageWarning')
+        shadow.querySelector('.you-label').textContent = this.i18n.t('you')
+        shadow.querySelector('.opponent-label').textContent = this.i18n.t('opponent')
+    }
+
+    format(key, values) {
+        let text = this.i18n.t(key)
+        for (const [name, value] of Object.entries(values)) text = text.replaceAll(`{${name}}`, String(value))
+        return text
+    }
+
+    save() {
+        if (!this.storage.write('checkers', this.state)) this.shadowRoot.querySelector('.warning').hidden = false
+    }
+
+    clearSelection() {
+        this.selectedFrom = null
+        this.movePath = []
+        this.candidates = []
+    }
+
+    select(index) {
+        const candidates = this.legal.filter(move => move.from === index)
+        if (!candidates.length) return false
+        this.selectedFrom = index
+        this.movePath = []
+        this.candidates = candidates
+        this.notice = null
+        this.render()
+        return true
+    }
+
+    tap(index) {
+        if (this.thinking || this.aiFailed || this.state.outcome || this.state.turn !== this.engine.BLACK) return
+        const piece = this.state.board[index]
+
+        if (this.selectedFrom == null) {
+            if (!this.select(index) && this.engine.sideOf(piece) === this.engine.BLACK) {
+                this.notice = this.legal.some(move => move.captures.length)
+                    ? 'checkersCaptureRequired' : 'checkersChoosePiece'
+                this.render()
+            }
+            return
+        }
+
+        if (!this.movePath.length && index === this.selectedFrom) {
+            this.clearSelection()
+            this.notice = null
+            this.render()
+            return
+        }
+        if (!this.movePath.length && this.engine.sideOf(piece) === this.engine.BLACK && this.select(index)) return
+
+        const step = this.movePath.length
+        const next = this.candidates.filter(move => move.path[step] === index)
+        if (!next.length) {
+            this.notice = this.movePath.length ? 'checkersContinueJump' : 'checkersChooseDestination'
+            this.render()
+            return
+        }
+
+        this.movePath.push(index)
+        this.candidates = next
+        this.notice = null
+        if (next[0].path.length === this.movePath.length) {
+            this.commit(next[0], this.engine.BLACK)
+        } else {
+            this.render()
+        }
+    }
+
+    commit(move, side) {
+        const moving = this.state.board[move.from]
+        const snapshot = {
+            board: this.state.board,
+            turn: this.state.turn,
+            halfmove: this.state.halfmove,
+            keysLength: this.state.keys.length,
+            outcome: this.state.outcome,
+            lastMove: this.state.lastMove,
+            side,
+        }
+        const board = this.engine.applyMove(this.state.board, move, side)
+        const turn = this.engine.other(side)
+        const progress = move.captures.length > 0 || !this.engine.isKing(moving)
+        this.state.history.push(snapshot)
+        this.state.board = board
+        this.state.turn = turn
+        this.state.halfmove = progress ? 0 : this.state.halfmove + 1
+        this.state.lastMove = {...move, side}
+        this.state.keys.push(this.engine.positionKey(board, turn))
+        this.state.outcome = this.engine.status(board, turn, this.state.halfmove, this.state.keys)
+        if (!this.state.outcome.ended) this.state.outcome = null
+        this.clearSelection()
+        this.notice = null
+        this.aiFailed = false
+        this.save()
+        this.render()
+        if (!this.state.outcome && this.state.turn === this.engine.RED) this.requestAI()
+    }
+
+    requestAI() {
+        this.cancelAI()
+        this.thinking = true
+        this.aiFailed = false
+        const id = ++this.requestId
+        this.worker = OfflineGames.runtime.createWorker('checkers-worker-payload')
+        this.worker.onmessage = event => {
+            if (event.data.id !== id || !this.thinking) return
+            const move = this.legalMoveMatching(event.data.move)
+            this.cancelAI(false)
+            if (move) this.commit(move, this.engine.RED)
+            else {
+                this.aiFailed = true
+                this.render()
+            }
+        }
+        this.worker.onerror = error => {
+            console.error(error)
+            this.cancelAI(false)
+            this.aiFailed = true
+            this.render()
+        }
+        this.worker.postMessage({
+            id,
+            board: this.state.board,
+            side: this.engine.RED,
+            difficulty: this.state.difficulty,
+            seed: OfflineGames.runtime.moveSeed(this.state.seed, this.state.history.length),
+        })
+        this.render()
+    }
+
+    legalMoveMatching(candidate) {
+        if (!candidate) return null
+        return this.engine.legalMoves(this.state.board, this.state.turn).find(move =>
+            move.from === candidate.from
+            && move.path.length === candidate.path?.length
+            && move.path.every((index, step) => index === candidate.path[step])) || null
+    }
+
+    cancelAI(invalidate = true) {
+        if (invalidate) this.requestId++
+        if (this.worker) this.worker.terminate()
+        this.worker = null
+        this.thinking = false
+    }
+
+    undo() {
+        if (!this.state.history.length) return
+        const wasThinking = this.thinking
+        this.cancelAI()
+        let count = wasThinking || this.state.history.at(-1).side === this.engine.BLACK ? 1 : 2
+        let snapshot = null
+        while (count-- > 0 && this.state.history.length) snapshot = this.state.history.pop()
+        if (!snapshot) return
+        this.state.board = snapshot.board
+        this.state.turn = snapshot.turn
+        this.state.halfmove = snapshot.halfmove
+        this.state.keys = this.state.keys.slice(0, snapshot.keysLength)
+        this.state.outcome = snapshot.outcome
+        this.state.lastMove = snapshot.lastMove
+        this.clearSelection()
+        this.notice = null
+        this.aiFailed = false
+        this.save()
+        this.render()
+        if (!this.state.outcome && this.state.turn === this.engine.RED) this.requestAI()
+    }
+
+    newGame() {
+        if (this.state.history.length && !confirm(this.i18n.t('confirmNew'))) return
+        const difficulty = this.state.difficulty
+        this.cancelAI()
+        this.state = this.fresh(difficulty)
+        this.clearSelection()
+        this.notice = null
+        this.aiFailed = false
+        this.save()
+        this.render()
+    }
+
+    statusText() {
+        if (this.state.outcome) {
+            if (this.state.outcome.winner === this.engine.BLACK) return this.i18n.t('youWin')
+            if (this.state.outcome.winner === this.engine.RED) return this.i18n.t('aiWins')
+            return this.i18n.t(this.state.outcome.reason === 'repetition'
+                ? 'checkersDrawRepetition' : 'checkersDrawFortyMove')
+        }
+        if (this.aiFailed) return this.i18n.t('checkersAiUnavailable')
+        if (this.thinking || this.state.turn === this.engine.RED) return this.i18n.t('aiThinking')
+        if (this.notice) return this.i18n.t(this.notice)
+        if (this.movePath.length) return this.i18n.t('checkersContinueJump')
+        if (this.selectedFrom != null) return this.i18n.t('checkersChooseDestination')
+        if (this.legal.some(move => move.captures.length)) return this.i18n.t('checkersCaptureRequired')
+        return this.i18n.t('yourTurn')
+    }
+
+    pieceLabel(piece) {
+        return this.i18n.t({
+            [this.engine.BLACK_MAN]: 'checkersBlackMan',
+            [this.engine.BLACK_KING]: 'checkersBlackKing',
+            [this.engine.RED_MAN]: 'checkersRedMan',
+            [this.engine.RED_KING]: 'checkersRedKing',
+        }[piece] || 'empty')
+    }
+
+    render() {
+        this.legal = this.state.outcome ? [] : this.engine.legalMoves(this.state.board, this.state.turn)
+        const previewMove = this.selectedFrom != null && this.candidates.length ? this.candidates[0] : null
+        const displayBoard = previewMove
+            ? this.engine.previewMove(this.state.board, previewMove, this.movePath.length)
+            : this.state.board
+        const current = this.movePath.at(-1) ?? this.selectedFrom
+        const destinations = new Set(this.selectedFrom == null ? []
+            : this.candidates.map(move => move.path[this.movePath.length]).filter(index => index != null))
+        const captureTargets = new Set(this.selectedFrom == null ? []
+            : this.candidates.filter(move => move.captures[this.movePath.length] != null)
+                .map(move => move.path[this.movePath.length]))
+        const movable = new Set(this.selectedFrom == null && !this.thinking && !this.state.outcome
+            && this.state.turn === this.engine.BLACK ? this.legal.map(move => move.from) : [])
+        const previewPath = new Set(this.movePath)
+        const lastPath = new Set(this.state.lastMove?.path || [])
+        const lastFrom = this.state.lastMove?.from
+        const lastTo = this.state.lastMove?.path?.at(-1)
+
+        for (const square of this.shadowRoot.querySelectorAll('.square')) {
+            const index = Number(square.dataset.index)
+            const dark = this.engine.playable(index)
+            const piece = displayBoard[index]
+            square.className = 'square'
+            square.classList.toggle('dark', dark)
+            square.classList.toggle('movable', movable.has(index))
+            square.classList.toggle('selected', current === index)
+            square.classList.toggle('destination', destinations.has(index))
+            square.classList.toggle('capture-target', captureTargets.has(index))
+            square.classList.toggle('path', previewPath.has(index))
+            square.classList.toggle('last', lastFrom === index || lastPath.has(index))
+            square.classList.toggle('last-to', lastTo === index)
+            square.disabled = !dark
+            square.setAttribute('aria-selected', String(current === index))
+            if (!dark) {
+                square.setAttribute('aria-hidden', 'true')
+                square.removeAttribute('aria-label')
+            } else {
+                square.removeAttribute('aria-hidden')
+                const states = [this.pieceLabel(piece)]
+                if (current === index) states.push(this.i18n.t('selected'))
+                if (destinations.has(index)) states.push(this.i18n.t('legalMove'))
+                if (lastFrom === index || lastPath.has(index)) states.push(this.i18n.t('lastMove'))
+                square.setAttribute('aria-label', this.format('checkersCellLabel', {
+                    row: this.engine.rowOf(index) + 1,
+                    column: this.engine.columnOf(index) + 1,
+                    state: states.join(', '),
+                }))
+            }
+            square.replaceChildren()
+            if (piece !== this.engine.EMPTY) {
+                const checker = document.createElement('span')
+                checker.className = `piece ${this.engine.sideOf(piece) === this.engine.BLACK ? 'black' : 'red'}`
+                checker.classList.toggle('king', this.engine.isKing(piece))
+                checker.setAttribute('aria-hidden', 'true')
+                square.append(checker)
+            }
+        }
+
+        const shadow = this.shadowRoot
+        shadow.querySelector('.black-count').textContent = String(this.engine.count(displayBoard, this.engine.BLACK))
+        shadow.querySelector('.red-count').textContent = String(this.engine.count(displayBoard, this.engine.RED))
+        shadow.querySelector('.black-kings').textContent = this.format('checkersKingCount', {count: this.engine.kingCount(displayBoard, this.engine.BLACK)})
+        shadow.querySelector('.red-kings').textContent = this.format('checkersKingCount', {count: this.engine.kingCount(displayBoard, this.engine.RED)})
+        shadow.querySelector('.difficulty').value = this.state.difficulty
+        shadow.querySelector('.undo').disabled = !this.state.history.length
+        const status = shadow.querySelector('.status')
+        status.textContent = this.statusText()
+        status.classList.toggle('thinking', this.thinking)
+        shadow.querySelector('.board').setAttribute('aria-label', this.i18n.t('checkersBoard'))
+        shadow.querySelector('.board').setAttribute('aria-disabled', String(this.thinking || Boolean(this.state.outcome)))
+    }
+})
+</script>
