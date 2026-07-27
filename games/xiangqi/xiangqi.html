@@ -55,8 +55,12 @@
             color: transparent; background: transparent; transform: translate(-50%, -50%);
         }
         .spot.legal::after {
-            width: 9px; height: 9px; border-radius: 50%; content: "";
+            position: absolute; z-index: 2; width: 9px; height: 9px; border-radius: 50%; content: "";
             background: var(--legal); box-shadow: 0 0 0 4px var(--legal-soft);
+        }
+        .spot.capture::after {
+            position: absolute; z-index: 2; inset: -2px;
+            border: 3px solid var(--capture); border-radius: 50%; content: "";
         }
         .spot.last::before, .spot.selected::before {
             position: absolute; z-index: 2; inset: -2px;
@@ -328,14 +332,14 @@ OfflineGames.wasm.defineElement('xiangqi', 'xiangqi-game', class extends HTMLEle
     render() {
         const shadow = this.shadowRoot
         const last = this.state.history.at(-1)
-        const legalTargets = new Set(this.legal.map(move => move.to))
+        const legalTargets = new Map(this.legal.map(move => [move.to, Boolean(move.captured)]))
         const glyphs = {rK: '帥', rA: '仕', rE: '相', rH: '馬', rR: '車', rC: '炮', rP: '兵', bK: '將', bA: '士', bE: '象', bH: '馬', bR: '車', bC: '砲', bP: '卒'}
         shadow.querySelector('.spots').innerHTML = this.state.board.map((piece, index) => {
             const row = this.engine.rowOf(index)
             const column = this.engine.columnOf(index)
             const classes = ['spot']
             if (this.selected === index) classes.push('selected')
-            if (legalTargets.has(index)) classes.push('legal')
+            if (legalTargets.has(index)) classes.push(legalTargets.get(index) ? 'capture' : 'legal')
             if (last && (last.from === index || last.to === index)) classes.push('last')
             if (last?.to === index) classes.push('last-to')
             const labels = [this.pieceName(piece), `${this.i18n.t('row')} ${row + 1}`, `${this.i18n.t('column')} ${column + 1}`]

@@ -252,6 +252,23 @@ test('Xiangqi plays an AI reply, persists, reloads, and undoes a full turn', asy
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:xiangqi')).history.length)).toBe(0)
 })
 
+test('Xiangqi legal capture hints preserve piece shape', async ({page}) => {
+    await page.goto('/xiangqi.html')
+    const target = page.locator('xiangqi-game .spot[data-index="1"]')
+    const pieceSize = () => target.locator('.piece').evaluate(piece => {
+        const {width, height} = piece.getBoundingClientRect()
+        return {width, height}
+    })
+    const before = await pieceSize()
+
+    await page.locator('xiangqi-game .spot[data-index="64"]').click()
+    await expect(target).toHaveClass(/capture/)
+    const after = await pieceSize()
+
+    expect(after.width).toBeCloseTo(before.width)
+    expect(after.height).toBeCloseTo(before.height)
+})
+
 test('Xiangqi keeps a fast AI reply visible and marks its landing square', async ({page}) => {
     await page.goto('/xiangqi.html')
     const midpoint = await page.evaluate(async () => {
