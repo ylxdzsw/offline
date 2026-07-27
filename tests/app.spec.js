@@ -481,6 +481,38 @@ test('Chess makes a legal AI reply, persists, reloads, and undoes the turn',asyn
     expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('offline-games:v1:chess')).history.length)).toBe(0)
 })
 
+test('Chess holds a fast AI reply and settles the arriving piece',async({page})=>{
+    await page.goto('/chess.html')
+    const midpoint=await page.evaluate(async()=>{
+        const game=document.querySelector('chess-game')
+        OfflineGames.runtime.createWorker=()=>{
+            const worker={
+                postMessage(message){
+                    const move=game.engine.legalMoves(game.position(),game.engine.BLACK)[0]
+                    queueMicrotask(()=>worker.onmessage({data:{id:message.id,move}}))
+                },
+                terminate(){},
+            }
+            return worker
+        }
+        game.tap(52)
+        const started=performance.now()
+        game.tap(36)
+        await new Promise(resolve=>setTimeout(resolve,180))
+        const piece=game.shadowRoot.querySelector('.square.last-to .piece')
+        return{started,historyLength:game.state.history.length,thinking:game.thinking,animationName:getComputedStyle(piece).animationName}
+    })
+
+    expect(midpoint.historyLength).toBe(1)
+    expect(midpoint.thinking).toBeTruthy()
+    expect(midpoint.animationName).toBe('chess-land')
+
+    await expect.poll(()=>page.evaluate(()=>document.querySelector('chess-game').state.history.length)).toBe(2)
+    expect(await page.evaluate(started=>performance.now()-started,midpoint.started)).toBeGreaterThanOrEqual(320)
+    await expect(page.locator('chess-game .status')).toHaveText('Your turn')
+    await expect(page.locator('chess-game .square.last-to')).toHaveAttribute('aria-label',/last move/)
+})
+
 test('Chess promotion presents all choices and applies the selected piece',async({page})=>{
     await page.goto('/chess.html')
     await page.locator('chess-game').evaluate(game=>{
