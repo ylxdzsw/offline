@@ -96,6 +96,7 @@
             box-shadow: 0 2px 4px rgba(0,0,0,.24);
         }
         .run-slot.complete.red { color: #c52d32; }
+        .run-slot.complete.collected { animation: spider-collect .28s ease-out; }
         .stock {
             background:
                 linear-gradient(135deg, rgba(255,255,255,.14) 25%, transparent 25%) 0 0 / 7px 7px,
@@ -135,6 +136,22 @@
             z-index: 30; transform: translateY(-2px);
             outline: 2px solid #ffd66b; outline-offset: -1px;
             box-shadow: 0 4px 9px rgba(0,0,0,.42);
+        }
+        .card.dealt {
+            animation: spider-deal .22s ease-out backwards;
+            animation-delay: var(--motion-delay, 0ms);
+        }
+        .card.moved { animation: spider-land .2s ease-out; }
+        .card.turned { animation: spider-turn .2s ease-out; }
+        @keyframes spider-deal {
+            from { opacity: .38; filter: brightness(1.15); transform: translateY(-12px) scale(.92); }
+        }
+        @keyframes spider-land {
+            from { opacity: .5; filter: brightness(1.12); transform: translateY(-9px) scale(.96); }
+        }
+        @keyframes spider-turn { from { opacity: .4; transform: rotateY(82deg) scale(.95); } }
+        @keyframes spider-collect {
+            from { opacity: .35; filter: brightness(1.18); transform: rotate(-7deg) scale(.62); }
         }
         .card:focus-visible, .slot:focus-visible, .stock:focus-visible {
             z-index: 40; outline: 2px solid #fff; outline-offset: 1px;
@@ -178,6 +195,7 @@
         @media (prefers-reduced-motion: reduce) {
             .celebration { display: none; }
             .card.selected { transform: none; }
+            .card.dealt, .card.moved, .card.turned, .run-slot.complete.collected { animation: none; }
         }
     </style>
     <div class="toolbar">
@@ -220,6 +238,7 @@ customElements.define('spider-game', class extends HTMLElement {
         this.dragSource = null
         this.timerOrigin = null
         this.timerInterval = null
+        this.motion = null
         this.visibilityHandler = () => this.visibilityChanged()
     }
 
@@ -334,7 +353,10 @@ customElements.define('spider-game', class extends HTMLElement {
         if (!target || this.state.outcome) return
         if (target.dataset.action === 'deal') {
             this.selected = null
-            this.apply(this.engine.deal(this.state.deal))
+            this.apply(this.engine.deal(this.state.deal), {
+                type: 'deal',
+                cards: this.state.deal.stock.slice(-10),
+            })
             return
         }
 
@@ -356,6 +378,7 @@ customElements.define('spider-game', class extends HTMLElement {
     }
 
     move(source, destination) {
+        const cards = this.state.deal.tableau[source.column].visible.slice(source.card)
         const result = this.engine.move(this.state.deal, source, destination)
         if (!result.moved) {
             this.notice = result.reason === 'mixedRun' ? 'spiderMixedRun' : 'spiderInvalidMove'
@@ -364,11 +387,12 @@ customElements.define('spider-game', class extends HTMLElement {
             return
         }
         this.selected = null
-        this.apply(result)
+        this.apply(result, {type: 'move', destination, cards})
     }
 
-    apply(result) {
+    apply(result, motion = null) {
         if (!result.moved) {
+            this.motion = null
             this.notice = result.reason === 'emptyColumn'
                 ? 'spiderEmptyDeal'
                 : result.reason === 'stockEmpty'
@@ -378,6 +402,7 @@ customElements.define('spider-game', class extends HTMLElement {
             return
         }
         this.snapshotElapsed()
+        const previousDeal = this.state.deal
         this.state.history.push({
             deal: this.state.deal,
             moves: this.state.moves,
@@ -389,6 +414,12 @@ customElements.define('spider-game', class extends HTMLElement {
         this.state.progress = !result.game.won
         this.state.outcome = result.game.won ? 'won' : null
         this.notice = result.completed ? 'spiderCompleted' : null
+        this.motion = motion ? {
+            ...motion,
+            completed: result.completed,
+            turnedColumns: result.game.tableau.flatMap((pile, column) =>
+                pile.hidden.length < previousDeal.tableau[column].hidden.length ? [column] : []),
+        } : null
         if (this.state.outcome) this.pauseTimer(false)
         else this.resumeTimer()
         this.save()
@@ -405,6 +436,7 @@ customElements.define('spider-game', class extends HTMLElement {
         })
         this.selected = null
         this.notice = null
+        this.motion = null
         this.save()
         this.render()
         this.resumeTimer()
@@ -416,6 +448,7 @@ customElements.define('spider-game', class extends HTMLElement {
         this.state = this.fresh(suitCount)
         this.selected = null
         this.notice = null
+        this.motion = null
         this.storage.clear('spider')
         this.render()
         if (!changedMode) this.shadowRoot.querySelector('.suit-count').value = String(suitCount)
@@ -472,13 +505,14 @@ customElements.define('spider-game', class extends HTMLElement {
         return this.i18n.locale === 'zh' ? `${suit}${rank}` : `${rank} of ${suit}`
     }
 
-    card(card, column, index, selected) {
+    card(card, column, index, selected, motion = '') {
         const rank = this.engine.RANKS[this.engine.rank(card)]
         const suit = this.engine.suit(card, this.state.suitCount)
         const mark = this.engine.SUIT_MARKS[suit]
-        return `<button class="card face ${this.engine.color(card, this.state.suitCount)}${selected ? ' selected' : ''}"
+        const style = motion === 'dealt' ? ` style="--motion-delay:${column * 12}ms"` : ''
+        return `<button class="card face ${this.engine.color(card, this.state.suitCount)}${selected ? ' selected' : ''}${motion ? ` ${motion}` : ''}"
             type="button" data-column="${column}" data-card="${index}" data-value="${card}"
-            draggable="true" aria-label="${this.cardName(card)}">
+            draggable="true" aria-label="${this.cardName(card)}"${style}>
             <span class="corner"><span>${rank}</span><span class="suit">${mark}</span></span>
             <span class="pip">${mark}</span>
         </button>`
@@ -497,7 +531,8 @@ customElements.define('spider-game', class extends HTMLElement {
             const run = game.completed[index]
             if (!run) return '<span class="run-slot" aria-hidden="true">○</span>'
             const suit = this.engine.suit(run[0], this.state.suitCount)
-            return `<span class="run-slot complete ${[1, 2].includes(suit) ? 'red' : 'black'}"
+            const collected = this.motion?.completed && index >= game.completed.length - this.motion.completed
+            return `<span class="run-slot complete ${[1, 2].includes(suit) ? 'red' : 'black'}${collected ? ' collected' : ''}"
                 aria-label="${this.i18n.t('spiderCompletedRun')}">${this.engine.SUIT_MARKS[suit]}</span>`
         }).join('')
     }
@@ -510,6 +545,10 @@ customElements.define('spider-game', class extends HTMLElement {
                 column,
                 index,
                 this.selected?.column === column && index >= this.selected.card,
+                this.motion?.turnedColumns.includes(column) && index === 0 ? 'turned'
+                    : this.motion?.cards.includes(card)
+                        ? this.motion.type === 'deal' ? 'dealt' : 'moved'
+                        : '',
             )).join('')
             const empty = hidden || visible ? '' : `<button class="slot" type="button" aria-label="${this.i18n.t('spiderEmptyColumn')}">+</button>`
             return `<div class="pile" data-column="${column}" role="group" aria-label="${this.i18n.t('column')} ${column + 1}">${hidden}${visible}${empty}</div>`
@@ -542,6 +581,7 @@ customElements.define('spider-game', class extends HTMLElement {
         this.renderTop()
         this.renderTableau()
         this.renderCelebration()
+        this.motion = null
     }
 
     dragStarted(event) {

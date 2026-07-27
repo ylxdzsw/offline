@@ -1075,7 +1075,7 @@ test('Solitaire animates draws and tableau moves, persists, reloads, and undoes'
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:solitaire')).outcome)).toBe('won')
 })
 
-test('Spider deals, persists, blocks empty-column deals, and completes the final run', async ({page}) => {
+test('Spider animates deals and moves, blocks empty-column deals, and completes the final run', async ({page}) => {
     await page.goto('/spider.html')
     await expect(page.locator('spider-game .pile')).toHaveCount(10)
     await expect(page.locator('spider-game .tableau .card.back')).toHaveCount(44)
@@ -1086,11 +1086,46 @@ test('Spider deals, persists, blocks empty-column deals, and completes the final
     await page.locator('spider-game .stock').click()
     await expect(page.locator('spider-game .stock-count')).toHaveText('4')
     await expect(page.locator('spider-game .moves')).toHaveText('1')
+    const dealMotion = await page.locator('spider-game .card.dealt').evaluateAll(cards => ({
+        count: cards.length,
+        names: [...new Set(cards.map(card => getComputedStyle(card).animationName))],
+        delays: [...new Set(cards.map(card => getComputedStyle(card).animationDelay))],
+    }))
+    expect(dealMotion).toEqual({
+        count: 10,
+        names: ['spider-deal'],
+        delays: ['0s', '0.012s', '0.024s', '0.036s', '0.048s', '0.06s', '0.072s', '0.084s', '0.096s', '0.108s'],
+    })
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:spider')).history.length)).toBe(1)
     await page.reload()
     await expect(page.locator('spider-game .stock-count')).toHaveText('4')
     await page.locator('spider-game .undo').click()
     await expect(page.locator('spider-game .stock-count')).toHaveText('5')
+
+    const move = await page.locator('spider-game').evaluate(game => {
+        for (let seed = 0; seed < 500; seed++) {
+            const deal = OfflineGames.Spider.newGame(seed, 1)
+            for (let from = 0; from < 10; from++) {
+                const card = deal.tableau[from].visible[0]
+                for (let to = 0; to < 10; to++) {
+                    if (from === to) continue
+                    const top = deal.tableau[to].visible.at(-1)
+                    if (OfflineGames.Spider.rank(card) + 1 !== OfflineGames.Spider.rank(top)) continue
+                    Object.assign(game.state, {
+                        suitCount: 1, deal, moves: 0, elapsedMs: 0,
+                        history: [], progress: false, outcome: null,
+                    })
+                    game.render()
+                    return {from, to}
+                }
+            }
+        }
+        throw new Error('No deterministic Spider move found')
+    })
+    await page.locator(`spider-game .card[data-column="${move.from}"][data-card="0"]`).click()
+    await page.locator(`spider-game .pile[data-column="${move.to}"]`).click({position: {x: 2, y: 300}})
+    await expect(page.locator(`spider-game .pile[data-column="${move.to}"] .card.moved`)).toHaveCSS('animation-name', 'spider-land')
+    await expect(page.locator(`spider-game .pile[data-column="${move.from}"] .card.turned`)).toHaveCSS('animation-name', 'spider-turn')
 
     await page.locator('offline-shell .guide-btn').click()
     await expect(page.locator('offline-shell .guide-image')).toHaveAttribute('src', './guides/spider.svg')
@@ -1131,7 +1166,11 @@ test('Spider deals, persists, blocks empty-column deals, and completes the final
     await page.locator('spider-game .card[data-column="0"][data-card="11"]').click()
     await expect(page.locator('spider-game .status')).toHaveText('All eight suited runs complete — you win!')
     await expect(page.locator('spider-game .runs')).toHaveText('8/8')
+    await expect(page.locator('spider-game .run-slot.collected')).toHaveCSS('animation-name', 'spider-collect')
     await expect(page.locator('spider-game .celebration')).toBeVisible()
+    await page.emulateMedia({reducedMotion: 'reduce'})
+    await expect(page.locator('spider-game .run-slot.collected')).toHaveCSS('animation-name', 'none')
+    await expect(page.locator('spider-game .celebration')).toBeHidden()
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:spider')).outcome)).toBe('won')
 })
 
