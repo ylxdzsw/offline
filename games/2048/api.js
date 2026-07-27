@@ -8,7 +8,7 @@
     const SIZE = 4
     const CELLS = SIZE * SIZE
     const TARGET = 2048
-    const DIRECTIONS = ['up', 'down', 'left', 'right']
+    const DIRECTIONS = Object.freeze(['up', 'down', 'left', 'right'])
     const U32_MAX = 0xffffffff
     const U64_MASK = 0xffffffffffffffffn
     const POSITION_SALT = 0x243f6a8885a308d3n

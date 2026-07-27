@@ -7,6 +7,12 @@ test('public constants and ABI identity remain stable', () => {
     assert.equal(engine.CELLS, 16)
     assert.equal(engine.TARGET, 2048)
     assert.deepEqual(engine.DIRECTIONS, ['up', 'down', 'left', 'right'])
+    assert.equal(Object.isFrozen(engine.DIRECTIONS), true)
+    assert.throws(() => engine.DIRECTIONS.push('north'), TypeError)
+    assert.throws(
+        () => engine.move([2, ...Array(15).fill(0)], 'north', 1),
+        /unknown direction "north"/,
+    )
     assert.deepEqual(engine.ping(), {abi: 1, game: '2048'})
 })
 
