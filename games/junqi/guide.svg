@@ -21,9 +21,13 @@
       <rect x="105" y="99" width="34" height="34" transform="rotate(45 122 116)"/>
       <rect x="267" y="99" width="34" height="34" transform="rotate(45 284 116)"/>
       <rect x="186" y="136" width="34" height="34" transform="rotate(45 203 153)"/>
-      <rect x="105" y="321" width="34" height="34" transform="rotate(45 122 338)"/>
-      <rect x="267" y="321" width="34" height="34" transform="rotate(45 284 338)"/>
-      <rect x="186" y="284" width="34" height="34" transform="rotate(45 203 301)"/>
+      <rect x="105" y="173" width="34" height="34" transform="rotate(45 122 190)"/>
+      <rect x="267" y="173" width="34" height="34" transform="rotate(45 284 190)"/>
+      <rect x="105" y="283" width="34" height="34" transform="rotate(45 122 300)"/>
+      <rect x="267" y="283" width="34" height="34" transform="rotate(45 284 300)"/>
+      <rect x="186" y="320" width="34" height="34" transform="rotate(45 203 337)"/>
+      <rect x="105" y="357" width="34" height="34" transform="rotate(45 122 374)"/>
+      <rect x="267" y="357" width="34" height="34" transform="rotate(45 284 374)"/>
     </g>
     <g fill="#f6ecd4" stroke="#765334" stroke-width="5">
       <rect x="94" y="421" width="56" height="38"/><rect x="256" y="421" width="56" height="38"/>

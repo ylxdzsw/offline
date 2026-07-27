@@ -43,6 +43,13 @@ test('railways allow straight travel and engineers can turn around corners', () 
     board[engine.at(5,2)] = token(engine.RED, '5')
     board[engine.at(5,3)] = token(engine.BLACK, '2')
     assert(!engine.movesFor(board, engine.at(5,2)).some(move => move.to === engine.at(5,4)))
+
+    board.fill(null)
+    board[engine.at(5,1)] = token(engine.RED, '5')
+    assert(!engine.movesFor(board, engine.at(5,1)).some(move => move.to === engine.at(6,1)))
+    board[engine.at(5,1)] = null
+    board[engine.at(5,2)] = token(engine.RED, '5')
+    assert(engine.movesFor(board, engine.at(5,2)).some(move => move.to === engine.at(6,2)))
 })
 
 test('camps protect occupants and combat handles ranks, bombs, mines, and flags', () => {

@@ -249,17 +249,19 @@ fn straight_rail_targets(board: &[Option<Piece>], from: usize) -> Vec<usize> {
     let column = column_of(from) as isize;
     let mut found = Vec::new();
     for (dr, dc) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
+        let mut current = from;
         let mut next_row = row + dr;
         let mut next_column = column + dc;
         while inside(next_row, next_column) {
             let target = at(next_row as usize, next_column as usize);
-            if !is_rail(target) {
+            if !railway_neighbors(current).contains(&target) {
                 break;
             }
             found.push(target);
             if board[target].is_some() {
                 break;
             }
+            current = target;
             next_row += dr;
             next_column += dc;
         }
@@ -523,6 +525,25 @@ mod tests {
             moves_for(&board, at(5, 2))
                 .iter()
                 .any(|movement| movement.to == at(10, 4))
+        );
+    }
+
+    #[test]
+    fn regular_pieces_cross_only_at_the_three_bridges() {
+        let mut board = vec![None; ROWS * COLS];
+        board[at(5, 1)] = token(RED, "5", "r5");
+        assert!(
+            !moves_for(&board, at(5, 1))
+                .iter()
+                .any(|movement| movement.to == at(6, 1))
+        );
+
+        board[at(5, 1)] = None;
+        board[at(5, 2)] = token(RED, "5", "r5");
+        assert!(
+            moves_for(&board, at(5, 2))
+                .iter()
+                .any(|movement| movement.to == at(6, 2))
         );
     }
 }
