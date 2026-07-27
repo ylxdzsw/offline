@@ -199,5 +199,7 @@ mod tests {
     fn occupied_move_is_rejected() {
         let position = placed(&[(7, 7, BLACK)]);
         assert!(position.apply(at(7, 7), WHITE).is_none());
+        assert!(position.apply(at(7, 8), EMPTY).is_none());
+        assert!(position.apply(CELLS as u16, WHITE).is_none());
     }
 }

@@ -25,6 +25,14 @@ test('four stones do not win and occupied intersections are rejected', () => {
     assert.throws(() => engine.applyMove(board, engine.at(7, 3), engine.WHITE), /occupied/)
 })
 
+test('move inputs cannot wrap onto another intersection or side', () => {
+    const board = engine.initialBoard()
+    assert.equal(engine.isWin(board, 0), false)
+    assert.throws(() => engine.isWin(board, 0x10000), /board intersection/)
+    assert.throws(() => engine.applyMove(board, 0x10000, engine.BLACK), /board intersection/)
+    assert.throws(() => engine.applyMove(board, 0, 0x101), /Black or White/)
+})
+
 test('a full board without a five is a draw', () => {
     const drawBoard = Array.from({length: 225}, (_, index) => {
         const row = Math.floor(index / 15)

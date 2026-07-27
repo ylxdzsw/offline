@@ -45,6 +45,35 @@ fn number(request: &Value, name: &str) -> Result<u64, DispatchError> {
         .ok_or_else(|| DispatchError::new(format!("{name:?} must be an unsigned integer")))
 }
 
+fn index(request: &Value, name: &str) -> Result<u16, DispatchError> {
+    let value = number(request, name)?;
+    if value >= game::CELLS as u64 {
+        return Err(DispatchError::new(format!(
+            "{name:?} must identify a board intersection"
+        )));
+    }
+    Ok(value as u16)
+}
+
+fn side(request: &Value, name: &str) -> Result<u8, DispatchError> {
+    match number(request, name)? {
+        value if value == BLACK as u64 => Ok(BLACK),
+        value if value == WHITE as u64 => Ok(WHITE),
+        _ => Err(DispatchError::new(format!(
+            "{name:?} must be Black or White"
+        ))),
+    }
+}
+
+fn stone(request: &Value, name: &str) -> Result<u8, DispatchError> {
+    match number(request, name)? {
+        value if value <= WHITE as u64 => Ok(value as u8),
+        _ => Err(DispatchError::new(format!(
+            "{name:?} must be Empty, Black, or White"
+        ))),
+    }
+}
+
 fn board(request: &Value) -> Result<Position, DispatchError> {
     let values = field(request, "board")?
         .as_array()
@@ -78,43 +107,39 @@ fn dispatch(request: Value) -> DispatchResult {
         "initialBoard" => Ok(json!(&Position::initial().board()[..])),
         "applyMove" => {
             let position = board(&request)?;
-            let index = number(&request, "index")? as u16;
-            let side = number(&request, "side")? as u8;
+            let index = index(&request, "index")?;
+            let side = side(&request, "side")?;
             let next = position.apply(index, side).ok_or("occupied intersection")?;
             Ok(json!(&next.board()[..]))
         }
         "isWin" => {
             let position = board(&request)?;
-            let index = number(&request, "index")? as u16;
-            let side = request
-                .get("side")
-                .and_then(Value::as_u64)
-                .map(|value| value as u8)
-                .or_else(|| position.board().get(index as usize).copied())
-                .unwrap_or(0);
+            let index = index(&request, "index")?;
+            let side = if request.get("side").is_some() {
+                stone(&request, "side")?
+            } else {
+                position.board()[index as usize]
+            };
             Ok(json!(position.is_win(index, side)))
         }
         "winner" => Ok(json!(board(&request)?.winner())),
         "status" => {
             let position = board(&request)?;
-            let last_move = request
-                .get("lastMove")
-                .and_then(Value::as_u64)
-                .map(|value| value as u16);
+            let last_move = match request.get("lastMove") {
+                Some(Value::Null) | None => None,
+                Some(_) => Some(index(&request, "lastMove")?),
+            };
             Ok(status_json(position.status(last_move)))
         }
         "candidates" => Ok(json!(board(&request)?.candidates())),
         "evaluate" => {
             let position = board(&request)?;
-            let side = number(&request, "side")? as u8;
+            let side = side(&request, "side")?;
             Ok(json!(search::evaluate(&position, side)))
         }
         "search" => {
             let position = board(&request)?;
-            let side = number(&request, "side")? as u8;
-            if ![BLACK, WHITE].contains(&side) {
-                return Err("invalid side".into());
-            }
+            let side = side(&request, "side")?;
             let difficulty = request
                 .get("difficulty")
                 .and_then(Value::as_str)
