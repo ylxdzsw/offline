@@ -139,6 +139,8 @@
         .point.top.destination::after { top: 56%; }
         .point.bottom.destination::after { bottom: 56%; }
         .target.last { background: color-mix(in srgb, var(--selected) 16%, transparent); }
+        .target.arrival .stack, .target.arrival .off-stack { animation: backgammon-arrive .18s ease-out; }
+        @keyframes backgammon-arrive { from { opacity: .45; transform: scale(.88); } }
         .target:focus-visible { z-index: 8; outline: 3px solid var(--focus); outline-offset: -3px; }
         .bar-target { z-index: 3; grid-column: 8; justify-content: center; }
         .bar-target.top { grid-row: 1; align-items: flex-start; }
@@ -208,6 +210,10 @@
             min-height: 18px; margin: 7px 2px 0; color: var(--ink-faint);
             font-size: .63rem; line-height: 1.35; text-align: center;
         }
+        @media (prefers-reduced-motion: reduce) {
+            .status.thinking::after, .target.arrival .stack, .target.arrival .off-stack { animation: none; }
+            .cube { transition: none; }
+        }
         @media (max-width: 340px) {
             .toolbar { gap: 4px; }
             .action { padding-inline: 8px; font-size: .78rem; }
@@ -262,6 +268,10 @@
 </template>
 
 <script>
+const BACKGAMMON_AI_DELAY_MS = 320
+const BACKGAMMON_DICE_PAUSE_MS = 180
+const BACKGAMMON_STEP_MS = 200
+
 OfflineGames.wasm.defineElement('backgammon', 'backgammon-game', class extends HTMLElement {
     constructor() {
         super()
@@ -273,6 +283,8 @@ OfflineGames.wasm.defineElement('backgammon', 'backgammon-game', class extends H
         this.aiFailed = false
         this.aiTimer = null
         this.passTimer = null
+        this.moveTimer = null
+        this.aiPath = []
         this.notice = null
         this.path = []
         this.candidates = []
@@ -803,7 +815,7 @@ OfflineGames.wasm.defineElement('backgammon', 'backgammon-game', class extends H
         if (this.state.turn === this.engine.AI && ['roll', 'move'].includes(this.state.phase)) this.scheduleAI()
     }
 
-    scheduleAI(delay = 220) {
+    scheduleAI(delay = BACKGAMMON_AI_DELAY_MS) {
         if (this.aiTimer || this.thinking) return
         this.aiTimer = setTimeout(() => {
             this.aiTimer = null
@@ -837,13 +849,14 @@ OfflineGames.wasm.defineElement('backgammon', 'backgammon-game', class extends H
         this.thinking = true
         this.aiFailed = false
         const id = ++this.requestId
+        const requestedAt = performance.now()
         const position = this.engine.clonePosition(this.state.position)
         const dice = this.state.dice.slice()
         this.worker = OfflineGames.runtime.createWorker('backgammon-worker-payload')
         this.worker.onmessage = event => {
             if (event.data.id !== id || !this.thinking) return
-            this.cancelAI(false)
             if (event.data.error) {
+                this.cancelAI(false)
                 this.aiFailed = true
                 this.render()
                 return
@@ -851,12 +864,21 @@ OfflineGames.wasm.defineElement('backgammon', 'backgammon-game', class extends H
             const legal = this.legalTurns()
             const turn = legal.find(candidate => this.engine.sameTurn(candidate, event.data.turn))
             if (!turn) {
+                this.cancelAI(false)
                 this.aiFailed = true
                 this.render()
                 return
             }
+            if (this.worker) this.worker.terminate()
+            this.worker = null
             const applied = this.engine.applyTurn(position, this.engine.AI, dice, turn.steps)
-            this.finishTurn(applied, this.engine.AI)
+            const delay = Math.max(0, BACKGAMMON_DICE_PAUSE_MS - (performance.now() - requestedAt))
+            const begin = () => {
+                this.moveTimer = null
+                if (id === this.requestId && this.thinking) this.playAITurn(id, turn, applied)
+            }
+            if (delay) this.moveTimer = setTimeout(begin, delay)
+            else begin()
         }
         this.worker.onerror = error => {
             console.error(error)
@@ -876,18 +898,42 @@ OfflineGames.wasm.defineElement('backgammon', 'backgammon-game', class extends H
         this.render()
     }
 
+    playAITurn(id, turn, applied) {
+        this.aiPath = []
+        const show = index => {
+            if (id !== this.requestId || !this.thinking) return
+            this.aiPath.push(turn.steps[index])
+            this.render()
+            this.moveTimer = setTimeout(() => {
+                this.moveTimer = null
+                if (id !== this.requestId || !this.thinking) return
+                if (index + 1 < turn.steps.length) { show(index + 1); return }
+                this.thinking = false
+                this.aiPath = []
+                this.finishTurn(applied, this.engine.AI)
+            }, BACKGAMMON_STEP_MS)
+        }
+        show(0)
+    }
+
     cancelAI(invalidate = true) {
         if (invalidate) this.requestId++
         if (this.worker) this.worker.terminate()
+        clearTimeout(this.moveTimer)
         this.worker = null
+        this.moveTimer = null
+        this.aiPath = []
         this.thinking = false
     }
 
     clearTimers() {
         clearTimeout(this.aiTimer)
         clearTimeout(this.passTimer)
+        clearTimeout(this.moveTimer)
         this.aiTimer = null
         this.passTimer = null
+        this.moveTimer = null
+        this.aiPath = []
     }
 
     undo() {
@@ -953,6 +999,7 @@ OfflineGames.wasm.defineElement('backgammon', 'backgammon-game', class extends H
         else states.push(this.i18n.t('empty'))
         if (classes.movable) states.push(this.i18n.t('selected'))
         if (classes.destination) states.push(this.i18n.t('legalMove'))
+        if (classes.last) states.push(this.i18n.t('lastMove'))
         return this.format('backgammonPointLabel', {point: location + 1, state: states.join(', ')})
     }
 
@@ -972,8 +1019,10 @@ OfflineGames.wasm.defineElement('backgammon', 'backgammon-game', class extends H
     renderBoard() {
         const legal = this.state.phase === 'move' ? this.legalTurns() : []
         if (!this.candidates.length && !this.path.length) this.candidates = legal
-        const display = this.path.length
-            ? this.engine.preview(this.state.position, this.engine.HUMAN, this.path)
+        const previewPath = this.aiPath.length ? this.aiPath : this.path
+        const previewSide = this.aiPath.length ? this.engine.AI : this.engine.HUMAN
+        const display = previewPath.length
+            ? this.engine.preview(this.state.position, previewSide, previewPath)
             : this.state.position
         const stepIndex = this.path.length
         const sources = new Set(this.state.turn === this.engine.HUMAN && this.state.phase === 'move' && this.selectedFrom == null
@@ -981,7 +1030,11 @@ OfflineGames.wasm.defineElement('backgammon', 'backgammon-game', class extends H
         const destinations = new Set(this.selectedFrom == null ? [] : this.candidates
             .filter(turn => turn.steps[stepIndex]?.from === this.selectedFrom)
             .map(turn => turn.steps[stepIndex].to))
-        const lastLocations = new Set((this.state.lastTurn?.steps || []).flatMap(step => [step.from, step.to]))
+        const activeStep = this.aiPath.at(-1) || this.path.at(-1)
+        const activeSide = this.aiPath.length ? this.engine.AI : this.path.length ? this.engine.HUMAN : null
+        const lastTurnSide = this.aiPath.length ? this.engine.AI : this.state.lastTurn?.side
+        const lastSteps = this.aiPath.length ? [activeStep] : this.state.lastTurn?.steps || []
+        const lastLocations = new Set(lastSteps.flatMap(step => [step.from, step.to]))
         const current = this.path.at(-1)?.to ?? this.selectedFrom
 
         for (const target of this.shadowRoot.querySelectorAll('.target')) {
@@ -992,20 +1045,26 @@ OfflineGames.wasm.defineElement('backgammon', 'backgammon-game', class extends H
             const count = side == null ? 0 : this.engine.countAt(display, location, side)
             const movable = sources.has(location) && (restrictedSide == null || restrictedSide === this.engine.HUMAN)
             const destination = destinations.has(location) && (restrictedSide == null || restrictedSide === this.engine.HUMAN)
+            const restrictedLast = restrictedSide == null || restrictedSide === lastTurnSide
+            const last = lastLocations.has(location) && restrictedLast
+            const arrival = activeStep?.to === location && (restrictedSide == null || restrictedSide === activeSide)
             target.classList.toggle('movable', movable)
             target.classList.toggle('selected', current === location && (restrictedSide == null || restrictedSide === this.engine.HUMAN))
             target.classList.toggle('destination', destination)
-            target.classList.toggle('last', lastLocations.has(location))
+            target.classList.toggle('last', last)
+            target.classList.toggle('arrival', arrival)
             target.setAttribute('aria-selected', String(current === location))
             target.setAttribute('aria-disabled', String(this.thinking || this.state.phase !== 'move'))
             if (location < 24) {
-                target.setAttribute('aria-label', this.pointLabel(location, display, side, count, {movable, destination}))
+                target.setAttribute('aria-label', this.pointLabel(location, display, side, count, {movable, destination, last}))
                 this.fillCheckers(target, count, side)
             } else if (location === this.engine.BAR) {
-                target.setAttribute('aria-label', this.format(side === this.engine.HUMAN ? 'backgammonYourBar' : 'backgammonAiBar', {count}))
+                const label = this.format(side === this.engine.HUMAN ? 'backgammonYourBar' : 'backgammonAiBar', {count})
+                target.setAttribute('aria-label', label + (last ? `, ${this.i18n.t('lastMove')}` : ''))
                 this.fillCheckers(target, count, side)
             } else {
-                target.setAttribute('aria-label', this.format(side === this.engine.HUMAN ? 'backgammonYourOff' : 'backgammonAiOff', {count}))
+                const label = this.format(side === this.engine.HUMAN ? 'backgammonYourOff' : 'backgammonAiOff', {count})
+                target.setAttribute('aria-label', label + (last ? `, ${this.i18n.t('lastMove')}` : ''))
                 const stack = target.querySelector('.off-stack')
                 stack.replaceChildren(...Array.from({length: Math.min(count, 10)}, () => {
                     const checker = document.createElement('span')
@@ -1097,7 +1156,8 @@ OfflineGames.wasm.defineElement('backgammon', 'backgammon-game', class extends H
         shadow.querySelector('.undo').disabled = !this.state.history.some(entry => entry.actor === 'human')
         const status = shadow.querySelector('.status')
         status.textContent = this.statusText()
-        status.classList.toggle('thinking', this.thinking || this.state.offeredBy === this.engine.HUMAN)
+        const aiTurn = this.state.turn === this.engine.AI && ['roll', 'move'].includes(this.state.phase)
+        status.classList.toggle('thinking', this.thinking || aiTurn || this.state.offeredBy === this.engine.HUMAN)
         const cube = shadow.querySelector('.cube')
         cube.textContent = String(this.state.cube)
         cube.className = 'cube'

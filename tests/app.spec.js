@@ -737,6 +737,78 @@ test('Backgammon plays a fixed opening, persists the AI reply, and undoes the tu
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:backgammon')).history.length)).toBe(0)
 })
 
+test('Backgammon shows a fast AI turn one checker step at a time', async ({page}) => {
+    await page.goto('/backgammon.html')
+    const playback = await page.evaluate(async () => {
+        const game = document.querySelector('backgammon-game')
+        game.cancelAI()
+        game.clearTimers()
+        game.state = {
+            ...game.fresh('easy'),
+            seed: 7,
+            rng: 1,
+            position: game.engine.initialPosition(),
+            turn: game.engine.AI,
+            phase: 'move',
+            dice: [3, 1],
+            opening: false,
+            ply: 0,
+            history: [],
+            lastTurn: null,
+            progress: false,
+        }
+        game.clearSelection()
+        game.notice = null
+        game.render()
+        OfflineGames.runtime.createWorker = () => {
+            const worker = {
+                postMessage(message) {
+                    const turn = game.engine.legalTurns(game.state.position, game.engine.AI, game.state.dice)[0]
+                    queueMicrotask(() => worker.onmessage({data: {id: message.id, turn}}))
+                },
+                terminate() {},
+            }
+            return worker
+        }
+        const waitFor = predicate => new Promise((resolve, reject) => {
+            const deadline = performance.now() + 3000
+            const check = () => {
+                if (predicate()) resolve()
+                else if (performance.now() >= deadline) reject(new Error('timed out waiting for AI playback'))
+                else setTimeout(check, 10)
+            }
+            check()
+        })
+        const started = performance.now()
+        game.scheduleAI()
+        await new Promise(resolve => setTimeout(resolve, 160))
+        const before = {ply: game.state.ply, steps: game.aiPath.length, thinking: game.shadowRoot.querySelector('.status').classList.contains('thinking')}
+        await waitFor(() => game.aiPath.length === 1)
+        const firstAt = performance.now()
+        const firstAnimation = getComputedStyle(game.shadowRoot.querySelector('.target.arrival .stack, .target.arrival .off-stack')).animationName
+        await waitFor(() => game.aiPath.length === 2)
+        const secondAt = performance.now()
+        await waitFor(() => game.state.ply === 1)
+        return {
+            before,
+            firstDelay: firstAt - started,
+            stepDelay: secondAt - firstAt,
+            firstAnimation,
+            actors: game.state.history.map(entry => entry.actor),
+            lastSteps: game.state.lastTurn.steps.length,
+            remainingPreview: game.aiPath.length,
+        }
+    })
+
+    expect(playback.before).toEqual({ply: 0, steps: 0, thinking: true})
+    expect(playback.firstDelay).toBeGreaterThanOrEqual(450)
+    expect(playback.stepDelay).toBeGreaterThanOrEqual(160)
+    expect(playback.firstAnimation).toBe('backgammon-arrive')
+    expect(playback.actors).toEqual(['computer'])
+    expect(playback.lastSteps).toBe(2)
+    expect(playback.remainingPreview).toBe(0)
+})
+
 test('Backgammon accepts the doubling cube and disables it for the Crawford game', async ({page}) => {
     await page.goto('/backgammon.html')
     await page.locator('backgammon-game').evaluate(game => {
