@@ -888,7 +888,7 @@ test('Backgammon accepts the doubling cube and disables it for the Crawford game
     expect(await page.locator('backgammon-game').evaluate(game => game.canDouble(game.engine.HUMAN))).toBe(false)
 })
 
-test('Huarong Dao hints an optimal slide, moves, persists, reloads, and undoes', async ({page}) => {
+test('Huarong Dao hints and animates an optimal slide, persists, reloads, and undoes', async ({page}) => {
     await page.goto('/huarong.html')
     await expect(page.locator('huarong-game .piece')).toHaveCount(10)
     await page.locator('offline-shell .guide-btn').click()
@@ -901,13 +901,26 @@ test('Huarong Dao hints an optimal slide, moves, persists, reloads, and undoes',
     await expect(page.locator('huarong-game .piece.hinted')).toHaveCount(1, {timeout: 6000})
     await expect(page.locator('huarong-game .target.hinted')).toHaveCount(1)
     await expect(page.locator('huarong-game .status')).toContainText('optimal moves remain')
-    await page.locator('huarong-game .target.hinted').click()
+    const motion = await page.locator('huarong-game .target.hinted').evaluate(target => {
+        const root = target.getRootNode()
+        const piece = root.querySelector('.piece.hinted')
+        const pieceIndex = piece.dataset.piece
+        piece.getBoundingClientRect()
+        target.click()
+        const moved = root.querySelector(`.piece[data-piece="${pieceIndex}"]`)
+        moved.getBoundingClientRect()
+        const transition = moved.getAnimations().find(animation => ['left', 'top'].includes(animation.transitionProperty))
+        return {sameElement: moved === piece, duration: transition?.effect.getTiming().duration}
+    })
+    expect(motion).toEqual({sameElement: true, duration: 200})
     await expect(page.locator('huarong-game .move-count')).toHaveText('1')
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:huarong')).history.length)).toBe(1)
     await page.reload()
     await expect(page.locator('huarong-game .undo')).toBeEnabled()
     await page.locator('huarong-game .undo').click()
     await expect(page.locator('huarong-game .move-count')).toHaveText('0')
+    await page.emulateMedia({reducedMotion: 'reduce'})
+    await expect(page.locator('huarong-game .piece').first()).toHaveCSS('transition-duration', '0s')
 
     await page.locator('huarong-game').evaluate(game => {
         game.state.positions = [8, 18, 0, 1, 2, 3, 10, 11, 14, 17]

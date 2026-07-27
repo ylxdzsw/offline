@@ -93,6 +93,10 @@
         .board.solved .piece.cao { z-index: 8; animation: escape .7s ease-in-out alternate 2; }
         @keyframes escape { to { transform: translateY(8%) scale(1.03); filter: brightness(1.15); } }
         .gesture-note { margin: 9px 0 0; color: var(--ink-faint); font-size: .72rem; line-height: 1.4; text-align: center; }
+        @media (prefers-reduced-motion: reduce) {
+            .piece { transition: none; }
+            .hint.thinking::after, .piece.hinted, .target.hinted::after, .board.solved .piece.cao { animation: none; }
+        }
         @media (max-width: 340px) {
             .toolbar { gap: 4px; }
             .toolbar button { padding-inline: 8px; font-size: .82rem; }
@@ -345,20 +349,35 @@ OfflineGames.wasm.defineElement('huarong', 'huarong-game', class extends HTMLEle
     render() {
         const s = this.shadowRoot, board = s.querySelector('.board')
         const legal = this.selected == null ? [] : this.engine.legalMoves(this.state.positions, this.selected)
-        const pieces = this.state.positions.map((position, piece) => {
+        this.state.positions.forEach((position, piece) => {
             const [width, height] = this.engine.SIZES[piece]
             const classes = ['piece', piece === 0 ? 'cao' : piece === 1 ? 'guan' : piece < 6 ? 'general' : 'soldier']
             if (piece === this.selected) classes.push('selected')
             if (this.hintMove?.from === position) classes.push('hinted')
             const name = this.i18n.t(`huarongPiece${piece}`)
-            return `<button type="button" role="gridcell" class="${classes.join(' ')}" data-piece="${piece}" style="--x:${this.engine.columnOf(position)};--y:${this.engine.rowOf(position)};--w:${width};--h:${height}" aria-label="${name}"><span class="piece-name">${this.displayName(piece)}</span></button>`
-        }).join('')
+            let element = board.querySelector(`.piece[data-piece="${piece}"]`)
+            if (!element) {
+                element = document.createElement('button')
+                element.type = 'button'
+                element.setAttribute('role', 'gridcell')
+                element.dataset.piece = piece
+                element.innerHTML = '<span class="piece-name"></span>'
+                board.append(element)
+            }
+            element.className = classes.join(' ')
+            element.style.setProperty('--x', this.engine.columnOf(position))
+            element.style.setProperty('--y', this.engine.rowOf(position))
+            element.style.setProperty('--w', width)
+            element.style.setProperty('--h', height)
+            element.setAttribute('aria-label', name)
+            element.querySelector('.piece-name').innerHTML = this.displayName(piece)
+        })
         const targets = legal.map(move => {
             const hinted = this.hintMove?.to === move.to ? ' hinted' : ''
             return `<button type="button" class="target${hinted}" data-to="${move.to}" style="--x:${this.engine.columnOf(move.to)};--y:${this.engine.rowOf(move.to)}" aria-label="${this.i18n.t('legalMove')}"></button>`
         }).join('')
-        board.querySelectorAll('.piece, .target').forEach(element => element.remove())
-        board.insertAdjacentHTML('beforeend', pieces + targets)
+        board.querySelectorAll('.target').forEach(element => element.remove())
+        board.insertAdjacentHTML('beforeend', targets)
         board.classList.toggle('solved', Boolean(this.state.outcome))
         s.querySelector('.move-count').textContent = this.state.history.length
         s.querySelector('.status').textContent = this.statusText()
