@@ -55,7 +55,12 @@
             position: absolute; z-index: 2; width: 30%; height: 30%;
             border: 2px solid var(--hint); border-radius: 50%; content: "";
         }
+        .spot.last .stone { animation: place .2s ease-out; }
+        @keyframes place { from { opacity: .35; transform: scale(.58); } }
         .board[aria-disabled="true"] .spot { cursor: wait; }
+        @media (prefers-reduced-motion: reduce) {
+            .status.thinking::after, .spot.last .stone { animation: none; }
+        }
         @media (max-width: 340px) {
             .toolbar { gap: 4px; }
             .action { padding-inline: 8px; font-size: .82rem; }
@@ -86,12 +91,16 @@
 </template>
 
 <script>
+const WUZIQI_MIN_AI_TURN_MS = 360
+
 OfflineGames.wasm.defineElement('wuziqi', 'wuziqi-game', class extends HTMLElement {
     constructor() {
         super()
         this.attachShadow({mode: 'open'}).append(document.getElementById('wuziqi-game-template').content.cloneNode(true))
         this.thinking = false
         this.worker = null
+        this.aiTimer = null
+        this.aiStartedAt = 0
         this.requestId = 0
     }
 
@@ -181,13 +190,23 @@ OfflineGames.wasm.defineElement('wuziqi', 'wuziqi-game', class extends HTMLEleme
         if (this.state.outcome || this.state.turn !== this.engine.WHITE) return
         this.cancelAI()
         this.thinking = true
+        this.aiStartedAt = performance.now()
         const id = ++this.requestId
         this.worker = OfflineGames.runtime.createWorker('wuziqi-worker-payload')
         this.worker.onmessage = event => {
             if (event.data.id !== id || !this.thinking) return
             const move = event.data.move
-            this.cancelAI(false)
-            if (Number.isInteger(move) && this.state.board[move] === this.engine.EMPTY) this.commit(move, this.engine.WHITE)
+            const valid = Number.isInteger(move) && this.state.board[move] === this.engine.EMPTY
+            if (this.worker) this.worker.terminate()
+            this.worker = null
+            const delay = Math.max(0, WUZIQI_MIN_AI_TURN_MS - (performance.now() - this.aiStartedAt))
+            this.aiTimer = setTimeout(() => {
+                this.aiTimer = null
+                if (id !== this.requestId || !this.thinking) return
+                this.thinking = false
+                if (valid) this.commit(move, this.engine.WHITE)
+                else this.render()
+            }, delay)
         }
         this.worker.onerror = error => {
             console.error(error)
@@ -201,7 +220,9 @@ OfflineGames.wasm.defineElement('wuziqi', 'wuziqi-game', class extends HTMLEleme
     cancelAI(invalidate = true) {
         if (invalidate) this.requestId++
         if (this.worker) this.worker.terminate()
+        if (this.aiTimer) clearTimeout(this.aiTimer)
         this.worker = null
+        this.aiTimer = null
         this.thinking = false
     }
 
@@ -246,8 +267,9 @@ OfflineGames.wasm.defineElement('wuziqi', 'wuziqi-game', class extends HTMLEleme
             const classes = ['spot', stone === this.engine.EMPTY ? 'empty' : 'occupied']
             if (index === last) classes.push('last')
             const name = stone === this.engine.BLACK ? this.i18n.t('blackStone') : stone === this.engine.WHITE ? this.i18n.t('whiteStone') : this.i18n.t('empty')
+            const state = index === last ? `, ${this.i18n.t('lastMove')}` : ''
             const token = stone ? `<span class="stone ${stone === this.engine.BLACK ? 'black' : 'white'}"></span>` : ''
-            return `<button type="button" role="gridcell" class="${classes.join(' ')}" data-index="${index}" aria-label="${name}, ${this.i18n.t('row')} ${row + 1}, ${this.i18n.t('column')} ${column + 1}" style="left:${column / 14 * 100}%;top:${row / 14 * 100}%">${token}</button>`
+            return `<button type="button" role="gridcell" class="${classes.join(' ')}" data-index="${index}" aria-label="${name}, ${this.i18n.t('row')} ${row + 1}, ${this.i18n.t('column')} ${column + 1}${state}" style="left:${column / 14 * 100}%;top:${row / 14 * 100}%">${token}</button>`
         }).join('')
         const status = shadow.querySelector('.status')
         status.textContent = this.statusText()

@@ -298,6 +298,42 @@ test('Wuziqi plays an AI reply and undo removes the pair', async ({page}) => {
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:wuziqi')).history.length)).toBe(0)
 })
 
+test('Wuziqi keeps a fast AI reply visible and settles the latest stone', async ({page}) => {
+    await page.goto('/wuziqi.html')
+    const midpoint = await page.evaluate(async () => {
+        const game = document.querySelector('wuziqi-game')
+        OfflineGames.runtime.createWorker = () => {
+            const worker = {
+                postMessage(message) {
+                    const move = game.state.board.findIndex(value => value === game.engine.EMPTY)
+                    queueMicrotask(() => worker.onmessage({data: {id: message.id, move}}))
+                },
+                terminate() {},
+            }
+            return worker
+        }
+        const started = performance.now()
+        game.tap(112)
+        await new Promise(resolve => setTimeout(resolve, 180))
+        const latest = game.shadowRoot.querySelector('.spot.last .stone')
+        return {
+            started,
+            historyLength: game.state.history.length,
+            thinking: game.thinking,
+            animationName: getComputedStyle(latest).animationName,
+        }
+    })
+
+    expect(midpoint.historyLength).toBe(1)
+    expect(midpoint.thinking).toBeTruthy()
+    expect(midpoint.animationName).toBe('place')
+
+    await expect.poll(() => page.evaluate(() => document.querySelector('wuziqi-game').state.history.length)).toBe(2)
+    expect(await page.evaluate(started => performance.now() - started, midpoint.started)).toBeGreaterThanOrEqual(320)
+    await expect(page.locator('wuziqi-game .status')).toHaveText('Your turn')
+    await expect(page.locator('wuziqi-game .spot.last .stone.white')).toHaveCount(1)
+})
+
 test('Sudoku supports long-press notes, entries, undo, and persistence without hints', async ({page}) => {
     await page.goto('/sudoku.html')
     let editable = page.locator('sudoku-game .cell:not(.given)').first()
