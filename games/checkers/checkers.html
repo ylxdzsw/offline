@@ -113,6 +113,9 @@
         .square.last-to .piece { animation: land .24s ease-out; }
         @keyframes land { from { opacity: .55; transform: scale(.72); } to { opacity: 1; transform: scale(1); } }
         .board[aria-disabled="true"] .square.dark { cursor: wait; }
+        @media (prefers-reduced-motion: reduce) {
+            .status.thinking::after, .square.last-to .piece { animation: none; }
+        }
         @media (max-width: 340px) {
             .toolbar { gap: 4px; }
             .action { padding-inline: 8px; font-size: .82rem; }
@@ -146,6 +149,8 @@
 </template>
 
 <script>
+const CHECKERS_MIN_AI_TURN_MS = 360
+
 OfflineGames.wasm.defineElement('checkers', 'checkers-game', class extends HTMLElement {
     constructor() {
         super()
@@ -153,6 +158,8 @@ OfflineGames.wasm.defineElement('checkers', 'checkers-game', class extends HTMLE
         this.thinking = false
         this.aiFailed = false
         this.worker = null
+        this.aiTimer = null
+        this.aiStartedAt = 0
         this.requestId = 0
         this.selectedFrom = null
         this.movePath = []
@@ -357,17 +364,22 @@ OfflineGames.wasm.defineElement('checkers', 'checkers-game', class extends HTMLE
         this.cancelAI()
         this.thinking = true
         this.aiFailed = false
+        this.aiStartedAt = performance.now()
         const id = ++this.requestId
         this.worker = OfflineGames.runtime.createWorker('checkers-worker-payload')
         this.worker.onmessage = event => {
             if (event.data.id !== id || !this.thinking) return
             const move = this.legalMoveMatching(event.data.move)
-            this.cancelAI(false)
-            if (move) this.commit(move, this.engine.RED)
-            else {
-                this.aiFailed = true
-                this.render()
-            }
+            if (this.worker) this.worker.terminate()
+            this.worker = null
+            const delay = Math.max(0, CHECKERS_MIN_AI_TURN_MS - (performance.now() - this.aiStartedAt))
+            this.aiTimer = setTimeout(() => {
+                this.aiTimer = null
+                if (id !== this.requestId || !this.thinking) return
+                this.thinking = false
+                if (move) this.commit(move, this.engine.RED)
+                else { this.aiFailed = true; this.render() }
+            }, delay)
         }
         this.worker.onerror = error => {
             console.error(error)
@@ -396,7 +408,9 @@ OfflineGames.wasm.defineElement('checkers', 'checkers-game', class extends HTMLE
     cancelAI(invalidate = true) {
         if (invalidate) this.requestId++
         if (this.worker) this.worker.terminate()
+        if (this.aiTimer) clearTimeout(this.aiTimer)
         this.worker = null
+        this.aiTimer = null
         this.thinking = false
     }
 

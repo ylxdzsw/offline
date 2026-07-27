@@ -644,6 +644,43 @@ test('English Draughts plays full turns and previews a compulsory multi-jump', a
     await expect(page.locator('checkers-game .red-count')).toHaveText('0')
 })
 
+test('English Draughts lets a landing finish before a fast AI reply', async ({page}) => {
+    await page.goto('/checkers.html')
+    const midpoint = await page.evaluate(async () => {
+        const game = document.querySelector('checkers-game')
+        OfflineGames.runtime.createWorker = () => {
+            const worker = {
+                postMessage(message) {
+                    const move = game.engine.legalMoves(game.state.board, game.engine.RED)[0]
+                    queueMicrotask(() => worker.onmessage({data: {id: message.id, move}}))
+                },
+                terminate() {},
+            }
+            return worker
+        }
+        const move = game.engine.legalMoves(game.state.board, game.engine.BLACK)[0]
+        const started = performance.now()
+        game.commit(move, game.engine.BLACK)
+        await new Promise(resolve => setTimeout(resolve, 180))
+        const piece = game.shadowRoot.querySelector('.square.last-to .piece')
+        return {
+            started,
+            historyLength: game.state.history.length,
+            thinking: game.thinking,
+            animationName: getComputedStyle(piece).animationName,
+        }
+    })
+
+    expect(midpoint.historyLength).toBe(1)
+    expect(midpoint.thinking).toBeTruthy()
+    expect(midpoint.animationName).toBe('land')
+
+    await expect.poll(() => page.evaluate(() => document.querySelector('checkers-game').state.history.length)).toBe(2)
+    expect(await page.evaluate(started => performance.now() - started, midpoint.started)).toBeGreaterThanOrEqual(320)
+    await expect(page.locator('checkers-game .status')).toHaveText('Your turn')
+    await expect(page.locator('checkers-game .square.last-to .piece.red')).toHaveCount(1)
+})
+
 test('Backgammon plays a fixed opening, persists the AI reply, and undoes the turn pair', async ({page}) => {
     await page.goto('/backgammon.html')
     await expect(page.locator('offline-shell h1')).toHaveText('Backgammon')
