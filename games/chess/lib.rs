@@ -169,13 +169,19 @@ fn move_to(state: &State, mv: Move) -> Value {
     Value::Object(object)
 }
 
+fn square_from(value: &Value, key: &str) -> Result<u8, DispatchError> {
+    let index = field(value, key)?
+        .as_u64()
+        .ok_or_else(|| DispatchError::new(format!("invalid {key}")))?;
+    if index >= 64 {
+        return Err(DispatchError::new(format!("invalid {key}")));
+    }
+    Ok(index as u8)
+}
+
 fn resolve_move(state: &State, value: &Value) -> Result<Move, DispatchError> {
-    let from = field(value, "from")?
-        .as_u64()
-        .ok_or_else(|| DispatchError::new("invalid move from"))? as u8;
-    let to = field(value, "to")?
-        .as_u64()
-        .ok_or_else(|| DispatchError::new("invalid move to"))? as u8;
+    let from = square_from(value, "from")?;
+    let to = square_from(value, "to")?;
     let promotion = match value.get("promotion").and_then(Value::as_str) {
         Some(text) => kind_from(
             *text
@@ -185,9 +191,9 @@ fn resolve_move(state: &State, value: &Value) -> Result<Move, DispatchError> {
         )?,
         None => 0,
     };
-    game::pseudo_moves_for(state, from as usize)
+    game::legal_moves(state, state.turn)
         .into_iter()
-        .find(|mv| mv.to == to && mv.promotion == promotion)
+        .find(|mv| mv.from == from && mv.to == to && mv.promotion == promotion)
         .ok_or_else(|| DispatchError::new("illegal chess move"))
 }
 
@@ -214,10 +220,7 @@ fn dispatch(request: Value) -> DispatchResult {
         "initialState" => Ok(state_to(&State::initial())),
         "isSquareAttacked" => {
             let state = state_from(field(&request, "state")?)?;
-            let index = field(&request, "index")?
-                .as_u64()
-                .ok_or_else(|| DispatchError::new("invalid index"))?
-                as usize;
+            let index = square_from(&request, "index")? as usize;
             let side = side_from(field(&request, "side")?)?;
             Ok(json!(game::is_square_attacked(&state, index, side)))
         }
@@ -231,13 +234,7 @@ fn dispatch(request: Value) -> DispatchResult {
         "pseudoMovesFor" | "pseudoMoves" | "legalMoves" => {
             let state = state_from(field(&request, "state")?)?;
             let moves = if op == "pseudoMovesFor" {
-                game::pseudo_moves_for(
-                    &state,
-                    field(&request, "from")?
-                        .as_u64()
-                        .ok_or_else(|| DispatchError::new("invalid from"))?
-                        as usize,
-                )
+                game::pseudo_moves_for(&state, square_from(&request, "from")? as usize)
             } else {
                 let side = side_from(field(&request, "side")?)?;
                 if op == "pseudoMoves" {

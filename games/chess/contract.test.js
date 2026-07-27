@@ -28,6 +28,14 @@ test('castling moves the rook and cannot cross an attacked square',()=>{
     assert(!engine.legalMoves(state).some(move=>move.castle==='K'))
 })
 
+test('move application rejects self-check and out-of-board aliases',()=>{
+    const state=bare();state.board[square('e1')]='wK';state.board[square('a8')]='bK';state.board[square('e8')]='bR';state.board[square('e2')]='wR'
+    const exposesKing={from:square('e2'),to:square('d2')}
+    assert(!engine.legalMoves(state).some(move=>move.from===exposesKing.from&&move.to===exposesKing.to))
+    assert.throws(()=>engine.applyMove(state,exposesKing),/illegal chess move/)
+    assert.throws(()=>engine.pseudoMovesFor(state,256),/invalid from/)
+})
+
 test('en passant is available for one move and removes the passed pawn',()=>{
     let state=engine.initialState()
     state=play(state,'e2','e4');state=play(state,'a7','a6');state=play(state,'e4','e5');state=play(state,'d7','d5')
