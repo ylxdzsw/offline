@@ -556,6 +556,45 @@ test('Reversi flips discs, plays an AI reply, persists, and undoes the turn', as
     await expect(page.locator('reversi-game .cell[data-index="3"]')).toHaveClass(/legal/)
 })
 
+test('Reversi lets flips finish before applying a fast AI reply', async ({page}) => {
+    await page.goto('/reversi.html')
+    const midpoint = await page.evaluate(async () => {
+        const game = document.querySelector('reversi-game')
+        OfflineGames.runtime.createWorker = () => {
+            const worker = {
+                postMessage(message) {
+                    const move = game.engine.legalMoves(game.state.board, game.engine.WHITE)[0].index
+                    queueMicrotask(() => worker.onmessage({data: {id: message.id, move}}))
+                },
+                terminate() {},
+            }
+            return worker
+        }
+        const started = performance.now()
+        game.tap(19)
+        await new Promise(resolve => setTimeout(resolve, 300))
+        const placed = game.shadowRoot.querySelector('.cell.last .disc')
+        const flipped = game.shadowRoot.querySelector('.cell.flipped .disc')
+        return {
+            started,
+            historyLength: game.state.history.length,
+            thinking: game.thinking,
+            placedAnimation: getComputedStyle(placed).animationName,
+            flippedAnimation: getComputedStyle(flipped).animationName,
+        }
+    })
+
+    expect(midpoint.historyLength).toBe(1)
+    expect(midpoint.thinking).toBeTruthy()
+    expect(midpoint.placedAnimation).toBe('reversi-place')
+    expect(midpoint.flippedAnimation).toBe('flip')
+
+    await expect.poll(() => page.evaluate(() => document.querySelector('reversi-game').state.history.length)).toBe(2)
+    expect(await page.evaluate(started => performance.now() - started, midpoint.started)).toBeGreaterThanOrEqual(380)
+    await expect(page.locator('reversi-game .status')).toHaveText('Your turn')
+    await expect(page.locator('reversi-game .cell.last .disc.white')).toHaveCount(1)
+})
+
 test('English Draughts plays full turns and previews a compulsory multi-jump', async ({page}) => {
     await page.goto('/checkers.html')
     await expect(page.locator('checkers-game .square.movable')).toHaveCount(4)

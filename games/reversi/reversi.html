@@ -67,9 +67,14 @@
         .disc { width: 88%; aspect-ratio: 1; border-radius: 50%; box-shadow: 0 3px 4px rgba(0, 0, 0, .35); }
         .disc.black { background: radial-gradient(circle at 35% 28%, #555, var(--stone-black) 68%); }
         .disc.white { border: 1px solid var(--stone-white-edge); background: radial-gradient(circle at 35% 28%, #fff, var(--stone-white) 72%); }
+        .cell.last .disc { animation: reversi-place .22s ease-out; }
         .cell.flipped .disc { animation: flip .34s ease-out; }
+        @keyframes reversi-place { from { opacity: .35; transform: scale(.55); } }
         @keyframes flip { 0% { transform: scaleX(.08); filter: brightness(.7); } 60% { transform: scaleX(1.08); } 100% { transform: scaleX(1); } }
         .board[aria-disabled="true"] .cell { cursor: wait; }
+        @media (prefers-reduced-motion: reduce) {
+            .status.thinking::after, .cell.last .disc, .cell.flipped .disc { animation: none; }
+        }
         @media (max-width: 340px) { .toolbar { gap: 4px; } .action { padding-inline: 8px; font-size: .82rem; } select { min-width: 88px; } .score { gap: 5px; } }
     </style>
     <div class="toolbar">
@@ -88,12 +93,16 @@
 </template>
 
 <script>
+const REVERSI_MIN_AI_TURN_MS = 420
+
 OfflineGames.wasm.defineElement('reversi', 'reversi-game', class extends HTMLElement {
     constructor() {
         super()
         this.attachShadow({mode: 'open'}).append(document.getElementById('reversi-game-template').content.cloneNode(true))
         this.thinking = false
         this.worker = null
+        this.aiTimer = null
+        this.aiStartedAt = 0
         this.requestId = 0
     }
 
@@ -165,16 +174,24 @@ OfflineGames.wasm.defineElement('reversi', 'reversi-game', class extends HTMLEle
         if (this.state.outcome || this.state.turn !== this.engine.WHITE) return
         this.cancelAI()
         this.thinking = true
+        this.aiStartedAt = performance.now()
         const id = ++this.requestId
         this.worker = OfflineGames.runtime.createWorker('reversi-worker-payload')
         this.worker.onmessage = event => {
             if (event.data.id !== id || !this.thinking) return
             const move = event.data.move
-            this.cancelAI(false)
-            if (Number.isInteger(move) && this.engine.flipsForMove(this.state.board, move, this.engine.WHITE).length) {
+            const valid = Number.isInteger(move) && this.engine.flipsForMove(this.state.board, move, this.engine.WHITE).length
+            if (this.worker) this.worker.terminate()
+            this.worker = null
+            const delay = Math.max(0, REVERSI_MIN_AI_TURN_MS - (performance.now() - this.aiStartedAt))
+            this.aiTimer = setTimeout(() => {
+                this.aiTimer = null
+                if (id !== this.requestId || !this.thinking) return
+                this.thinking = false
+                if (!valid) { this.render(); return }
                 this.commit(move, this.engine.WHITE)
                 if (!this.state.outcome && this.state.turn === this.engine.WHITE) this.requestAI()
-            }
+            }, delay)
         }
         this.worker.onerror = error => { console.error(error); this.cancelAI(false); this.render() }
         this.worker.postMessage({id, board: this.state.board, side: this.engine.WHITE, difficulty: this.state.difficulty, seed: OfflineGames.runtime.moveSeed(this.state.seed, this.state.history.length)})
@@ -183,7 +200,9 @@ OfflineGames.wasm.defineElement('reversi', 'reversi-game', class extends HTMLEle
     cancelAI(invalidate = true) {
         if (invalidate) this.requestId++
         if (this.worker) this.worker.terminate()
+        if (this.aiTimer) clearTimeout(this.aiTimer)
         this.worker = null
+        this.aiTimer = null
         this.thinking = false
     }
     undo() {
@@ -231,8 +250,9 @@ OfflineGames.wasm.defineElement('reversi', 'reversi-game', class extends HTMLEle
             if (flipped.has(index)) classes.push('flipped')
             const name = disc === this.engine.BLACK ? this.i18n.t('blackStone') : disc === this.engine.WHITE ? this.i18n.t('whiteStone') : this.i18n.t('empty')
             const hint = legal.has(index) ? `, ${this.i18n.t('legalMove')}` : ''
+            const last = lastMove?.index === index ? `, ${this.i18n.t('lastMove')}` : ''
             const token = disc ? `<span class="disc ${disc === this.engine.BLACK ? 'black' : 'white'}"></span>` : ''
-            return `<button type="button" role="gridcell" class="${classes.join(' ')}" data-index="${index}" aria-label="${name}, ${this.i18n.t('row')} ${this.engine.rowOf(index) + 1}, ${this.i18n.t('column')} ${this.engine.columnOf(index) + 1}${hint}">${token}</button>`
+            return `<button type="button" role="gridcell" class="${classes.join(' ')}" data-index="${index}" aria-label="${name}, ${this.i18n.t('row')} ${this.engine.rowOf(index) + 1}, ${this.i18n.t('column')} ${this.engine.columnOf(index) + 1}${hint}${last}">${token}</button>`
         }).join('')
         shadow.querySelector('.black-score').textContent = this.engine.count(this.state.board, this.engine.BLACK)
         shadow.querySelector('.white-score').textContent = this.engine.count(this.state.board, this.engine.WHITE)
