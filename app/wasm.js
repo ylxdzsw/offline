@@ -26,6 +26,17 @@
             now_ms: () => typeof performance === 'object' ? performance.now() : Date.now(),
             ...imports?.env,
         },
+        __wbindgen_placeholder__: {
+            // Some pure Rust dependencies retain wasm-bindgen's metadata hook
+            // even when their JavaScript-backed code paths are never called.
+            __wbindgen_describe: () => {},
+            ...imports?.__wbindgen_placeholder__,
+        },
+        __wbindgen_externref_xform__: {
+            __wbindgen_externref_table_set_null: () => {},
+            __wbindgen_externref_table_grow: () => 0,
+            ...imports?.__wbindgen_externref_xform__,
+        },
     })
 
     const finishInstantiation = async (entry, module, imports) => {

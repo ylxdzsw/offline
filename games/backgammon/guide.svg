@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-labelledby="title description">
+  <title id="title">Backgammon movement and bearing off</title>
+  <desc id="description">A complete backgammon board with opposing checker paths, dice, bar, doubling cube, and bear-off trays.</desc>
+  <defs>
+    <linearGradient id="wood" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#744332"/>
+      <stop offset="1" stop-color="#4f2c23"/>
+    </linearGradient>
+    <radialGradient id="light" cx="35%" cy="28%" r="75%">
+      <stop offset="0" stop-color="#fffdf4"/>
+      <stop offset=".55" stop-color="#eadfc8"/>
+      <stop offset="1" stop-color="#b9aa91"/>
+    </radialGradient>
+    <radialGradient id="dark" cx="35%" cy="28%" r="75%">
+      <stop offset="0" stop-color="#75665e"/>
+      <stop offset=".55" stop-color="#39302d"/>
+      <stop offset="1" stop-color="#171414"/>
+    </radialGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%">
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#28130d" flood-opacity=".45"/>
+    </filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0 0 10 5 0 10Z" fill="#2d6357"/>
+    </marker>
+    <g id="light-checker"><circle r="21" fill="url(#light)" stroke="#887b67" stroke-width="2"/><circle r="14" fill="none" stroke="#fff" stroke-opacity=".42"/></g>
+    <g id="dark-checker"><circle r="21" fill="url(#dark)" stroke="#171313" stroke-width="2"/><circle r="14" fill="none" stroke="#fff" stroke-opacity=".10"/></g>
+  </defs>
+  <rect width="960" height="540" rx="28" fill="#f4f1eb"/>
+  <rect x="31" y="45" width="898" height="450" rx="18" fill="url(#wood)" filter="url(#shadow)"/>
+  <rect x="57" y="69" width="846" height="402" rx="8" fill="#b9734e" stroke="#d89d6d" stroke-opacity=".48" stroke-width="3"/>
+  <rect x="449" y="69" width="62" height="402" fill="#6c3b2c" stroke="#48241c" stroke-width="3"/>
+  <rect x="67" y="78" width="30" height="184" rx="5" fill="#7e4432" stroke="#4d291f"/>
+  <rect x="863" y="278" width="30" height="184" rx="5" fill="#7e4432" stroke="#4d291f"/>
+
+  <g stroke="#5f3026" stroke-width="1">
+    <path d="M108 75H158L133 245Z" fill="#e1b171"/><path d="M161 75H211L186 245Z" fill="#813d34"/>
+    <path d="M214 75H264L239 245Z" fill="#e1b171"/><path d="M267 75H317L292 245Z" fill="#813d34"/>
+    <path d="M320 75H370L345 245Z" fill="#e1b171"/><path d="M373 75H423L398 245Z" fill="#813d34"/>
+    <path d="M537 75H587L562 245Z" fill="#e1b171"/><path d="M590 75H640L615 245Z" fill="#813d34"/>
+    <path d="M643 75H693L668 245Z" fill="#e1b171"/><path d="M696 75H746L721 245Z" fill="#813d34"/>
+    <path d="M749 75H799L774 245Z" fill="#e1b171"/><path d="M802 75H852L827 245Z" fill="#813d34"/>
+    <path d="M108 465H158L133 295Z" fill="#813d34"/><path d="M161 465H211L186 295Z" fill="#e1b171"/>
+    <path d="M214 465H264L239 295Z" fill="#813d34"/><path d="M267 465H317L292 295Z" fill="#e1b171"/>
+    <path d="M320 465H370L345 295Z" fill="#813d34"/><path d="M373 465H423L398 295Z" fill="#e1b171"/>
+    <path d="M537 465H587L562 295Z" fill="#813d34"/><path d="M590 465H640L615 295Z" fill="#e1b171"/>
+    <path d="M643 465H693L668 295Z" fill="#813d34"/><path d="M696 465H746L721 295Z" fill="#e1b171"/>
+    <path d="M749 465H799L774 295Z" fill="#813d34"/><path d="M802 465H852L827 295Z" fill="#e1b171"/>
+  </g>
+
+  <g filter="url(#shadow)">
+    <use href="#light-checker" x="827" y="99"/><use href="#light-checker" x="827" y="138"/>
+    <use href="#light-checker" x="133" y="99"/><use href="#light-checker" x="133" y="138"/><use href="#light-checker" x="133" y="177"/>
+    <use href="#light-checker" x="562" y="441"/><use href="#light-checker" x="562" y="402"/><use href="#light-checker" x="562" y="363"/>
+    <use href="#dark-checker" x="133" y="441"/><use href="#dark-checker" x="133" y="402"/>
+    <use href="#dark-checker" x="827" y="441"/><use href="#dark-checker" x="827" y="402"/><use href="#dark-checker" x="827" y="363"/>
+    <use href="#dark-checker" x="562" y="99"/><use href="#dark-checker" x="562" y="138"/><use href="#dark-checker" x="562" y="177"/>
+    <use href="#dark-checker" x="480" y="115"/>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="565" y="246" width="52" height="52" rx="9" fill="#fbf3e2" stroke="#756651" stroke-width="2"/>
+    <circle cx="578" cy="259" r="4" fill="#332924"/><circle cx="604" cy="259" r="4" fill="#332924"/>
+    <circle cx="578" cy="285" r="4" fill="#332924"/><circle cx="604" cy="285" r="4" fill="#332924"/>
+    <rect x="633" y="246" width="52" height="52" rx="9" fill="#fbf3e2" stroke="#756651" stroke-width="2"/>
+    <circle cx="646" cy="259" r="4" fill="#332924"/><circle cx="672" cy="259" r="4" fill="#332924"/>
+    <circle cx="659" cy="272" r="4" fill="#332924"/>
+    <circle cx="646" cy="285" r="4" fill="#332924"/><circle cx="672" cy="285" r="4" fill="#332924"/>
+    <rect x="456" y="246" width="48" height="48" rx="7" fill="#f2e5c9" stroke="#76664f" stroke-width="2"/>
+    <text x="480" y="279" text-anchor="middle" font-family="Georgia,serif" font-size="24" font-weight="700" fill="#3c3027">2</text>
+  </g>
+
+  <path d="M814 166C755 205 709 229 648 235" fill="none" stroke="#2d6357" stroke-width="7" stroke-linecap="round" marker-end="url(#arrow)"/>
+  <path d="M547 355C622 327 705 313 838 320" fill="none" stroke="#2d6357" stroke-width="7" stroke-linecap="round" marker-end="url(#arrow)"/>
+  <circle cx="480" cy="115" r="27" fill="none" stroke="#c94b42" stroke-width="5" stroke-dasharray="7 5"/>
+  <path d="M480 149V218" fill="none" stroke="#c94b42" stroke-width="5" stroke-linecap="round" marker-end="url(#arrow)"/>
+
+  <g fill="#5c493d" font-family="system-ui,sans-serif" font-size="15" font-weight="700">
+    <text x="107" y="519">13</text><text x="815" y="519">24</text>
+    <text x="107" y="32">12</text><text x="821" y="32">1</text>
+    <text x="467" y="526">BAR</text><text x="866" y="487">OFF</text>
+  </g>
+</svg>

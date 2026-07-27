@@ -57,6 +57,7 @@ test('language preference persists across pages without changing their URLs', as
     await expect(page.locator('offline-shell offline-drawer a[href*="xiangqi.html"]')).toHaveAttribute('href', /xiangqi\.html$/)
     await expect(page.locator('offline-shell offline-drawer a[href*="reversi.html"]')).toHaveAttribute('href', /reversi\.html$/)
     await expect(page.locator('offline-shell offline-drawer a[href*="checkers.html"]')).toHaveAttribute('href', /checkers\.html$/)
+    await expect(page.locator('offline-shell offline-drawer a[href*="backgammon.html"]')).toHaveAttribute('href', /backgammon\.html$/)
     await expect(page.locator('offline-shell offline-drawer a[href*="huarong.html"]')).toHaveAttribute('href', /huarong\.html$/)
     await page.locator('offline-shell offline-drawer a[href*="xiangqi.html"]').click()
     await expect(page).toHaveURL(/\/xiangqi\.html$/)
@@ -406,6 +407,141 @@ test('English Draughts plays full turns and previews a compulsory multi-jump', a
     await expect(page.locator('checkers-game .red-count')).toHaveText('0')
 })
 
+test('Backgammon plays a fixed opening, persists the AI reply, and undoes the turn pair', async ({page}) => {
+    await page.goto('/backgammon.html')
+    await expect(page.locator('offline-shell h1')).toHaveText('Backgammon')
+    await expect(page.locator('backgammon-game .point')).toHaveCount(24)
+
+    await page.locator('offline-shell .guide-btn').click()
+    const guide = page.locator('offline-shell offline-guide dialog')
+    await expect(guide.locator('.rule-group')).toHaveCount(3)
+    await expect(guide.locator('.guide-image')).toHaveAttribute('src', './guides/backgammon.svg')
+    await expect(guide.locator('figcaption')).toContainText('Light checkers travel')
+    expect(await guide.locator('.guide-image').evaluate(image => image.complete && image.naturalWidth > 0)).toBeTruthy()
+    await page.keyboard.press('Escape')
+
+    await page.locator('backgammon-game').evaluate(game => {
+        game.cancelAI()
+        game.clearTimers()
+        game.state = {
+            ...game.fresh('easy'),
+            seed: 7,
+            rng: 1,
+            position: game.engine.initialPosition(),
+            turn: game.engine.HUMAN,
+            phase: 'move',
+            dice: [3, 1],
+            opening: true,
+            openingRolls: 1,
+            ply: 0,
+            history: [],
+            lastTurn: null,
+            progress: false,
+        }
+        game.clearSelection()
+        game.notice = null
+        game.save()
+        game.render()
+    })
+    await expect(page.locator('backgammon-game .status')).toHaveText('Opening roll 3–1 · you move first')
+    for (const location of [5, 2, 2, 1]) {
+        await page.locator(`backgammon-game .point[data-location="${location}"]`).click()
+    }
+    await expect(page.locator('backgammon-game .status')).toHaveText('Roll the dice or offer the cube', {timeout: 8000})
+
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:backgammon')))
+    expect(saved.history.map(entry => entry.actor)).toEqual(['human', 'computer'])
+    expect(saved.ply).toBe(2)
+    expect(saved.lastTurn.side).toBe(1)
+
+    await page.reload()
+    await expect(page.locator('backgammon-game .status')).toHaveText('Roll the dice or offer the cube')
+    expect(await page.locator('backgammon-game').evaluate(game => game.state.position)).toEqual(saved.position)
+    await page.locator('backgammon-game .undo').click()
+    await expect(page.locator('backgammon-game .status')).toHaveText('Opening roll 3–1 · you move first')
+    await expect(page.locator('backgammon-game .point[data-location="5"] .checker.human')).toHaveCount(5)
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:backgammon')).history.length)).toBe(0)
+})
+
+test('Backgammon accepts the doubling cube and disables it for the Crawford game', async ({page}) => {
+    await page.goto('/backgammon.html')
+    await page.locator('backgammon-game').evaluate(game => {
+        game.cancelAI()
+        game.clearTimers()
+        const position = {board: Array(24).fill(0), bar: [0, 0], off: [0, 10]}
+        position.board[18] = 15
+        position.board[20] = -5
+        game.state = {
+            ...game.fresh('easy'),
+            seed: 11,
+            rng: 1,
+            position,
+            turn: game.engine.AI,
+            phase: 'roll',
+            dice: null,
+            opening: false,
+            ply: 2,
+            history: [],
+            progress: true,
+        }
+        game.clearSelection()
+        game.notice = null
+        game.save()
+        game.render()
+        game.resume()
+    })
+    await expect(page.locator('backgammon-game .status')).toHaveText('Opponent offers the cube at 2')
+    await expect(page.locator('backgammon-game .take')).toBeVisible()
+    await expect(page.locator('backgammon-game .pass-cube')).toBeVisible()
+    await page.locator('backgammon-game .take').click()
+    await expect(page.locator('backgammon-game .cube')).toHaveText('2')
+    await expect(page.locator('backgammon-game .cube')).toHaveClass(/owner-human/)
+    await expect.poll(() => page.locator('backgammon-game').evaluate(game => game.state.cubeOwner)).toBe(0)
+
+    await page.locator('backgammon-game').evaluate(game => {
+        game.cancelAI()
+        game.clearTimers()
+        Object.assign(game.state, {
+            score: [4, 0],
+            gameNumber: 3,
+            crawford: false,
+            crawfordPlayed: false,
+            turn: game.engine.HUMAN,
+            phase: 'game-over',
+            dice: null,
+            cube: 1,
+            cubeOwner: null,
+            offeredBy: null,
+            opening: false,
+            rng: 1,
+            history: [],
+            roundOutcome: {winner: game.engine.HUMAN, kind: 'regular', multiplier: 1, points: 1, dropped: false, cube: 1},
+            outcome: null,
+        })
+        game.clearSelection()
+        game.notice = null
+        game.save()
+        game.render()
+    })
+    await page.locator('backgammon-game .next-game').click()
+    await expect(page.locator('backgammon-game .match-center .crawford')).toBeVisible()
+    await expect(page.locator('backgammon-game .game-number')).toHaveText('Game 4')
+    await expect(page.locator('backgammon-game .match-note')).toHaveText('The doubling cube is out of play for this Crawford game.')
+    await expect(page.locator('backgammon-game .cube')).toHaveClass(/crawford/)
+
+    await page.locator('backgammon-game').evaluate(game => {
+        game.state.turn = game.engine.HUMAN
+        game.state.phase = 'roll'
+        game.state.dice = null
+        game.state.opening = false
+        game.clearSelection()
+        game.render()
+    })
+    await expect(page.locator('backgammon-game .roll')).toBeVisible()
+    await expect(page.locator('backgammon-game .double')).toBeHidden()
+    expect(await page.locator('backgammon-game').evaluate(game => game.canDouble(game.engine.HUMAN))).toBe(false)
+})
+
 test('Huarong Dao hints an optimal slide, moves, persists, reloads, and undoes', async ({page}) => {
     await page.goto('/huarong.html')
     await expect(page.locator('huarong-game .piece')).toHaveCount(10)
@@ -645,6 +781,12 @@ test('the installed app reloads and navigates completely offline', async ({brows
     await page.goto('/checkers.html')
     await expect(page.locator('offline-shell h1')).toHaveText('English Draughts')
     await expect(page.locator('checkers-game .square.movable')).toHaveCount(4)
+    await page.goto('/backgammon.html')
+    await expect(page.locator('offline-shell h1')).toHaveText('Backgammon')
+    await expect(page.locator('backgammon-game .point')).toHaveCount(24)
+    await page.locator('offline-shell .guide-btn').click()
+    await expect(page.locator('offline-shell .guide-image')).toHaveAttribute('src', './guides/backgammon.svg')
+    expect(await page.locator('offline-shell .guide-image').evaluate(image => image.complete && image.naturalWidth > 0)).toBeTruthy()
     await page.goto('/huarong.html')
     await expect(page.locator('offline-shell h1')).toHaveText('Huarong Dao')
     await expect(page.locator('huarong-game .piece')).toHaveCount(10)

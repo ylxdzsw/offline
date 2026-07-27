@@ -1,0 +1,1112 @@
+<template id="backgammon-game-template">
+    <style>
+        :host { display: block; color: var(--ink); }
+        .toolbar {
+            display: grid; grid-template-columns: 1fr auto auto; gap: 8px;
+            align-items: end; margin-bottom: 9px;
+        }
+        label {
+            display: grid; gap: 3px; color: var(--ink-muted);
+            font-size: .7rem; font-weight: 650; letter-spacing: 0;
+        }
+        select, .action {
+            min-height: var(--control-h, 42px); border: 1px solid var(--border-strong);
+            border-radius: var(--radius-sm); color: var(--ink); background: var(--bg-surface);
+        }
+        select { min-width: 96px; padding: 0 28px 0 10px; }
+        .action { padding: 0 12px; font-weight: 680; white-space: nowrap; }
+        .action:disabled { opacity: .42; }
+        .warning { margin: 0 0 8px; color: var(--danger); font-size: .77rem; text-align: center; }
+        .warning[hidden] { display: none; }
+        .scoreboard {
+            display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+            min-height: 58px; margin-bottom: 8px; overflow: hidden;
+            border: 1px solid var(--border); border-radius: var(--radius-md);
+            background: var(--bg-surface); box-shadow: var(--shadow-soft);
+        }
+        .player-score {
+            display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 7px;
+            align-items: center; min-width: 0; padding: 7px 9px;
+        }
+        .player-score.computer { grid-template-columns: minmax(0, 1fr) auto; text-align: right; }
+        .player-score.active { background: var(--accent-dim); }
+        .score-copy { display: grid; min-width: 0; gap: 3px; }
+        .score-name { overflow: hidden; font-size: .73rem; font-weight: 720; text-overflow: ellipsis; white-space: nowrap; }
+        .match-points { display: flex; gap: 3px; }
+        .computer .match-points { justify-content: flex-end; }
+        .match-point {
+            width: 9px; height: 4px; border-radius: 2px; background: var(--bg-muted);
+            box-shadow: inset 0 0 0 1px var(--separator);
+        }
+        .match-point.filled { background: var(--accent); box-shadow: none; }
+        .computer .match-point.filled { background: var(--danger); }
+        .score-number {
+            min-width: 1.15em; font-family: var(--font-display); font-size: 1.65rem;
+            font-variant-numeric: tabular-nums; line-height: 1; text-align: center;
+        }
+        .match-center {
+            display: grid; min-width: 68px; align-content: center; justify-items: center;
+            padding: 5px 7px; border-inline: 1px solid var(--separator);
+        }
+        .game-number { color: var(--ink-muted); font-size: .64rem; font-weight: 750; white-space: nowrap; }
+        .match-label { margin-top: 2px; color: var(--ink-faint); font-size: .56rem; white-space: nowrap; }
+        .match-center .crawford {
+            margin-top: 3px; padding: 2px 5px; border-radius: 4px;
+            color: var(--danger); background: var(--danger-soft); font-size: .52rem; font-weight: 800;
+        }
+        .match-center .crawford[hidden] { display: none; }
+        .status {
+            display: flex; min-height: 38px; align-items: center; justify-content: center;
+            margin: 0 0 8px; padding: 6px 10px; border-radius: var(--radius-sm);
+            color: var(--status-ink); font-size: .84rem; font-weight: 720;
+            line-height: 1.25; text-align: center; background: var(--status-bg);
+        }
+        .status.thinking::after {
+            width: 5px; height: 5px; margin-left: 7px; border-radius: 50%; content: "";
+            background: currentColor; animation: pulse .8s ease-in-out infinite alternate;
+        }
+        @keyframes pulse { to { opacity: .2; transform: scale(.7); } }
+        .board {
+            position: relative; display: grid; width: 100%; aspect-ratio: 1.42;
+            grid-template-columns: .58fr repeat(6, minmax(0, 1fr)) .62fr repeat(6, minmax(0, 1fr)) .58fr;
+            grid-template-rows: repeat(2, minmax(0, 1fr)); overflow: hidden;
+            border: 5px solid #5c3325; border-radius: var(--radius-sm);
+            background: #bc794f; box-shadow: inset 0 0 0 2px rgba(255,255,255,.12), inset 0 0 28px rgba(52,19,10,.28), var(--shadow-soft);
+            touch-action: manipulation; user-select: none; isolation: isolate;
+        }
+        .board::after {
+            position: absolute; z-index: 1; top: 50%; right: 0; left: 0; height: 1px;
+            content: ""; background: rgba(74,36,23,.28); pointer-events: none;
+        }
+        .bar-rail {
+            z-index: 1; grid-column: 8; grid-row: 1 / 3; margin-inline: 2px;
+            border-inline: 1px solid rgba(58,27,18,.38);
+            background: linear-gradient(90deg, #71402e, #92583c 45%, #6c3a2a);
+            box-shadow: inset 0 0 8px rgba(34,13,8,.38);
+        }
+        .target {
+            position: relative; z-index: 2; display: flex; min-width: 0; min-height: 0;
+            padding: 0; border: 0; border-radius: 0; align-items: center;
+            color: #2b1d18; background: transparent;
+        }
+        .point.top { align-items: flex-start; }
+        .point.bottom { align-items: flex-end; }
+        .point::before {
+            position: absolute; z-index: -1; inset-inline: 1px; height: 81%; content: "";
+            background: #e3b774; filter: drop-shadow(0 1px 0 rgba(255,255,255,.10));
+        }
+        .point.dark::before { background: #813b32; }
+        .point.top::before { top: 0; clip-path: polygon(0 0, 100% 0, 50% 100%); }
+        .point.bottom::before { bottom: 0; clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+        .point-number {
+            display: none;
+        }
+        .stack {
+            position: absolute; z-index: 3; right: 4%; left: 4%; display: flex;
+            height: 78%; align-items: center; pointer-events: none;
+        }
+        .top .stack { top: 1%; flex-direction: column; }
+        .bottom .stack { bottom: 1%; flex-direction: column-reverse; }
+        .checker {
+            position: relative; display: grid; width: 94%; aspect-ratio: 1; flex: 0 0 auto;
+            border-radius: 50%; place-items: center; font-size: clamp(.48rem, 1.7vw, .67rem);
+            font-weight: 850; line-height: 1;
+        }
+        .checker.human {
+            border: 1px solid #8d826e;
+            color: #3d352b;
+            background: radial-gradient(circle at 36% 28%, #fffdf4 0 9%, #efe6d1 42%, #c9baa0 82%);
+            box-shadow: inset 0 0 0 2px rgba(255,255,255,.34), 0 1px 2px rgba(39,21,13,.42);
+        }
+        .checker.computer {
+            border: 1px solid #251d1b;
+            color: #f5e6d0;
+            background: radial-gradient(circle at 36% 28%, #766861 0 8%, #3a312e 42%, #171515 82%);
+            box-shadow: inset 0 0 0 2px rgba(255,255,255,.08), 0 1px 2px rgba(28,12,8,.55);
+        }
+        .stack .checker + .checker { margin-top: -2%; }
+        .bottom .stack .checker + .checker { margin-top: 0; margin-bottom: -2%; }
+        .target.movable .checker:first-child, .target.selected .checker:first-child {
+            box-shadow: 0 0 0 3px var(--legal), 0 3px 5px rgba(25,13,8,.48);
+        }
+        .target.selected .checker:first-child { box-shadow: 0 0 0 3px var(--selected), 0 3px 6px rgba(25,13,8,.52); }
+        .target.destination::after {
+            position: absolute; z-index: 5; width: min(52%, 16px); aspect-ratio: 1;
+            border: 2px solid rgba(255,255,255,.86); border-radius: 50%; content: "";
+            background: var(--legal); box-shadow: 0 0 0 3px rgba(19,62,51,.25);
+        }
+        .point.destination::after { left: 50%; transform: translateX(-50%); }
+        .point.top.destination::after { top: 56%; }
+        .point.bottom.destination::after { bottom: 56%; }
+        .target.last { background: color-mix(in srgb, var(--selected) 16%, transparent); }
+        .target:focus-visible { z-index: 8; outline: 3px solid var(--focus); outline-offset: -3px; }
+        .bar-target { z-index: 3; grid-column: 8; justify-content: center; }
+        .bar-target.top { grid-row: 1; align-items: flex-start; }
+        .bar-target.bottom { grid-row: 2; align-items: flex-end; }
+        .bar-target .stack { right: 3%; left: 3%; height: 72%; }
+        .off-tray {
+            z-index: 3; margin: 3px 2px; justify-content: center;
+            border: 1px solid rgba(58,27,18,.38); border-radius: 3px;
+            background: rgba(79,40,28,.30);
+        }
+        .off-tray.computer { grid-column: 1; grid-row: 1; align-items: flex-start; }
+        .off-tray.human { grid-column: 15; grid-row: 2; align-items: flex-end; }
+        .off-stack {
+            display: flex; width: 74%; height: 94%; align-items: center; pointer-events: none;
+        }
+        .off-tray.computer .off-stack { flex-direction: column; }
+        .off-tray.human .off-stack { flex-direction: column-reverse; }
+        .off-checker {
+            position: relative; width: 100%; height: 7px; min-height: 3px; flex: 0 0 auto;
+            border: 1px solid rgba(48,29,22,.58); border-radius: 4px;
+        }
+        .off-checker.human { background: #eee4cf; }
+        .off-checker.computer { background: #26211f; }
+        .off-checker + .off-checker { margin-top: 1px; }
+        .off-tray.human .off-checker + .off-checker { margin-top: 0; margin-bottom: 1px; }
+        .off-count {
+            position: absolute; z-index: 4; right: 0; left: 0; color: #fff5e8;
+            font-size: .56rem; font-weight: 850; text-align: center; text-shadow: 0 1px 2px #2d1710;
+        }
+        .off-tray.computer .off-count { top: 4px; }
+        .off-tray.human .off-count { bottom: 4px; }
+        .cube {
+            z-index: 7; display: grid; grid-column: 8; grid-row: 1 / 3; width: clamp(22px, 6.5vw, 30px);
+            aspect-ratio: 1; align-self: center; justify-self: center; border: 1px solid #8f8068;
+            border-radius: 5px; place-items: center; color: #3b3027; background: #f2e7cf;
+            box-shadow: 0 2px 5px rgba(38,18,10,.45); font-family: var(--font-display);
+            font-size: clamp(.62rem, 2.1vw, .82rem); font-weight: 850; pointer-events: none;
+            transition: align-self .18s ease, margin .18s ease;
+        }
+        .cube.owner-human { align-self: end; margin-bottom: 18%; }
+        .cube.owner-computer { align-self: start; margin-top: 18%; }
+        .cube.crawford { opacity: .38; }
+        .dice-rack {
+            position: absolute; z-index: 9; top: 50%; left: 72%; display: flex; gap: 4px;
+            transform: translate(-50%, -50%); pointer-events: none;
+        }
+        .dice-rack.computer { left: 28%; }
+        .die {
+            display: grid; width: clamp(22px, 7vw, 30px); aspect-ratio: 1;
+            grid-template: repeat(3, 1fr) / repeat(3, 1fr); padding: 4px;
+            border: 1px solid rgba(59,43,34,.48); border-radius: 6px;
+            background: #f8f0df; box-shadow: 0 2px 5px rgba(40,19,10,.38);
+        }
+        .die.used { opacity: .32; transform: scale(.88); }
+        .pip { width: 4px; height: 4px; align-self: center; justify-self: center; border-radius: 50%; background: #302723; }
+        .actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 9px; }
+        .actions[hidden], .actions button[hidden] { display: none; }
+        .turn-action {
+            min-height: var(--control-h); padding: 0 12px; border: 1px solid var(--border-strong);
+            border-radius: var(--radius-sm); color: var(--ink); background: var(--bg-surface);
+            font-weight: 740;
+        }
+        .turn-action.primary { border-color: var(--accent); color: var(--accent-ink); background: var(--accent); }
+        .turn-action.danger { color: var(--danger); }
+        .actions.single { grid-template-columns: 1fr; }
+        .match-note {
+            min-height: 18px; margin: 7px 2px 0; color: var(--ink-faint);
+            font-size: .63rem; line-height: 1.35; text-align: center;
+        }
+        @media (max-width: 340px) {
+            .toolbar { gap: 4px; }
+            .action { padding-inline: 8px; font-size: .78rem; }
+            select { min-width: 84px; padding-left: 7px; font-size: .8rem; }
+            .player-score { gap: 4px; padding-inline: 6px; }
+            .match-center { min-width: 59px; padding-inline: 4px; }
+            .score-number { font-size: 1.45rem; }
+            .score-name { font-size: .68rem; }
+            .match-point { width: 7px; }
+            .status { font-size: .78rem; }
+            .board { border-width: 4px; }
+            .die { padding: 3px; }
+            .pip { width: 3px; height: 3px; }
+            .turn-action { padding-inline: 8px; font-size: .82rem; }
+        }
+    </style>
+    <div class="toolbar">
+        <label><span class="difficulty-label"></span><select class="difficulty"><option value="easy"></option><option value="medium"></option><option value="hard"></option></select></label>
+        <button class="action undo" type="button"></button>
+        <button class="action new-match" type="button"></button>
+    </div>
+    <p class="warning" hidden></p>
+    <div class="scoreboard" aria-live="polite">
+        <div class="player-score human">
+            <strong class="score-number human-score">0</strong>
+            <span class="score-copy"><span class="score-name you-label"></span><span class="match-points human-points"></span></span>
+        </div>
+        <div class="match-center">
+            <span class="game-number"></span>
+            <span class="match-label"></span>
+            <span class="crawford" hidden></span>
+        </div>
+        <div class="player-score computer">
+            <span class="score-copy"><span class="score-name opponent-label"></span><span class="match-points computer-points"></span></span>
+            <strong class="score-number computer-score">0</strong>
+        </div>
+    </div>
+    <div class="status" role="status" aria-live="polite"></div>
+    <div class="board" role="grid">
+        <div class="bar-rail" aria-hidden="true"></div>
+        <div class="cube" aria-hidden="true">1</div>
+        <div class="dice-rack" aria-hidden="true"></div>
+    </div>
+    <div class="actions">
+        <button class="turn-action primary roll" type="button"></button>
+        <button class="turn-action double" type="button"></button>
+        <button class="turn-action primary take" type="button"></button>
+        <button class="turn-action danger pass-cube" type="button"></button>
+        <button class="turn-action primary next-game" type="button"></button>
+    </div>
+    <p class="match-note"></p>
+</template>
+
+<script>
+OfflineGames.wasm.defineElement('backgammon', 'backgammon-game', class extends HTMLElement {
+    constructor() {
+        super()
+        this.attachShadow({mode: 'open'}).append(document.getElementById('backgammon-game-template').content.cloneNode(true))
+        this.initialized = false
+        this.worker = null
+        this.requestId = 0
+        this.thinking = false
+        this.aiFailed = false
+        this.aiTimer = null
+        this.passTimer = null
+        this.notice = null
+        this.path = []
+        this.candidates = []
+        this.selectedFrom = null
+        this.legalCache = null
+    }
+
+    connectedCallback() {
+        if (!this.initialized) {
+            this.initialized = true
+            this.engine = OfflineGames.Backgammon
+            this.i18n = OfflineGames.i18n
+            this.storage = OfflineGames.storage
+            this.buildBoard()
+            this.load()
+            this.bind()
+            this.localize()
+        }
+        this.render()
+        this.resume()
+    }
+
+    disconnectedCallback() {
+        this.cancelAI()
+        this.clearTimers()
+    }
+
+    format(key, values = {}) {
+        let text = this.i18n.t(key)
+        for (const [name, value] of Object.entries(values)) text = text.replaceAll(`{${name}}`, String(value))
+        return text
+    }
+
+    nextRandom(state = this.state) {
+        let value = Number(state.rng) >>> 0
+        if (!value) value = 0x6d2b79f5
+        value ^= value << 13
+        value ^= value >>> 17
+        value ^= value << 5
+        state.rng = value >>> 0
+        return state.rng
+    }
+
+    rollDie(state = this.state) {
+        return this.nextRandom(state) % 6 + 1
+    }
+
+    openingRoll(state) {
+        let dice
+        let attempts = 0
+        do {
+            dice = [this.rollDie(state), this.rollDie(state)]
+            attempts++
+        } while (dice[0] === dice[1])
+        state.dice = dice
+        state.turn = dice[0] > dice[1] ? this.engine.HUMAN : this.engine.AI
+        state.phase = 'move'
+        state.opening = true
+        state.openingRolls = attempts
+    }
+
+    fresh(difficulty = 'medium') {
+        const seed = OfflineGames.runtime.randomSeed() || 0x6d2b79f5
+        const state = {
+            schema: 1,
+            game: 'backgammon',
+            seed,
+            rng: seed,
+            difficulty,
+            target: 5,
+            score: [0, 0],
+            gameNumber: 1,
+            crawford: false,
+            crawfordPlayed: false,
+            position: this.engine.initialPosition(),
+            turn: this.engine.HUMAN,
+            phase: 'move',
+            dice: null,
+            cube: 1,
+            cubeOwner: null,
+            offeredBy: null,
+            opening: true,
+            openingRolls: 1,
+            ply: 0,
+            history: [],
+            lastTurn: null,
+            roundOutcome: null,
+            outcome: null,
+            progress: false,
+        }
+        this.openingRoll(state)
+        return state
+    }
+
+    validPosition(position) {
+        if (!position || !Array.isArray(position.board) || position.board.length !== 24
+            || !Array.isArray(position.bar) || position.bar.length !== 2
+            || !Array.isArray(position.off) || position.off.length !== 2) return false
+        if (!position.board.every(value => Number.isInteger(value) && value >= -15 && value <= 15)) return false
+        if (![...position.bar, ...position.off].every(value => Number.isInteger(value) && value >= 0 && value <= 15)) return false
+        const human = position.board.reduce((sum, value) => sum + Math.max(0, value), 0) + position.bar[0] + position.off[0]
+        const computer = position.board.reduce((sum, value) => sum + Math.max(0, -value), 0) + position.bar[1] + position.off[1]
+        return human === 15 && computer === 15
+    }
+
+    valid(saved) {
+        return saved && saved.schema === 1 && saved.game === 'backgammon'
+            && this.validPosition(saved.position)
+            && ['easy', 'medium', 'hard'].includes(saved.difficulty)
+            && [this.engine.HUMAN, this.engine.AI].includes(saved.turn)
+            && ['roll', 'move', 'pass', 'cube-offered', 'game-over', 'match-over'].includes(saved.phase)
+            && Array.isArray(saved.score) && saved.score.length === 2
+            && saved.score.every(value => Number.isInteger(value) && value >= 0)
+            && Number.isInteger(saved.rng) && Number.isInteger(saved.ply)
+            && Number.isInteger(saved.cube) && saved.cube >= 1 && (saved.cube & (saved.cube - 1)) === 0
+            && [null, this.engine.HUMAN, this.engine.AI].includes(saved.cubeOwner)
+            && [null, this.engine.HUMAN, this.engine.AI].includes(saved.offeredBy)
+            && Array.isArray(saved.history)
+            && (saved.dice == null || Array.isArray(saved.dice) && saved.dice.length === 2
+                && saved.dice.every(value => Number.isInteger(value) && value >= 1 && value <= 6))
+    }
+
+    load() {
+        const saved = this.storage.read('backgammon')
+        this.state = this.valid(saved) ? saved : this.fresh()
+        this.state.target = 5
+        this.state.progress = Boolean(this.state.progress)
+        this.state.roundOutcome ??= null
+        this.state.outcome ??= null
+        this.state.lastTurn ??= null
+        this.state.openingRolls ??= 1
+        this.state.history = this.state.history.filter(entry => entry && entry.state && ['human', 'computer'].includes(entry.actor)).slice(-80)
+        this.clearSelection()
+    }
+
+    coreState() {
+        const {history, ...core} = this.state
+        return JSON.parse(JSON.stringify(core))
+    }
+
+    ensureHistory(actor) {
+        const last = this.state.history.at(-1)
+        if (last?.actor === actor && last.ply === this.state.ply) return
+        this.state.history.push({actor, ply: this.state.ply, state: this.coreState()})
+        if (this.state.history.length > 80) this.state.history.splice(0, this.state.history.length - 80)
+    }
+
+    save() {
+        this.state.progress = this.state.progress || this.state.ply > 0 || this.state.score.some(Boolean)
+        if (!this.storage.write('backgammon', this.state)) this.shadowRoot.querySelector('.warning').hidden = false
+    }
+
+    buildBoard() {
+        const board = this.shadowRoot.querySelector('.board')
+        const pointPlacement = index => {
+            if (index >= 12 && index <= 17) return {row: 1, column: index - 10, edge: 'top'}
+            if (index >= 18) return {row: 1, column: index - 9, edge: 'top'}
+            if (index >= 6) return {row: 2, column: 13 - index, edge: 'bottom'}
+            return {row: 2, column: 14 - index, edge: 'bottom'}
+        }
+        for (let index = 0; index < 24; index++) {
+            const point = document.createElement('button')
+            const placement = pointPlacement(index)
+            point.type = 'button'
+            point.className = `target point ${placement.edge} ${(index + 1) % 2 ? 'dark' : 'light'}`
+            point.dataset.location = String(index)
+            point.style.gridColumn = String(placement.column)
+            point.style.gridRow = String(placement.row)
+            point.setAttribute('role', 'gridcell')
+            const number = document.createElement('span')
+            number.className = 'point-number'
+            number.textContent = String(index + 1)
+            number.setAttribute('aria-hidden', 'true')
+            const stack = document.createElement('span')
+            stack.className = 'stack'
+            stack.setAttribute('aria-hidden', 'true')
+            point.append(number, stack)
+            board.append(point)
+        }
+        for (const [side, edge] of [[this.engine.AI, 'top'], [this.engine.HUMAN, 'bottom']]) {
+            const bar = document.createElement('button')
+            bar.type = 'button'
+            bar.className = `target bar-target ${edge}`
+            bar.dataset.location = String(this.engine.BAR)
+            bar.dataset.side = String(side)
+            bar.setAttribute('role', 'gridcell')
+            const stack = document.createElement('span')
+            stack.className = 'stack'
+            stack.setAttribute('aria-hidden', 'true')
+            bar.append(stack)
+            board.append(bar)
+        }
+        for (const [side, name] of [[this.engine.AI, 'computer'], [this.engine.HUMAN, 'human']]) {
+            const off = document.createElement('button')
+            off.type = 'button'
+            off.className = `target off-tray ${name}`
+            off.dataset.location = String(this.engine.OFF)
+            off.dataset.side = String(side)
+            off.setAttribute('role', 'gridcell')
+            const stack = document.createElement('span')
+            stack.className = 'off-stack'
+            stack.setAttribute('aria-hidden', 'true')
+            const count = document.createElement('span')
+            count.className = 'off-count'
+            count.setAttribute('aria-hidden', 'true')
+            off.append(stack, count)
+            board.append(off)
+        }
+    }
+
+    bind() {
+        const shadow = this.shadowRoot
+        shadow.querySelector('.board').addEventListener('click', event => {
+            const target = event.target.closest('.target')
+            if (target) this.tap(Number(target.dataset.location), target.dataset.side == null ? null : Number(target.dataset.side))
+        })
+        shadow.querySelector('.difficulty').addEventListener('change', event => {
+            this.state.difficulty = event.target.value
+            this.save()
+        })
+        shadow.querySelector('.undo').addEventListener('click', () => this.undo())
+        shadow.querySelector('.new-match').addEventListener('click', () => this.newMatch())
+        shadow.querySelector('.roll').addEventListener('click', () => this.humanRoll())
+        shadow.querySelector('.double').addEventListener('click', () => this.humanDouble())
+        shadow.querySelector('.take').addEventListener('click', () => this.takeCube())
+        shadow.querySelector('.pass-cube').addEventListener('click', () => this.passCube())
+        shadow.querySelector('.next-game').addEventListener('click', () => this.nextGame())
+    }
+
+    localize() {
+        const shadow = this.shadowRoot
+        shadow.querySelector('.difficulty-label').textContent = this.i18n.t('difficulty')
+        for (const option of shadow.querySelectorAll('.difficulty option')) option.textContent = this.i18n.t(option.value)
+        shadow.querySelector('.undo').textContent = this.i18n.t('undo')
+        shadow.querySelector('.new-match').textContent = this.i18n.t('backgammonNewMatch')
+        shadow.querySelector('.roll').textContent = this.i18n.t('backgammonRoll')
+        shadow.querySelector('.double').textContent = this.i18n.t('backgammonDouble')
+        shadow.querySelector('.take').textContent = this.i18n.t('backgammonTake')
+        shadow.querySelector('.pass-cube').textContent = this.i18n.t('backgammonPass')
+        shadow.querySelector('.next-game').textContent = this.i18n.t('backgammonNextGame')
+        shadow.querySelector('.you-label').textContent = this.i18n.t('you')
+        shadow.querySelector('.opponent-label').textContent = this.i18n.t('opponent')
+        shadow.querySelector('.match-label').textContent = this.i18n.t('backgammonFivePoint')
+        shadow.querySelector('.crawford').textContent = this.i18n.t('backgammonCrawford')
+        shadow.querySelector('.warning').textContent = this.i18n.t('storageWarning')
+    }
+
+    clearSelection() {
+        this.path = []
+        this.candidates = []
+        this.selectedFrom = null
+        this.legalCache = null
+    }
+
+    legalKey() {
+        return this.state.phase === 'move' && this.state.dice
+            ? `${this.state.turn}:${this.state.dice.join(',')}:${this.state.position.board.join(',')}:${this.state.position.bar}:${this.state.position.off}`
+            : ''
+    }
+
+    legalTurns() {
+        const key = this.legalKey()
+        if (!key) return []
+        if (this.legalCache?.key !== key) {
+            this.legalCache = {key, turns: this.engine.legalTurns(this.state.position, this.state.turn, this.state.dice)}
+        }
+        return this.legalCache.turns
+    }
+
+    tap(location, targetSide) {
+        if (this.thinking || this.aiFailed || this.state.phase !== 'move' || this.state.turn !== this.engine.HUMAN) return
+        if ((location === this.engine.BAR || location === this.engine.OFF) && targetSide !== this.engine.HUMAN) return
+        if (!this.candidates.length) this.candidates = this.legalTurns()
+        const stepIndex = this.path.length
+        const sources = new Set(this.candidates.map(turn => turn.steps[stepIndex]?.from).filter(value => value != null))
+
+        if (this.selectedFrom == null) {
+            if (sources.has(location)) {
+                this.selectedFrom = location
+                this.notice = null
+            } else {
+                this.notice = 'backgammonChooseChecker'
+            }
+            this.render()
+            return
+        }
+
+        const matching = this.candidates.filter(turn => {
+            const step = turn.steps[stepIndex]
+            return step?.from === this.selectedFrom && step.to === location
+        })
+        if (!matching.length) {
+            if (sources.has(location)) {
+                this.selectedFrom = location
+                this.notice = null
+            } else if (location === this.selectedFrom) {
+                this.selectedFrom = null
+                this.notice = null
+            } else {
+                this.notice = 'backgammonChooseDestination'
+            }
+            this.render()
+            return
+        }
+
+        this.path.push(matching[0].steps[stepIndex])
+        this.candidates = matching
+        this.selectedFrom = null
+        this.notice = null
+        if (this.path.length === matching[0].steps.length) this.commitHuman(matching[0])
+        else this.render()
+    }
+
+    ensureHumanHistory() {
+        this.ensureHistory('human')
+    }
+
+    humanRoll() {
+        if (this.state.turn !== this.engine.HUMAN || this.state.phase !== 'roll') return
+        this.ensureHumanHistory()
+        this.notice = null
+        this.rollIntoMove(this.engine.HUMAN)
+    }
+
+    rollIntoMove(side) {
+        this.state.dice = [this.rollDie(), this.rollDie()]
+        this.state.phase = 'move'
+        this.clearSelection()
+        const legal = this.legalTurns()
+        if (!legal.length) {
+            this.state.phase = 'pass'
+            this.notice = side === this.engine.HUMAN ? 'backgammonYouBlocked' : 'backgammonAiBlocked'
+            this.save()
+            this.render()
+            this.schedulePass(side)
+            return false
+        }
+        this.save()
+        this.render()
+        return true
+    }
+
+    commitHuman(turn) {
+        this.ensureHumanHistory()
+        const applied = this.engine.applyTurn(this.state.position, this.engine.HUMAN, this.state.dice, turn.steps)
+        this.finishTurn(applied, this.engine.HUMAN)
+    }
+
+    finishTurn(turn, side) {
+        const dice = this.state.dice.slice()
+        this.state.position = turn.position
+        this.state.lastTurn = {side, dice, steps: turn.steps}
+        this.state.ply++
+        this.state.opening = false
+        this.state.dice = null
+        this.state.offeredBy = null
+        this.clearSelection()
+        this.notice = null
+        this.aiFailed = false
+        if (turn.outcome) {
+            this.finishGame(turn.outcome.winner, turn.outcome.kind, turn.outcome.multiplier, false)
+            return
+        }
+        this.state.turn = this.engine.other(side)
+        this.state.phase = 'roll'
+        this.save()
+        this.render()
+        this.resume()
+    }
+
+    schedulePass(side) {
+        clearTimeout(this.passTimer)
+        this.passTimer = setTimeout(() => {
+            this.passTimer = null
+            if (this.state.phase === 'pass' && this.state.turn === side) this.finishPass(side)
+        }, 650)
+    }
+
+    finishPass(side) {
+        this.state.lastTurn = {side, dice: this.state.dice?.slice() || [], steps: [], pass: true}
+        this.state.ply++
+        this.state.opening = false
+        this.state.dice = null
+        this.state.turn = this.engine.other(side)
+        this.state.phase = 'roll'
+        this.notice = null
+        this.clearSelection()
+        this.save()
+        this.render()
+        this.resume()
+    }
+
+    canDouble(side) {
+        return this.state.phase === 'roll' && this.state.turn === side && !this.state.opening
+            && !this.state.crawford && this.state.cube < 64
+            && (this.state.cubeOwner == null || this.state.cubeOwner === side)
+    }
+
+    humanDouble() {
+        if (!this.canDouble(this.engine.HUMAN)) return
+        this.ensureHumanHistory()
+        this.state.phase = 'cube-offered'
+        this.state.offeredBy = this.engine.HUMAN
+        this.notice = null
+        this.save()
+        this.render()
+        this.scheduleAI(380)
+    }
+
+    shouldAIDouble() {
+        if (!this.canDouble(this.engine.AI)) return false
+        const value = this.engine.evaluate(this.state.position, this.engine.AI)
+        const matchPressure = this.state.target - this.state.score[this.engine.AI] <= this.state.cube ? -70 : 0
+        return value >= 170 + matchPressure
+    }
+
+    aiTakesCube() {
+        const value = this.engine.evaluate(this.state.position, this.engine.AI)
+        const mustFight = this.state.target - this.state.score[this.engine.HUMAN] <= this.state.cube
+        return value >= (mustFight ? -620 : -440)
+    }
+
+    resolveAICube() {
+        if (this.state.phase !== 'cube-offered' || this.state.offeredBy !== this.engine.HUMAN) return
+        if (this.aiTakesCube()) {
+            this.state.cube *= 2
+            this.state.cubeOwner = this.engine.AI
+            this.state.offeredBy = null
+            this.state.phase = 'roll'
+            this.notice = 'backgammonAiTakes'
+            this.save()
+            this.render()
+        } else {
+            this.finishGame(this.engine.HUMAN, 'drop', 1, true)
+        }
+    }
+
+    takeCube() {
+        if (this.state.phase !== 'cube-offered' || this.state.offeredBy !== this.engine.AI) return
+        this.ensureHumanHistory()
+        this.state.cube *= 2
+        this.state.cubeOwner = this.engine.HUMAN
+        this.state.offeredBy = null
+        this.state.phase = 'roll'
+        this.notice = 'backgammonYouTake'
+        this.save()
+        this.render()
+        this.resume()
+    }
+
+    passCube() {
+        if (this.state.phase !== 'cube-offered' || this.state.offeredBy !== this.engine.AI) return
+        this.ensureHumanHistory()
+        this.finishGame(this.engine.AI, 'drop', 1, true)
+    }
+
+    finishGame(winner, kind, multiplier, dropped) {
+        const points = this.state.cube * multiplier
+        this.state.score[winner] += points
+        this.state.roundOutcome = {winner, kind, multiplier, points, dropped, cube: this.state.cube}
+        this.state.dice = null
+        this.state.offeredBy = null
+        this.state.progress = true
+        if (this.state.score[winner] >= this.state.target) {
+            this.state.phase = 'match-over'
+            this.state.outcome = {winner, reason: 'match'}
+        } else {
+            this.state.phase = 'game-over'
+            this.state.outcome = null
+        }
+        this.cancelAI(false)
+        this.clearTimers()
+        this.clearSelection()
+        this.save()
+        this.render()
+    }
+
+    nextGame() {
+        if (this.state.phase !== 'game-over') return
+        const crawford = !this.state.crawfordPlayed
+            && this.state.score.some(score => score === this.state.target - 1)
+        if (crawford) this.state.crawfordPlayed = true
+        this.state.gameNumber++
+        this.state.crawford = crawford
+        this.state.position = this.engine.initialPosition()
+        this.state.cube = 1
+        this.state.cubeOwner = null
+        this.state.offeredBy = null
+        this.state.ply = 0
+        this.state.history = []
+        this.state.lastTurn = null
+        this.state.roundOutcome = null
+        this.state.outcome = null
+        this.state.dice = null
+        this.state.progress = true
+        this.openingRoll(this.state)
+        this.clearSelection()
+        this.notice = null
+        this.save()
+        this.render()
+        this.resume()
+    }
+
+    newMatch() {
+        if ((this.state.progress || this.state.score.some(Boolean)) && !confirm(this.i18n.t('backgammonConfirmNewMatch'))) return
+        const difficulty = this.state.difficulty
+        this.cancelAI()
+        this.clearTimers()
+        this.state = this.fresh(difficulty)
+        this.clearSelection()
+        this.notice = null
+        this.aiFailed = false
+        this.save()
+        this.render()
+        this.resume()
+    }
+
+    resume() {
+        if (!this.isConnected) return
+        if (this.state.phase === 'pass') {
+            this.schedulePass(this.state.turn)
+            return
+        }
+        if (this.state.phase === 'cube-offered' && this.state.offeredBy === this.engine.HUMAN) {
+            this.scheduleAI(380)
+            return
+        }
+        if (this.state.turn === this.engine.AI && ['roll', 'move'].includes(this.state.phase)) this.scheduleAI()
+    }
+
+    scheduleAI(delay = 220) {
+        if (this.aiTimer || this.thinking) return
+        this.aiTimer = setTimeout(() => {
+            this.aiTimer = null
+            this.runAI()
+        }, delay)
+    }
+
+    runAI() {
+        if (this.state.phase === 'cube-offered' && this.state.offeredBy === this.engine.HUMAN) {
+            this.resolveAICube()
+            return
+        }
+        if (this.state.turn !== this.engine.AI || !['roll', 'move'].includes(this.state.phase)) return
+        this.ensureHistory('computer')
+        if (this.state.phase === 'roll') {
+            if (this.shouldAIDouble()) {
+                this.state.phase = 'cube-offered'
+                this.state.offeredBy = this.engine.AI
+                this.notice = null
+                this.save()
+                this.render()
+                return
+            }
+            if (!this.rollIntoMove(this.engine.AI)) return
+        }
+        this.requestAI()
+    }
+
+    requestAI() {
+        this.cancelAI()
+        this.thinking = true
+        this.aiFailed = false
+        const id = ++this.requestId
+        const position = this.engine.clonePosition(this.state.position)
+        const dice = this.state.dice.slice()
+        this.worker = OfflineGames.runtime.createWorker('backgammon-worker-payload')
+        this.worker.onmessage = event => {
+            if (event.data.id !== id || !this.thinking) return
+            this.cancelAI(false)
+            if (event.data.error) {
+                this.aiFailed = true
+                this.render()
+                return
+            }
+            const legal = this.legalTurns()
+            const turn = legal.find(candidate => this.engine.sameTurn(candidate, event.data.turn))
+            if (!turn) {
+                this.aiFailed = true
+                this.render()
+                return
+            }
+            const applied = this.engine.applyTurn(position, this.engine.AI, dice, turn.steps)
+            this.finishTurn(applied, this.engine.AI)
+        }
+        this.worker.onerror = error => {
+            console.error(error)
+            this.cancelAI(false)
+            this.aiFailed = true
+            this.render()
+        }
+        this.worker.postMessage({
+            id,
+            position,
+            side: this.engine.AI,
+            dice,
+            difficulty: this.state.difficulty,
+            seed: OfflineGames.runtime.moveSeed(this.state.seed, this.state.gameNumber * 128 + this.state.ply),
+        })
+        this.save()
+        this.render()
+    }
+
+    cancelAI(invalidate = true) {
+        if (invalidate) this.requestId++
+        if (this.worker) this.worker.terminate()
+        this.worker = null
+        this.thinking = false
+    }
+
+    clearTimers() {
+        clearTimeout(this.aiTimer)
+        clearTimeout(this.passTimer)
+        this.aiTimer = null
+        this.passTimer = null
+    }
+
+    undo() {
+        let index = -1
+        for (let current = this.state.history.length - 1; current >= 0; current--) {
+            if (this.state.history[current].actor === 'human') {
+                index = current
+                break
+            }
+        }
+        if (index < 0) return
+        this.cancelAI()
+        this.clearTimers()
+        const history = this.state.history.slice(0, index)
+        this.state = {...JSON.parse(JSON.stringify(this.state.history[index].state)), history}
+        this.clearSelection()
+        this.notice = null
+        this.aiFailed = false
+        this.save()
+        this.render()
+        this.resume()
+    }
+
+    statusText() {
+        if (this.state.phase === 'match-over') {
+            return this.i18n.t(this.state.outcome?.winner === this.engine.HUMAN
+                ? 'backgammonMatchYouWin' : 'backgammonMatchAiWins')
+        }
+        if (this.state.phase === 'game-over') {
+            const result = this.state.roundOutcome
+            const side = result.winner === this.engine.HUMAN ? 'You' : 'Ai'
+            const kind = result.kind === 'drop' ? 'Drop'
+                : result.kind === 'gammon' ? 'Gammon'
+                    : result.kind === 'backgammon' ? 'Backgammon' : 'Regular'
+            return this.format(`backgammon${side}${kind}`, {points: result.points})
+        }
+        if (this.state.phase === 'cube-offered') {
+            return this.state.offeredBy === this.engine.AI
+                ? this.format('backgammonAiOffers', {value: this.state.cube * 2})
+                : this.format('backgammonYouOffer', {value: this.state.cube * 2})
+        }
+        if (this.aiFailed) return this.i18n.t('backgammonAiUnavailable')
+        if (this.thinking) return this.i18n.t('aiThinking')
+        if (this.state.phase === 'pass') return this.i18n.t(this.notice || 'backgammonYouBlocked')
+        if (this.notice) return this.i18n.t(this.notice)
+        if (this.state.opening && this.state.phase === 'move') {
+            return this.format(this.state.turn === this.engine.HUMAN
+                ? 'backgammonOpeningYou' : 'backgammonOpeningAi', {
+                human: this.state.dice[0], computer: this.state.dice[1],
+            })
+        }
+        if (this.state.turn === this.engine.AI) return this.i18n.t('aiThinking')
+        if (this.state.phase === 'roll') return this.i18n.t(this.canDouble(this.engine.HUMAN)
+            ? 'backgammonRollOrDouble' : 'backgammonRollPrompt')
+        if (this.selectedFrom != null) return this.i18n.t('backgammonChooseDestination')
+        if (this.path.length) return this.i18n.t('backgammonContinueTurn')
+        return this.i18n.t('backgammonChooseChecker')
+    }
+
+    pointLabel(location, position, side, count, classes) {
+        const states = []
+        if (count) states.push(this.format(side === this.engine.HUMAN ? 'backgammonYourCheckers' : 'backgammonAiCheckers', {count}))
+        else states.push(this.i18n.t('empty'))
+        if (classes.movable) states.push(this.i18n.t('selected'))
+        if (classes.destination) states.push(this.i18n.t('legalMove'))
+        return this.format('backgammonPointLabel', {point: location + 1, state: states.join(', ')})
+    }
+
+    fillCheckers(target, count, side) {
+        const stack = target.querySelector('.stack')
+        if (!stack) return
+        stack.replaceChildren()
+        const shown = Math.min(count, 5)
+        for (let index = 0; index < shown; index++) {
+            const checker = document.createElement('span')
+            checker.className = `checker ${side === this.engine.HUMAN ? 'human' : 'computer'}`
+            if (index === shown - 1 && count > 5) checker.textContent = String(count)
+            stack.append(checker)
+        }
+    }
+
+    renderBoard() {
+        const legal = this.state.phase === 'move' ? this.legalTurns() : []
+        if (!this.candidates.length && !this.path.length) this.candidates = legal
+        const display = this.path.length
+            ? this.engine.preview(this.state.position, this.engine.HUMAN, this.path)
+            : this.state.position
+        const stepIndex = this.path.length
+        const sources = new Set(this.state.turn === this.engine.HUMAN && this.state.phase === 'move' && this.selectedFrom == null
+            ? this.candidates.map(turn => turn.steps[stepIndex]?.from).filter(value => value != null) : [])
+        const destinations = new Set(this.selectedFrom == null ? [] : this.candidates
+            .filter(turn => turn.steps[stepIndex]?.from === this.selectedFrom)
+            .map(turn => turn.steps[stepIndex].to))
+        const lastLocations = new Set((this.state.lastTurn?.steps || []).flatMap(step => [step.from, step.to]))
+        const current = this.path.at(-1)?.to ?? this.selectedFrom
+
+        for (const target of this.shadowRoot.querySelectorAll('.target')) {
+            const location = Number(target.dataset.location)
+            const restrictedSide = target.dataset.side == null ? null : Number(target.dataset.side)
+            const value = location < 24 ? display.board[location] : 0
+            const side = restrictedSide ?? (value > 0 ? this.engine.HUMAN : value < 0 ? this.engine.AI : null)
+            const count = side == null ? 0 : this.engine.countAt(display, location, side)
+            const movable = sources.has(location) && (restrictedSide == null || restrictedSide === this.engine.HUMAN)
+            const destination = destinations.has(location) && (restrictedSide == null || restrictedSide === this.engine.HUMAN)
+            target.classList.toggle('movable', movable)
+            target.classList.toggle('selected', current === location && (restrictedSide == null || restrictedSide === this.engine.HUMAN))
+            target.classList.toggle('destination', destination)
+            target.classList.toggle('last', lastLocations.has(location))
+            target.setAttribute('aria-selected', String(current === location))
+            target.setAttribute('aria-disabled', String(this.thinking || this.state.phase !== 'move'))
+            if (location < 24) {
+                target.setAttribute('aria-label', this.pointLabel(location, display, side, count, {movable, destination}))
+                this.fillCheckers(target, count, side)
+            } else if (location === this.engine.BAR) {
+                target.setAttribute('aria-label', this.format(side === this.engine.HUMAN ? 'backgammonYourBar' : 'backgammonAiBar', {count}))
+                this.fillCheckers(target, count, side)
+            } else {
+                target.setAttribute('aria-label', this.format(side === this.engine.HUMAN ? 'backgammonYourOff' : 'backgammonAiOff', {count}))
+                const stack = target.querySelector('.off-stack')
+                stack.replaceChildren(...Array.from({length: Math.min(count, 10)}, () => {
+                    const checker = document.createElement('span')
+                    checker.className = `off-checker ${side === this.engine.HUMAN ? 'human' : 'computer'}`
+                    return checker
+                }))
+                target.querySelector('.off-count').textContent = count ? String(count) : ''
+            }
+        }
+        this.shadowRoot.querySelector('.board').setAttribute('aria-label', this.i18n.t('backgammonBoard'))
+    }
+
+    renderDice() {
+        const rack = this.shadowRoot.querySelector('.dice-rack')
+        rack.className = `dice-rack ${this.state.turn === this.engine.AI ? 'computer' : 'human'}`
+        rack.replaceChildren()
+        if (!this.state.dice || !['move', 'pass'].includes(this.state.phase)) return
+        const faces = this.state.dice[0] === this.state.dice[1]
+            ? Array(4).fill(this.state.dice[0]) : this.state.dice.slice()
+        const consumed = new Map()
+        for (const step of this.path) consumed.set(step.die, (consumed.get(step.die) || 0) + 1)
+        const used = new Map()
+        const pips = {
+            1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8],
+            5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8],
+        }
+        for (const value of faces) {
+            const die = document.createElement('span')
+            die.className = 'die'
+            const already = used.get(value) || 0
+            if (already < (consumed.get(value) || 0)) {
+                die.classList.add('used')
+                used.set(value, already + 1)
+            }
+            die.setAttribute('aria-label', this.format('backgammonDie', {value}))
+            for (const index of pips[value]) {
+                const pip = document.createElement('span')
+                pip.className = 'pip'
+                pip.style.gridArea = `${Math.floor(index / 3) + 1} / ${index % 3 + 1}`
+                die.append(pip)
+            }
+            rack.append(die)
+        }
+    }
+
+    renderScore() {
+        const shadow = this.shadowRoot
+        shadow.querySelector('.human-score').textContent = String(this.state.score[this.engine.HUMAN])
+        shadow.querySelector('.computer-score').textContent = String(this.state.score[this.engine.AI])
+        for (const [side, container] of [[this.engine.HUMAN, '.human-points'], [this.engine.AI, '.computer-points']]) {
+            shadow.querySelector(container).replaceChildren(...Array.from({length: this.state.target}, (_, index) => {
+                const point = document.createElement('span')
+                point.className = 'match-point'
+                point.classList.toggle('filled', index < this.state.score[side])
+                return point
+            }))
+        }
+        shadow.querySelector('.player-score.human').classList.toggle('active', this.state.turn === this.engine.HUMAN && !this.state.roundOutcome)
+        shadow.querySelector('.player-score.computer').classList.toggle('active', this.state.turn === this.engine.AI && !this.state.roundOutcome)
+        shadow.querySelector('.game-number').textContent = this.format('backgammonGameNumber', {number: this.state.gameNumber})
+        shadow.querySelector('.crawford').hidden = !this.state.crawford
+    }
+
+    renderActions() {
+        const shadow = this.shadowRoot
+        const actions = shadow.querySelector('.actions')
+        const show = selector => shadow.querySelector(selector)
+        const roll = this.state.turn === this.engine.HUMAN && this.state.phase === 'roll'
+        const double = this.canDouble(this.engine.HUMAN)
+        const offered = this.state.phase === 'cube-offered' && this.state.offeredBy === this.engine.AI
+        const next = this.state.phase === 'game-over'
+        show('.roll').hidden = !roll
+        show('.double').hidden = !double
+        show('.take').hidden = !offered
+        show('.pass-cube').hidden = !offered
+        show('.next-game').hidden = !next
+        const visible = [roll, double, offered, offered, next].filter(Boolean).length
+        actions.hidden = visible === 0
+        actions.classList.toggle('single', visible === 1)
+    }
+
+    render() {
+        this.renderScore()
+        this.renderBoard()
+        this.renderDice()
+        this.renderActions()
+        const shadow = this.shadowRoot
+        shadow.querySelector('.difficulty').value = this.state.difficulty
+        shadow.querySelector('.undo').disabled = !this.state.history.some(entry => entry.actor === 'human')
+        const status = shadow.querySelector('.status')
+        status.textContent = this.statusText()
+        status.classList.toggle('thinking', this.thinking || this.state.offeredBy === this.engine.HUMAN)
+        const cube = shadow.querySelector('.cube')
+        cube.textContent = String(this.state.cube)
+        cube.className = 'cube'
+        if (this.state.cubeOwner === this.engine.HUMAN) cube.classList.add('owner-human')
+        if (this.state.cubeOwner === this.engine.AI) cube.classList.add('owner-computer')
+        cube.classList.toggle('crawford', this.state.crawford)
+        shadow.querySelector('.match-note').textContent = this.state.crawford
+            ? this.i18n.t('backgammonCrawfordNote')
+            : this.format('backgammonCubeNote', {value: this.state.cube})
+    }
+})
+</script>

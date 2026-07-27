@@ -10,6 +10,7 @@ A mobile-first bilingual collection of classic board and puzzle games that remai
 - Full orthodox Chess against an on-device AI
 - Reversi with legal-move hints and a mobility-aware on-device AI
 - English Draughts with compulsory multi-jumps and an on-device AI
+- Five-point Backgammon with the doubling cube, Crawford rule, and expectiminimax AI
 - Huarong Dao with three layouts and optimal on-device path hints
 - Minesweeper with confirmation-first mobile controls and irreversible reveals
 - Klondike Solitaire with draw-one and draw-three play
@@ -84,3 +85,7 @@ All application URLs and service-worker resources are relative, so the site also
 ## License
 
 [MIT](LICENSE) © 2026 ylxdzsw
+
+The Backgammon rules engine includes the BSD-2-Clause `backgammon` crate. Its
+copyright and license text are preserved in
+[`games/backgammon/THIRD_PARTY_LICENSE`](games/backgammon/THIRD_PARTY_LICENSE).

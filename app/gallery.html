@@ -36,6 +36,7 @@
     .game-gallery article[data-game="chess"]   .preview { color: var(--ink); background: color-mix(in srgb, var(--board-dark) 35%, var(--bg-elevated)); }
     .game-gallery article[data-game="reversi"] .preview { color: var(--stone-white); background: color-mix(in srgb, var(--board-felt) 70%, var(--bg-elevated)); }
     .game-gallery article[data-game="checkers"] .preview { color: var(--piece-white); background: color-mix(in srgb, var(--board-dark) 48%, var(--bg-elevated)); }
+    .game-gallery article[data-game="backgammon"] .preview { color: #f4e6cf; background: color-mix(in srgb, #a75c42 68%, var(--bg-elevated)); }
     .game-gallery article[data-game="huarong"] .preview { color: var(--piece-red); background: color-mix(in srgb, var(--board-wood) 62%, var(--bg-elevated)); }
     .game-gallery article[data-game="minesweeper"] .preview { color: var(--ink); background: color-mix(in srgb, var(--selected) 14%, var(--bg-elevated)); }
     .game-gallery article[data-game="solitaire"] .preview { color: #fff; background: color-mix(in srgb, #246449 78%, var(--bg-elevated)); }
@@ -137,6 +138,33 @@
     .game-gallery .checkers-mark::after {
         bottom: 7px; left: 7px; border: 1px solid #090b0b;
         background: radial-gradient(circle at 35% 27%, #59605e, #111414 70%);
+    }
+    .game-gallery .backgammon-mark {
+        position: relative; width: 68px; height: 54px; overflow: hidden;
+        border: 3px solid #613628; border-radius: 5px; background: #b8734f;
+        box-shadow: inset 0 0 8px rgba(47,20,12,.28);
+    }
+    .game-gallery .backgammon-mark::before, .game-gallery .backgammon-mark::after {
+        position: absolute; right: 4px; left: 4px; height: 43%; content: "";
+        background: repeating-conic-gradient(from 153deg at 8.333% 0, #e7ba78 0 27deg, #7d3931 28deg 55deg, transparent 56deg 60deg);
+    }
+    .game-gallery .backgammon-mark::before { top: 0; }
+    .game-gallery .backgammon-mark::after { bottom: 0; transform: rotate(180deg); }
+    .game-gallery .backgammon-mark i {
+        position: absolute; z-index: 2; width: 12px; height: 12px; border-radius: 50%;
+        box-shadow: 0 1px 2px rgba(30,12,8,.42);
+    }
+    .game-gallery .backgammon-mark i:nth-child(1), .game-gallery .backgammon-mark i:nth-child(2) {
+        top: 2px; right: 5px; border: 1px solid #8d826e; background: #efe5cf;
+    }
+    .game-gallery .backgammon-mark i:nth-child(2) { top: 12px; }
+    .game-gallery .backgammon-mark i:nth-child(3), .game-gallery .backgammon-mark i:nth-child(4) {
+        bottom: 2px; left: 5px; border: 1px solid #221c1a; background: #342c29;
+    }
+    .game-gallery .backgammon-mark i:nth-child(4) { bottom: 12px; }
+    .game-gallery .backgammon-mark i:nth-child(5) {
+        top: 20px; left: 27px; width: 10px; height: 10px; border: 1px solid #7f735e;
+        border-radius: 3px; background: #f1e6cc;
     }
     .game-gallery .huarong-mark {
         position: relative; width: 52px; height: 64px; border: 2px solid var(--board-wood-edge);
@@ -281,6 +309,7 @@
             chess:   '<span class="chess-mark"><i></i><i></i><i></i><i></i></span>',
             reversi: '<span class="reversi-mark">' + '<i></i>'.repeat(16) + '</span>',
             checkers: '<span class="checkers-mark"></span>',
+            backgammon: '<span class="backgammon-mark"><i></i><i></i><i></i><i></i><i></i></span>',
             huarong: '<span class="huarong-mark"><i class="cao"></i><i class="guan"></i><i class="g1"></i><i class="g2"></i><i class="g3"></i><i class="g4"></i><i class="s1"></i><i class="s2"></i><i class="s3"></i><i class="s4"></i></span>',
             minesweeper: '<span class="minesweeper-mark"><i></i><i class="one">1</i><i class="covered"></i><i class="covered"></i><i></i><i class="one">1</i><i class="two">2</i><i class="covered flag">⚑</i><i></i><i></i><i class="one">1</i><i class="covered"></i><i></i><i></i><i class="one">1</i><i class="covered"></i></span>',
             solitaire: '<span class="solitaire-mark"><i>♥</i><i>♣</i><i>♦</i></span>',

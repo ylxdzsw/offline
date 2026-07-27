@@ -11,6 +11,7 @@ GAMES := \
 	chess \
 	reversi \
 	checkers \
+	backgammon \
 	huarong \
 	minesweeper \
 	solitaire \
