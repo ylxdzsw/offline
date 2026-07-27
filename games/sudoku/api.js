@@ -220,9 +220,14 @@
     const completeBoard = (random = Math.random) => completeBoardFromSeed(seedFrom(random))
     const generate = (difficulty = 'medium', random = Math.random) => generateFromSeed(difficulty, seedFrom(random))
     const isComplete = (board, solution) => {
-        byteArray(board, 'board')
-        byteArray(solution, 'solution')
-        return board.length === solution.length && board.every((value, index) => value === solution[index])
+        const checkedBoard = byteArray(board, 'board')
+        const checkedSolution = byteArray(solution, 'solution')
+        return checkedBoard.length === CELLS
+            && checkedSolution.length === CELLS
+            && !checkedBoard.includes(0)
+            && isValidUnchecked(checkedBoard)
+            && isValidUnchecked(checkedSolution)
+            && checkedBoard.every((value, index) => value === checkedSolution[index])
     }
 
     return {SIZE, BOX, CELLS, DIGITS, CLUES, rowOf, columnOf, boxOf, peers, candidates, conflicts, isValid, solve, completeBoard, generate, isComplete}

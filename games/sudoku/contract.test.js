@@ -54,6 +54,8 @@ test('completion requires the exact generated solution', () => {
     const incomplete = solution.slice()
     incomplete[0] = 0
     assert.equal(engine.isComplete(incomplete, solution), false)
+    assert.equal(engine.isComplete([], []), false)
+    assert.equal(engine.isComplete(Array(81).fill(1), Array(81).fill(1)), false)
 })
 
 test('generation is deterministic and keeps the xorshift zero-seed rule', () => {
