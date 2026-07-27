@@ -117,9 +117,9 @@ mod tests {
     #[test]
     fn curated_layouts_have_increasing_optimal_distances() {
         let result = shortest_hint(&game::layout("easy").unwrap().positions).unwrap();
-        assert_eq!(result.distance, Some(12));
+        assert_eq!(result.distance, Some(64));
         let result = shortest_hint(&game::layout("medium").unwrap().positions).unwrap();
-        assert_eq!(result.distance, Some(28));
+        assert_eq!(result.distance, Some(68));
     }
 
     #[test]
@@ -127,7 +127,7 @@ mod tests {
         let positions = game::layout("hard").unwrap().positions;
         let result = shortest_hint(&positions).unwrap();
         let selected = result.selected.expect("classic layout is solvable");
-        assert!(result.distance.unwrap() > 40);
+        assert_eq!(result.distance, Some(90));
         let piece = positions
             .iter()
             .position(|position| *position == selected.from)

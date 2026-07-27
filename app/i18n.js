@@ -1265,7 +1265,7 @@
                     {
                         title: 'Layouts and controls',
                         items: [
-                            'Open Gate, Crossroads, and Heng Dao Li Ma require optimal solutions of 12, 28, and 74 moves under this move-counting rule.',
+                            'Open Gate, Crossroads, and Heng Dao Li Ma require optimal solutions of 64, 68, and 90 moves under this move-counting rule.',
                             'Tap a block and then a green destination, swipe a block in the desired direction, or focus it and use an arrow key.',
                             'Undo restores one slide. Hint searches the complete reachable position graph in a worker and marks an optimal next slide; progress saves locally.',
                         ],
@@ -1682,7 +1682,7 @@
                     {
                         title: '布局与操作',
                         items: [
-                            '“出口在望”“步步为营”“横刀立马”按本游戏计步规则的最短解分别为 12、28、74 步。',
+                            '“出口在望”“步步为营”“横刀立马”按本游戏计步规则的最短解分别为 64、68、90 步。',
                             '可点选棋子后再点绿色位置，也可直接沿目标方向滑动棋子，或聚焦棋子后使用方向键。',
                             '“悔棋”撤销一步；“提示”会在工作线程中搜索全部可达局面，并标出最优下一步；进度自动保存在本机。',
                         ],

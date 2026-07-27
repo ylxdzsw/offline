@@ -7,9 +7,9 @@ test('curated layouts are valid, distinct, and ordered by solution depth', () =>
     assert.deepEqual(layouts.map(layout => layout.id), ['easy', 'medium', 'hard'])
     assert(layouts.every(layout => engine.validate(layout.positions)))
     assert.equal(new Set(layouts.map(layout => layout.positions.join(','))).size, 3)
-    assert.equal(engine.hint(layouts[0].positions).distance, 12)
-    assert.equal(engine.hint(layouts[1].positions).distance, 28)
-    assert.equal(engine.hint(layouts[2].positions).distance, 74)
+    assert.equal(engine.hint(layouts[0].positions).distance, 64)
+    assert.equal(engine.hint(layouts[1].positions).distance, 68)
+    assert.equal(engine.hint(layouts[2].positions).distance, 90)
 })
 
 test('legal slides apply without mutating the input position', () => {
@@ -26,15 +26,17 @@ test('legal slides apply without mutating the input position', () => {
 test('following optimal hints solves the easy layout', () => {
     let positions = engine.layout('easy').positions
     let steps = 0
-    while (!engine.isSolved(positions) && steps < 20) {
+    while (!engine.isSolved(positions) && steps < 100) {
         const result = engine.hint(positions)
         assert(result.move)
+        assert(engine.rowOf(result.move.from) === engine.rowOf(result.move.to)
+            || engine.columnOf(result.move.from) === engine.columnOf(result.move.to))
         const piece = positions.indexOf(result.move.from)
         assert.notEqual(piece, -1)
         positions = engine.applyMove(positions, piece, result.move.to)
         steps++
     }
-    assert.equal(steps, 12)
+    assert.equal(steps, 64)
     assert(engine.isSolved(positions))
 })
 

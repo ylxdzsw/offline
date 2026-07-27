@@ -562,6 +562,16 @@ test('Huarong Dao hints an optimal slide, moves, persists, reloads, and undoes',
     await expect(page.locator('huarong-game .undo')).toBeEnabled()
     await page.locator('huarong-game .undo').click()
     await expect(page.locator('huarong-game .move-count')).toHaveText('0')
+
+    await page.locator('huarong-game').evaluate(game => {
+        game.state.positions = [8, 18, 0, 1, 2, 3, 10, 11, 14, 17]
+        game.state.history = []
+        game.state.outcome = null
+        game.selected = null
+        game.render()
+    })
+    await page.locator('huarong-game .piece[data-piece="8"]').click()
+    await expect(page.locator('huarong-game .target[data-to="16"]')).toHaveCount(0)
 })
 
 test('Minesweeper confirms reveals, keeps flags reversible, persists, and has no undo', async ({page}) => {

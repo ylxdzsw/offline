@@ -96,7 +96,7 @@ fn destination(position: u8, dx: i8, dy: i8, distance: usize) -> Option<u8> {
     let column = i16::from(position) % WIDTH as i16;
     let next_row = row + i16::from(dy) * distance as i16;
     let next_column = column + i16::from(dx) * distance as i16;
-    if next_row < 0 || next_column < 0 {
+    if next_row < 0 || next_row >= HEIGHT as i16 || next_column < 0 || next_column >= WIDTH as i16 {
         return None;
     }
     u8::try_from(next_row * WIDTH as i16 + next_column).ok()
@@ -186,6 +186,17 @@ mod tests {
         assert!(moves.contains(&Slide { from: 16, to: 17 }));
         assert!(moves.contains(&Slide { from: 16, to: 18 }));
         assert!(!moves.contains(&Slide { from: 16, to: 19 }));
+    }
+
+    #[test]
+    fn horizontal_slides_never_wrap_into_another_row() {
+        let positions = [8, 18, 0, 1, 2, 3, 10, 11, 14, 17];
+        let moves = legal_moves(&positions, 8).unwrap();
+        assert!(!moves.contains(&Slide { from: 14, to: 16 }));
+        assert!(moves.iter().all(|slide| {
+            usize::from(slide.from) / WIDTH == usize::from(slide.to) / WIDTH
+                || usize::from(slide.from) % WIDTH == usize::from(slide.to) % WIDTH
+        }));
     }
 
     #[test]
