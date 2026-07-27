@@ -373,7 +373,17 @@ test('2048 merges, scores, persists, reloads, undoes, and accepts a swipe', asyn
         game.render()
     })
     const board = page.locator('game-2048 .board')
-    await board.press('ArrowLeft')
+    const cue = await board.evaluate(element => {
+        element.dispatchEvent(new KeyboardEvent('keydown', {key: 'ArrowLeft', bubbles: true}))
+        return {
+            className: element.className,
+            merged: getComputedStyle(element.querySelector('.merged')).animationName,
+            spawned: getComputedStyle(element.querySelector('.spawn')).animationName,
+        }
+    })
+    expect(cue.className).toContain('move-left')
+    expect(cue.merged).toBe('slide, merge')
+    expect(cue.spawned).toBe('spawn')
     await expect(page.locator('game-2048 .current-score')).toHaveText('4')
     await expect(page.locator('game-2048 .cell[data-value="4"]')).toHaveCount(1)
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:2048')).history.length)).toBe(1)
