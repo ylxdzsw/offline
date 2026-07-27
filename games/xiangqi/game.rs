@@ -119,6 +119,9 @@ fn push_if_open(moves: &mut Vec<Move>, state: &State, side: u8, from: usize, row
 }
 
 pub fn pseudo_moves_for(state: &State, from: usize) -> Vec<Move> {
+    if from >= state.board.len() {
+        return Vec::new();
+    }
     let moving = state.board[from];
     if moving == 0 {
         return Vec::new();
@@ -337,5 +340,10 @@ mod tests {
         let mv = legal_moves(&state, RED)[0];
         let _ = apply_move(&state, mv);
         assert_eq!(state, before);
+    }
+
+    #[test]
+    fn moves_from_outside_the_board_are_empty() {
+        assert!(pseudo_moves_for(&State::initial(), ROWS * COLS).is_empty());
     }
 }

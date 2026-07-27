@@ -116,16 +116,22 @@ fn move_to(state: &State, mv: Move) -> Value {
     })
 }
 
+fn square_from(value: &Value, key: &str) -> Result<u8, DispatchError> {
+    let index = field(value, key)?
+        .as_u64()
+        .ok_or_else(|| DispatchError::new(format!("invalid move {key}")))?;
+    if index >= (game::ROWS * game::COLS) as u64 {
+        return Err(DispatchError::new(format!("invalid move {key}")));
+    }
+    Ok(index as u8)
+}
+
 fn resolve_move(state: &State, value: &Value) -> Result<Move, DispatchError> {
-    let from = field(value, "from")?
-        .as_u64()
-        .ok_or_else(|| DispatchError::new("invalid move from"))? as u8;
-    let to = field(value, "to")?
-        .as_u64()
-        .ok_or_else(|| DispatchError::new("invalid move to"))? as u8;
-    game::pseudo_moves_for(state, from as usize)
+    let from = square_from(value, "from")?;
+    let to = square_from(value, "to")?;
+    game::legal_moves(state, state.turn)
         .into_iter()
-        .find(|mv| mv.to == to)
+        .find(|mv| mv.from == from && mv.to == to)
         .ok_or_else(|| DispatchError::new("illegal Xiangqi move"))
 }
 
@@ -153,13 +159,7 @@ fn dispatch(request: Value) -> DispatchResult {
         "pseudoMovesFor" | "pseudoMoves" | "legalMoves" => {
             let state = state_from(&request)?;
             let moves = if op == "pseudoMovesFor" {
-                game::pseudo_moves_for(
-                    &state,
-                    field(&request, "from")?
-                        .as_u64()
-                        .ok_or_else(|| DispatchError::new("invalid from"))?
-                        as usize,
-                )
+                game::pseudo_moves_for(&state, square_from(&request, "from")? as usize)
             } else if op == "pseudoMoves" {
                 game::pseudo_moves(&state, state.turn)
             } else {

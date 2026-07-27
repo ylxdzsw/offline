@@ -58,6 +58,10 @@ test('flying generals and self-check are rejected', () => {
     board[engine.at(5, 4)] = 'rR'
     const sideways = engine.legalMoves(board, engine.RED).find(move => move.from === engine.at(5, 4) && move.to === engine.at(5, 3))
     assert.equal(sideways, undefined)
+    assert.throws(
+        () => engine.applyMove(board, {from: engine.at(5, 4), to: engine.at(5, 3)}),
+        /illegal Xiangqi move/,
+    )
 })
 
 test('checkmate, stalemate-as-loss, and threefold draw are distinguished', () => {
