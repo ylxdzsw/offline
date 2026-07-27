@@ -70,6 +70,19 @@
         .cell.revealed {
             border-radius: 0; background: var(--board-paper); box-shadow: none;
         }
+        .cell.just-revealed {
+            animation: minesweeper-reveal .18s ease-out backwards;
+            animation-delay: var(--motion-delay, 0ms);
+        }
+        .cell.flag-change { animation: minesweeper-flag .18s ease-out; }
+        .cell.exploded.just-revealed { animation-name: minesweeper-explode; animation-duration: .28s; }
+        @keyframes minesweeper-reveal {
+            from { opacity: .35; filter: brightness(1.18); transform: scale(.72); }
+        }
+        @keyframes minesweeper-flag { from { opacity: .5; transform: scale(.64); } }
+        @keyframes minesweeper-explode {
+            from { opacity: .25; filter: brightness(1.35); transform: scale(.5); }
+        }
         .cell.selected {
             z-index: 3; transform: scale(.88);
             background: color-mix(in srgb, var(--selected) 22%, var(--bg-surface));
@@ -105,6 +118,10 @@
         .gesture-note {
             margin: 9px auto 0; max-width: 420px; color: var(--ink-faint);
             font-size: .71rem; line-height: 1.45; text-align: center;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .cell { transition: none; }
+            .cell.just-revealed, .cell.flag-change, .cell.exploded.just-revealed { animation: none; }
         }
         @media (max-width: 340px) {
             .toolbar { gap: 5px; }
@@ -149,6 +166,7 @@ customElements.define('minesweeper-game', class extends HTMLElement {
         this.suppressContextUntil = 0
         this.timerOrigin = null
         this.timerInterval = null
+        this.motion = null
         this.visibilityHandler = () => this.visibilityChanged()
     }
 
@@ -359,11 +377,11 @@ customElements.define('minesweeper-game', class extends HTMLElement {
         if (this.state.outcome || this.state.board.revealed[index]) return
         this.selected = index
         this.notice = null
-        this.apply(this.engine.toggleFlag(this.state.board, index), {keepSelection: true})
+        this.apply(this.engine.toggleFlag(this.state.board, index), {keepSelection: true, motion: 'flag'})
         if (focus) this.focusCell(index)
     }
 
-    apply(result, {keepSelection = false} = {}) {
+    apply(result, {keepSelection = false, motion = 'reveal'} = {}) {
         const wasStarted = this.state.board.started
         this.state.board = result.board
         this.state.difficulty = result.board.difficulty
@@ -372,6 +390,9 @@ customElements.define('minesweeper-game', class extends HTMLElement {
             result.board.started || result.board.flagged.some(Boolean) || result.board.outcome
         )
         this.notice = result.flagMismatch ? 'flagMismatch' : null
+        this.motion = result.changed.length
+            ? {type: motion, order: new Map(result.changed.map((index, order) => [index, order]))}
+            : null
         if (!keepSelection && !result.flagMismatch) this.selected = null
         if (!wasStarted && result.board.started && !result.board.outcome) this.resumeTimer()
         if (result.board.outcome) this.pauseTimer(false)
@@ -386,6 +407,7 @@ customElements.define('minesweeper-game', class extends HTMLElement {
         this.state = this.fresh(difficulty)
         this.selected = null
         this.notice = null
+        this.motion = null
         this.save()
         this.render()
     }
@@ -501,6 +523,11 @@ customElements.define('minesweeper-game', class extends HTMLElement {
             if (shownMine) cell.classList.add('mine', 'revealed')
             if (index === board.exploded) cell.classList.add('exploded')
             if (wrongFlag) cell.classList.add('wrong', 'revealed')
+            const motionOrder = this.motion?.order.get(index)
+            if (motionOrder != null) {
+                cell.classList.add(this.motion.type === 'flag' ? 'flag-change' : 'just-revealed')
+                cell.style.setProperty('--motion-delay', `${Math.min(motionOrder * 12, 120)}ms`)
+            }
 
             if (wrongFlag) cell.textContent = '×'
             else if (shownMine) cell.textContent = '✹'
@@ -513,6 +540,7 @@ customElements.define('minesweeper-game', class extends HTMLElement {
             fragment.append(cell)
         }
         boardElement.replaceChildren(fragment)
+        this.motion = null
         s.querySelector('.difficulty').value = this.state.difficulty
         const flagCount = board.flagged.filter(Boolean).length
         s.querySelector('.mines-left').textContent = board.mineCount - flagCount

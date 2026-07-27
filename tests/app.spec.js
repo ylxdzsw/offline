@@ -933,7 +933,7 @@ test('Huarong Dao hints and animates an optimal slide, persists, reloads, and un
     await expect(page.locator('huarong-game .target[data-to="16"]')).toHaveCount(0)
 })
 
-test('Minesweeper confirms reveals, keeps flags reversible, persists, and has no undo', async ({page}) => {
+test('Minesweeper animates confirmed reveals, keeps flags reversible, persists, and has no undo', async ({page}) => {
     await page.goto('/minesweeper.html')
     await expect(page.locator('minesweeper-game .cell')).toHaveCount(256)
     await expect(page.locator('minesweeper-game .undo')).toHaveCount(0)
@@ -952,6 +952,14 @@ test('Minesweeper confirms reveals, keeps flags reversible, persists, and has no
 
     await second.click()
     expect(await page.locator('minesweeper-game .cell.revealed').count()).toBeGreaterThanOrEqual(9)
+    const revealMotion = await page.locator('minesweeper-game .cell.just-revealed').evaluateAll(cells => ({
+        count: cells.length,
+        names: [...new Set(cells.map(cell => getComputedStyle(cell).animationName))],
+        delays: [...new Set(cells.map(cell => getComputedStyle(cell).animationDelay))],
+    }))
+    expect(revealMotion.count).toBeGreaterThanOrEqual(9)
+    expect(revealMotion.names).toEqual(['minesweeper-reveal'])
+    expect(revealMotion.delays.length).toBeGreaterThan(1)
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:minesweeper')))
     expect(saved.board.started).toBe(true)
     expect(saved.board.cells[120]).toBe(0)
@@ -963,6 +971,7 @@ test('Minesweeper confirms reveals, keeps flags reversible, persists, and has no
     await covered.click()
     await page.locator('minesweeper-game .flag').click()
     await expect(covered).toHaveClass(/flagged/)
+    await expect(covered).toHaveCSS('animation-name', 'minesweeper-flag')
     await page.locator('minesweeper-game .flag').click()
     await expect(covered).not.toHaveClass(/flagged/)
     await covered.dispatchEvent('pointerdown', {
@@ -976,6 +985,11 @@ test('Minesweeper confirms reveals, keeps flags reversible, persists, and has no
     await expect(covered).toHaveClass(/flagged/)
     await page.locator('minesweeper-game .flag').click()
     await expect(covered).not.toHaveClass(/flagged/)
+
+    await page.emulateMedia({reducedMotion: 'reduce'})
+    await page.locator('minesweeper-game .flag').click()
+    await expect(covered).toHaveCSS('animation-name', 'none')
+    await page.locator('minesweeper-game .flag').click()
 
     await page.reload()
     expect(await page.locator('minesweeper-game .cell.revealed').count()).toBeGreaterThanOrEqual(9)
