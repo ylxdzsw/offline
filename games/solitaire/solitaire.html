@@ -108,6 +108,20 @@
             outline: 3px solid #ffd66b; outline-offset: -2px;
             box-shadow: 0 5px 11px rgba(0,0,0,.42);
         }
+        .card.dealt { transform-origin: left center; animation: solitaire-deal .22s ease-out; }
+        .card.moved { animation: solitaire-land .2s ease-out; }
+        .card.turned { animation: solitaire-turn .2s ease-out; }
+        .card.recycled { transform-origin: right center; animation: solitaire-recycle .22s ease-out; }
+        @keyframes solitaire-deal {
+            from { opacity: .45; transform: translateX(-45%) rotate(-4deg) scale(.94); }
+        }
+        @keyframes solitaire-land {
+            from { opacity: .5; filter: brightness(1.12); transform: translateY(-10px) scale(.96); }
+        }
+        @keyframes solitaire-turn { from { opacity: .45; transform: rotateY(82deg) scale(.96); } }
+        @keyframes solitaire-recycle {
+            from { opacity: .4; transform: translateX(45%) rotate(5deg) scale(.94); }
+        }
         .card:focus-visible, .slot:focus-visible {
             z-index: 40; outline: 3px solid #fff; outline-offset: 1px;
         }
@@ -150,6 +164,7 @@
         @media (prefers-reduced-motion: reduce) {
             .celebration { display: none; }
             .card.selected { transform: none; }
+            .card.dealt, .card.moved, .card.turned, .card.recycled { animation: none; }
         }
     </style>
     <div class="toolbar">
@@ -187,6 +202,7 @@ customElements.define('solitaire-game', class extends HTMLElement {
         this.lastTap = null
         this.timerOrigin = null
         this.timerInterval = null
+        this.motion = null
         this.visibilityHandler = () => this.visibilityChanged()
     }
 
@@ -293,7 +309,8 @@ customElements.define('solitaire-game', class extends HTMLElement {
         if (target.dataset.action === 'draw') {
             this.selected = null
             this.lastTap = null
-            this.apply(this.engine.draw(this.state.deal))
+            const type = this.state.deal.stock.length ? 'draw' : 'recycle'
+            this.apply(this.engine.draw(this.state.deal), {type})
             return
         }
 
@@ -334,6 +351,9 @@ customElements.define('solitaire-game', class extends HTMLElement {
     }
 
     move(source, destination) {
+        const count = source.kind === 'tableau'
+            ? this.state.deal.tableau[source.column].visible.length - source.card
+            : 1
         const result = this.engine.move(this.state.deal, source, destination)
         if (!result.moved) {
             this.notice = 'solitaireInvalidMove'
@@ -343,10 +363,10 @@ customElements.define('solitaire-game', class extends HTMLElement {
         }
         this.selected = null
         this.lastTap = null
-        this.apply(result)
+        this.apply(result, {type: 'move', source, destination, count})
     }
 
-    apply(result) {
+    apply(result, motion = null) {
         if (!result.moved) return
         this.snapshotElapsed()
         this.state.history.push({
@@ -360,6 +380,7 @@ customElements.define('solitaire-game', class extends HTMLElement {
         this.state.progress = !result.game.won
         this.state.outcome = result.game.won ? 'won' : null
         this.notice = null
+        this.motion = motion ? {...motion, flipped: result.flipped} : null
         if (this.state.outcome) this.pauseTimer(false)
         else this.resumeTimer()
         this.save()
@@ -377,6 +398,7 @@ customElements.define('solitaire-game', class extends HTMLElement {
         this.selected = null
         this.lastTap = null
         this.notice = null
+        this.motion = null
         this.save()
         this.render()
         this.resumeTimer()
@@ -389,6 +411,7 @@ customElements.define('solitaire-game', class extends HTMLElement {
         this.selected = null
         this.lastTap = null
         this.notice = null
+        this.motion = null
         this.storage.clear('solitaire')
         this.render()
         if (!forced) this.shadowRoot.querySelector('.draw-count').value = String(drawCount)
@@ -443,7 +466,7 @@ customElements.define('solitaire-game', class extends HTMLElement {
         return this.i18n.locale === 'zh' ? `${suit}${rank}` : `${rank} of ${suit}`
     }
 
-    card(card, source, selected = false, foundation = null) {
+    card(card, source, selected = false, foundation = null, motion = '') {
         const rank = this.engine.RANKS[this.engine.rank(card)]
         const suit = this.engine.suit(card)
         const mark = this.engine.SUIT_MARKS[suit]
@@ -453,7 +476,7 @@ customElements.define('solitaire-game', class extends HTMLElement {
                 ? `data-kind="foundation" data-suit="${source.suit}"`
                 : 'data-kind="waste"'
         const foundationAttr = foundation == null ? '' : `data-foundation="${foundation}"`
-        return `<button class="card face ${this.engine.color(card)}${selected ? ' selected' : ''}" type="button"
+        return `<button class="card face ${this.engine.color(card)}${selected ? ' selected' : ''}${motion ? ` ${motion}` : ''}" type="button"
             ${attributes} ${foundationAttr} data-value="${card}" draggable="true" aria-label="${this.cardName(card)}">
             <span class="corner"><span>${rank}</span><span class="suit">${mark}</span></span>
             <span class="pip">${mark}</span>
@@ -463,13 +486,21 @@ customElements.define('solitaire-game', class extends HTMLElement {
     renderTop() {
         const game = this.state.deal
         const stock = game.stock.length
-            ? `<button class="card back" type="button" data-action="draw" aria-label="${this.i18n.t('solitaireStock')}"><span class="stock-count">${game.stock.length}</span></button>`
+            ? `<button class="card back${this.motion?.type === 'recycle' ? ' recycled' : ''}" type="button" data-action="draw" aria-label="${this.i18n.t('solitaireStock')}"><span class="stock-count">${game.stock.length}</span></button>`
             : `<button class="slot" type="button" data-action="draw" aria-label="${this.i18n.t('solitaireRedeal')}">↻</button>`
         const waste = game.waste.length
-            ? this.card(game.waste.at(-1), {kind: 'waste'}, this.selected?.kind === 'waste')
+            ? this.card(game.waste.at(-1), {kind: 'waste'}, this.selected?.kind === 'waste', null, this.motion?.type === 'draw' ? 'dealt' : '')
             : '<span class="slot" aria-hidden="true"></span>'
         const foundations = game.foundations.map((pile, suit) => pile.length
-            ? this.card(pile.at(-1), {kind: 'foundation', suit}, this.selected?.kind === 'foundation' && this.selected.suit === suit, suit)
+            ? this.card(
+                pile.at(-1),
+                {kind: 'foundation', suit},
+                this.selected?.kind === 'foundation' && this.selected.suit === suit,
+                suit,
+                this.motion?.type === 'move'
+                    && this.motion.destination.kind === 'foundation'
+                    && this.motion.destination.suit === suit ? 'moved' : '',
+            )
             : `<button class="foundation slot" type="button" data-foundation="${suit}" aria-label="${this.i18n.t('solitaireFoundation')} ${this.engine.SUIT_MARKS[suit]}">${this.engine.SUIT_MARKS[suit]}</button>`
         ).join('')
         this.shadowRoot.querySelector('.top').innerHTML = stock + waste + '<span></span>' + foundations
@@ -484,6 +515,16 @@ customElements.define('solitaire-game', class extends HTMLElement {
                 this.selected?.kind === 'tableau'
                     && this.selected.column === column
                     && index >= this.selected.card,
+                null,
+                this.motion?.type === 'move'
+                    && this.motion.destination.kind === 'tableau'
+                    && this.motion.destination.column === column
+                    && index >= pile.visible.length - this.motion.count ? 'moved'
+                    : this.motion?.type === 'move'
+                        && this.motion.flipped
+                        && this.motion.source.kind === 'tableau'
+                        && this.motion.source.column === column
+                        && index === 0 ? 'turned' : '',
             )).join('')
             const empty = hidden || visible ? '' : `<button class="slot" type="button" aria-label="${this.i18n.t('solitaireEmptyColumn')}">K</button>`
             return `<div class="pile" data-column="${column}" role="group" aria-label="${this.i18n.t('column')} ${column + 1}">${hidden}${visible}${empty}</div>`
@@ -514,6 +555,7 @@ customElements.define('solitaire-game', class extends HTMLElement {
         this.renderTop()
         this.renderTableau()
         this.renderCelebration()
+        this.motion = null
     }
 
     dragStarted(event) {

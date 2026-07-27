@@ -1000,7 +1000,7 @@ test('Minesweeper animates confirmed reveals, keeps flags reversible, persists, 
     await expect(page.locator('.game-gallery article[data-game="minesweeper"] a')).toHaveText('Continue')
 })
 
-test('Solitaire draws, moves a tableau card, persists, reloads, and undoes', async ({page}) => {
+test('Solitaire animates draws and tableau moves, persists, reloads, and undoes', async ({page}) => {
     await page.goto('/solitaire.html')
     await expect(page.locator('solitaire-game .pile')).toHaveCount(7)
     await expect(page.locator('solitaire-game [data-action="draw"] .stock-count')).toHaveText('24')
@@ -1008,6 +1008,7 @@ test('Solitaire draws, moves a tableau card, persists, reloads, and undoes', asy
 
     await page.locator('solitaire-game [data-action="draw"]').click()
     await expect(page.locator('solitaire-game .top .card.face[data-kind="waste"]')).toHaveCount(1)
+    await expect(page.locator('solitaire-game .top .card.dealt')).toHaveCSS('animation-name', 'solitaire-deal')
     await expect(page.locator('solitaire-game .moves')).toHaveText('1')
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:solitaire')).history.length)).toBe(1)
     await page.reload()
@@ -1041,6 +1042,8 @@ test('Solitaire draws, moves a tableau card, persists, reloads, and undoes', asy
     await expect(page.locator('solitaire-game .status')).toContainText('selected')
     await page.locator(`solitaire-game .pile[data-column="${move.to}"]`).click({position: {x: 2, y: 220}})
     await expect(page.locator('solitaire-game .moves')).toHaveText('1')
+    await expect(page.locator(`solitaire-game .pile[data-column="${move.to}"] .card.moved`)).toHaveCSS('animation-name', 'solitaire-land')
+    await expect(page.locator(`solitaire-game .pile[data-column="${move.from}"] .card.turned`)).toHaveCSS('animation-name', 'solitaire-turn')
     expect(await page.locator(`solitaire-game .pile[data-column="${move.from}"] .card.back`).count()).toBe(move.hidden - 1)
     await page.reload()
     await expect(page.locator('solitaire-game .moves')).toHaveText('1')
@@ -1064,7 +1067,11 @@ test('Solitaire draws, moves a tableau card, persists, reloads, and undoes', asy
     })
     await page.locator('solitaire-game .card[data-value="51"]').dblclick()
     await expect(page.locator('solitaire-game .status')).toHaveText('All four suits complete — you win!')
+    await expect(page.locator('solitaire-game .card[data-value="51"]')).toHaveCSS('animation-name', 'solitaire-land')
     await expect(page.locator('solitaire-game .celebration')).toBeVisible()
+    await page.emulateMedia({reducedMotion: 'reduce'})
+    await expect(page.locator('solitaire-game .card[data-value="51"]')).toHaveCSS('animation-name', 'none')
+    await expect(page.locator('solitaire-game .celebration')).toBeHidden()
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:solitaire')).outcome)).toBe('won')
 })
 
