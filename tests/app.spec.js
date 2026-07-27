@@ -341,6 +341,7 @@ test('Sudoku supports long-press notes, entries, undo, and persistence without h
     await expect(page.locator('sudoku-game .notes-toggle, sudoku-game .hint')).toHaveCount(0)
     await page.locator('sudoku-game .digit[data-digit="3"]').click({delay: 600})
     await expect(editable.locator('.notes')).toContainText('3')
+    await expect(editable.locator('.notes')).toHaveCSS('animation-name', 'sudoku-entry')
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:sudoku')).history.length)).toBe(1)
     await page.reload()
     editable = page.locator('sudoku-game .cell:not(.given)').first()
@@ -348,9 +349,11 @@ test('Sudoku supports long-press notes, entries, undo, and persistence without h
     await editable.click()
     await page.locator('sudoku-game .digit[data-digit="4"]').click()
     await expect(editable).toHaveText('4')
+    await expect(editable.locator('.entry')).toHaveCSS('animation-name', 'sudoku-entry')
     await expect(page.locator('sudoku-game .undo')).toBeEnabled()
     await page.locator('sudoku-game .undo').click()
     await expect(editable.locator('.notes')).toContainText('3')
+    await expect(editable).toHaveClass(/changed/)
 })
 
 test('2048 merges, scores, persists, reloads, undoes, and accepts a swipe', async ({page}) => {
