@@ -94,8 +94,11 @@ impl Position {
     }
 
     pub fn flips(self, index: u8, side: u8) -> u64 {
+        if index >= 64 || side != BLACK && side != WHITE {
+            return 0;
+        }
         let bit = 1_u64 << index;
-        if side != BLACK && side != WHITE || self.occupied() & bit != 0 {
+        if self.occupied() & bit != 0 {
             return 0;
         }
         let row = (index / 8) as i8;
@@ -254,5 +257,13 @@ mod tests {
         let status = Position::from_board(&full).unwrap().status();
         assert_eq!(status.reason, "full");
         assert_eq!(status.winner, Some(BLACK));
+    }
+
+    #[test]
+    fn out_of_range_moves_and_invalid_sides_are_rejected() {
+        let position = Position::initial();
+        assert_eq!(position.flips(64, BLACK), 0);
+        assert_eq!(position.flips(19, EMPTY), 0);
+        assert!(position.apply(64, BLACK).is_none());
     }
 }

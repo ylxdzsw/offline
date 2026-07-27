@@ -32,6 +32,14 @@ test('unbracketed and occupied squares are illegal', () => {
     assert.throws(() => engine.applyMove(board, engine.at(3, 3), engine.BLACK), /illegal move/)
 })
 
+test('move inputs cannot wrap onto another square or side', () => {
+    const board = Array(64).fill(engine.BLACK)
+    board[0] = engine.EMPTY
+    board[1] = engine.WHITE
+    assert.throws(() => engine.applyMove(board, 256, engine.BLACK), /board square/)
+    assert.throws(() => engine.applyMove(board, 0, 257), /Black or White/)
+})
+
 test('play continues when only one side can move and ends when neither can', () => {
     const passing = Array(64).fill(engine.BLACK)
     passing[0] = engine.EMPTY
