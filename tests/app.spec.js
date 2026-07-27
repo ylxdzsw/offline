@@ -433,6 +433,44 @@ test('Junqi places the army, conceals the opponent, plays, persists, and undoes'
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:junqi')).history.length)).toBe(0)
 })
 
+test('Junqi holds a fast AI battle reply and cues its destination', async ({page}) => {
+    await page.goto('/junqi.html')
+    const midpoint = await page.evaluate(async () => {
+        const game = document.querySelector('junqi-game')
+        game.startBattle()
+        OfflineGames.runtime.createWorker = () => {
+            const worker = {
+                postMessage(message) {
+                    const move = game.engine.legalMoves(game.state.board, game.engine.BLACK)[0]
+                    queueMicrotask(() => worker.onmessage({data: {id: message.id, move}}))
+                },
+                terminate() {},
+            }
+            return worker
+        }
+        const move = game.engine.legalMoves(game.state.board, game.engine.RED)[0]
+        const started = performance.now()
+        game.commit(move, game.engine.RED)
+        await new Promise(resolve => setTimeout(resolve, 180))
+        const target = game.shadowRoot.querySelector('.square.last-to')
+        return {
+            started,
+            historyLength: game.state.history.length,
+            thinking: game.thinking,
+            animationName: getComputedStyle(target).animationName,
+        }
+    })
+
+    expect(midpoint.historyLength).toBe(1)
+    expect(midpoint.thinking).toBeTruthy()
+    expect(midpoint.animationName).toBe('junqi-target')
+
+    await expect.poll(() => page.evaluate(() => document.querySelector('junqi-game').state.history.length)).toBe(2)
+    expect(await page.evaluate(started => performance.now() - started, midpoint.started)).toBeGreaterThanOrEqual(320)
+    await expect(page.locator('junqi-game .status')).not.toHaveClass(/thinking/)
+    await expect(page.locator('junqi-game .square.last-to')).toHaveAttribute('aria-label', /last move/)
+})
+
 test('Chess makes a legal AI reply, persists, reloads, and undoes the turn',async({page})=>{
     await page.goto('/chess.html')
     await page.locator('chess-game .square[data-index="52"]').click()
