@@ -65,12 +65,14 @@
     .game-gallery .gomoku-mark::after  { right: 8px; bottom: 8px; border: 1px solid var(--stone-white-edge); background: radial-gradient(circle at 35% 30%, #fff, var(--stone-white) 72%); }
     .game-gallery .sudoku-mark {
         display: grid; width: 58px; height: 58px;
-        grid-template-columns: repeat(3, 1fr);
+        grid-template: repeat(3, minmax(0, 1fr)) / repeat(3, minmax(0, 1fr));
         border: 2px solid var(--board-paper-box); background: var(--board-paper);
     }
     .game-gallery .sudoku-mark i {
-        display: grid; border: 1px solid var(--board-paper-line); place-items: center;
+        display: grid; min-width: 0; min-height: 0;
+        border: 1px solid var(--board-paper-line); place-items: center;
         font-family: var(--font-display); font-size: .95rem; font-style: normal; font-weight: 700; color: var(--ink);
+        line-height: 1;
     }
     .game-gallery .game2048-mark {
         display: grid; width: 64px; height: 64px; box-sizing: border-box;
@@ -171,26 +173,29 @@
         border-radius: 5px; background: var(--board-wood); box-shadow: inset 0 0 8px rgba(60,35,15,.16);
     }
     .game-gallery .huarong-mark i { position: absolute; border: 1px solid currentColor; border-radius: 3px; background: var(--piece-face); }
-    .game-gallery .huarong-mark .cao { top: 3px; left: 14px; width: 22px; height: 22px; color: #8f2c26; background: #bd4a3f; }
-    .game-gallery .huarong-mark .guan { top: 28px; left: 14px; width: 22px; height: 10px; color: #6f5420; background: #987129; }
+    .game-gallery .huarong-mark .cao { top: 3px; left: 14px; width: 20px; height: 22px; color: #8f2c26; background: #bd4a3f; }
+    .game-gallery .huarong-mark .guan { top: 28px; left: 14px; width: 20px; height: 10px; color: #6f5420; background: #987129; }
     .game-gallery .huarong-mark .g1 { top: 3px; left: 3px; width: 9px; height: 22px; }
     .game-gallery .huarong-mark .g2 { top: 3px; right: 3px; width: 9px; height: 22px; }
     .game-gallery .huarong-mark .g3 { top: 28px; left: 3px; width: 9px; height: 22px; }
     .game-gallery .huarong-mark .g4 { top: 28px; right: 3px; width: 9px; height: 22px; }
-    .game-gallery .huarong-mark .s1 { top: 41px; left: 15px; width: 9px; height: 9px; }
-    .game-gallery .huarong-mark .s2 { top: 41px; left: 27px; width: 9px; height: 9px; }
+    .game-gallery .huarong-mark .s1 { top: 41px; left: 14px; width: 9px; height: 9px; }
+    .game-gallery .huarong-mark .s2 { top: 41px; left: 25px; width: 9px; height: 9px; }
     .game-gallery .huarong-mark .s3 { bottom: 3px; left: 3px; width: 9px; height: 9px; }
     .game-gallery .huarong-mark .s4 { right: 3px; bottom: 3px; width: 9px; height: 9px; }
     .game-gallery .minesweeper-mark {
         display: grid; width: 62px; height: 62px; box-sizing: border-box;
-        grid-template-columns: repeat(4, 1fr); gap: 2px; padding: 3px;
+        grid-template: repeat(4, minmax(0, 1fr)) / repeat(4, minmax(0, 1fr));
+        gap: 2px; padding: 3px;
         border: 1px solid var(--border-strong); border-radius: 6px;
         background: var(--border);
     }
     .game-gallery .minesweeper-mark i {
-        display: grid; min-width: 0; border-radius: 2px; place-items: center;
+        display: grid; min-width: 0; min-height: 0;
+        border-radius: 2px; place-items: center;
         color: var(--ink); background: var(--board-paper);
         font-family: var(--font-mono); font-size: .62rem; font-style: normal; font-weight: 850;
+        line-height: 1;
     }
     .game-gallery .minesweeper-mark i.covered {
         background: linear-gradient(145deg, var(--bg-surface), var(--bg-muted));

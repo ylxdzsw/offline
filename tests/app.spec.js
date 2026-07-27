@@ -39,6 +39,48 @@ test('build is self-contained and contains the complete PWA shell', async () => 
     expect(sw).not.toContain('cache.put(request')
 })
 
+test('gallery grid logos stay centered and contained', async ({page}) => {
+    await page.goto('/index.html')
+
+    const geometry = await page.locator([
+        'article[data-game="sudoku"] .preview > span',
+        'article[data-game="huarong"] .preview > span',
+        'article[data-game="minesweeper"] .preview > span',
+    ].join(',')).evaluateAll(marks => marks.map(mark => {
+        const preview = mark.parentElement.getBoundingClientRect()
+        const rect = mark.getBoundingClientRect()
+        return {
+            game: mark.closest('article').dataset.game,
+            centerX: rect.left + rect.width / 2 - (preview.left + preview.width / 2),
+            centerY: rect.top + rect.height / 2 - (preview.top + preview.height / 2),
+            overflowX: mark.scrollWidth - mark.clientWidth,
+            overflowY: mark.scrollHeight - mark.clientHeight,
+        }
+    }))
+
+    for (const mark of geometry) {
+        expect(Math.abs(mark.centerX), `${mark.game} horizontal alignment`).toBeLessThanOrEqual(.01)
+        expect(Math.abs(mark.centerY), `${mark.game} vertical alignment`).toBeLessThanOrEqual(.01)
+        expect(mark.overflowX, `${mark.game} horizontal overflow`).toBeLessThanOrEqual(0)
+        expect(mark.overflowY, `${mark.game} vertical overflow`).toBeLessThanOrEqual(0)
+    }
+
+    const huarongOffsets = await page.locator('.huarong-mark').evaluate(mark => {
+        const center = mark.getBoundingClientRect().left + mark.getBoundingClientRect().width / 2
+        const offset = selector => {
+            const rect = mark.querySelector(selector).getBoundingClientRect()
+            return rect.left + rect.width / 2 - center
+        }
+        const soldiers = ['.s1', '.s2'].map(selector => mark.querySelector(selector).getBoundingClientRect())
+        return [
+            offset('.cao'),
+            offset('.guan'),
+            (soldiers[0].left + soldiers[1].right) / 2 - center,
+        ]
+    })
+    for (const offset of huarongOffsets) expect(Math.abs(offset)).toBeLessThanOrEqual(.01)
+})
+
 test('language preference persists across pages without changing their URLs', async ({page}) => {
     await page.goto('/index.html')
     await page.locator('offline-shell .menu-btn').click()
