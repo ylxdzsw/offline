@@ -252,6 +252,43 @@ test('Xiangqi plays an AI reply, persists, reloads, and undoes a full turn', asy
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:xiangqi')).history.length)).toBe(0)
 })
 
+test('Xiangqi keeps a fast AI reply visible and marks its landing square', async ({page}) => {
+    await page.goto('/xiangqi.html')
+    const midpoint = await page.evaluate(async () => {
+        const game = document.querySelector('xiangqi-game')
+        OfflineGames.runtime.createWorker = () => {
+            const worker = {
+                postMessage(message) {
+                    const move = game.engine.legalMoves(game.state.board, game.engine.BLACK)[0]
+                    queueMicrotask(() => worker.onmessage({data: {id: message.id, move}}))
+                },
+                terminate() {},
+            }
+            return worker
+        }
+        game.tap(54)
+        const started = performance.now()
+        game.tap(45)
+        await new Promise(resolve => setTimeout(resolve, 180))
+        const landing = game.shadowRoot.querySelector('.spot.last-to .piece')
+        return {
+            started,
+            historyLength: game.state.history.length,
+            thinking: game.thinking,
+            animationName: getComputedStyle(landing).animationName,
+        }
+    })
+
+    expect(midpoint.historyLength).toBe(1)
+    expect(midpoint.thinking).toBeTruthy()
+    expect(midpoint.animationName).toBe('land')
+
+    await expect.poll(() => page.evaluate(() => document.querySelector('xiangqi-game').state.history.length)).toBe(2)
+    expect(await page.evaluate(started => performance.now() - started, midpoint.started)).toBeGreaterThanOrEqual(320)
+    await expect(page.locator('xiangqi-game .status')).toHaveText('Your turn')
+    await expect(page.locator('xiangqi-game .spot.last-to .piece')).toHaveCount(1)
+})
+
 test('Wuziqi plays an AI reply and undo removes the pair', async ({page}) => {
     await page.goto('/wuziqi.html')
     await page.locator('wuziqi-game .spot[data-index="112"]').click()

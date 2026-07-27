@@ -72,7 +72,12 @@
         }
         .piece.red { color: var(--piece-red); }
         .piece.black { color: var(--piece-black); }
+        .spot.last-to .piece { animation: land .22s ease-out; }
+        @keyframes land { from { opacity: .4; transform: scale(.72); } }
         .board[aria-disabled="true"] .spot { cursor: wait; }
+        @media (prefers-reduced-motion: reduce) {
+            .status.thinking::after, .spot.last-to .piece { animation: none; }
+        }
         @media (max-width: 340px) {
             .toolbar { gap: 4px; }
             .action { padding-inline: 8px; font-size: .82rem; }
@@ -102,6 +107,8 @@
 </template>
 
 <script>
+const XIANGQI_MIN_AI_TURN_MS = 360
+
 OfflineGames.wasm.defineElement('xiangqi', 'xiangqi-game', class extends HTMLElement {
     constructor() {
         super()
@@ -110,6 +117,8 @@ OfflineGames.wasm.defineElement('xiangqi', 'xiangqi-game', class extends HTMLEle
         this.legal = []
         this.thinking = false
         this.worker = null
+        this.aiTimer = null
+        this.aiStartedAt = 0
         this.requestId = 0
     }
 
@@ -236,14 +245,23 @@ OfflineGames.wasm.defineElement('xiangqi', 'xiangqi-game', class extends HTMLEle
         if (this.state.outcome || this.state.turn !== this.engine.BLACK) return
         this.cancelAI()
         this.thinking = true
+        this.aiStartedAt = performance.now()
         const id = ++this.requestId
         this.worker = OfflineGames.runtime.createWorker('xiangqi-worker-payload')
         this.worker.onmessage = event => {
             if (event.data.id !== id || !this.thinking) return
             const legal = this.engine.legalMoves(this.state.board, this.engine.BLACK)
             const move = legal.find(candidate => candidate.from === event.data.move?.from && candidate.to === event.data.move?.to)
-            this.cancelAI(false)
-            if (move) this.commit(move, this.engine.BLACK)
+            if (this.worker) this.worker.terminate()
+            this.worker = null
+            const delay = Math.max(0, XIANGQI_MIN_AI_TURN_MS - (performance.now() - this.aiStartedAt))
+            this.aiTimer = setTimeout(() => {
+                this.aiTimer = null
+                if (id !== this.requestId || !this.thinking) return
+                this.thinking = false
+                if (move) this.commit(move, this.engine.BLACK)
+                else this.render()
+            }, delay)
         }
         this.worker.onerror = error => {
             console.error(error)
@@ -257,7 +275,9 @@ OfflineGames.wasm.defineElement('xiangqi', 'xiangqi-game', class extends HTMLEle
     cancelAI(invalidate = true) {
         if (invalidate) this.requestId++
         if (this.worker) this.worker.terminate()
+        if (this.aiTimer) clearTimeout(this.aiTimer)
         this.worker = null
+        this.aiTimer = null
         this.thinking = false
     }
 
@@ -317,9 +337,11 @@ OfflineGames.wasm.defineElement('xiangqi', 'xiangqi-game', class extends HTMLEle
             if (this.selected === index) classes.push('selected')
             if (legalTargets.has(index)) classes.push('legal')
             if (last && (last.from === index || last.to === index)) classes.push('last')
+            if (last?.to === index) classes.push('last-to')
             const labels = [this.pieceName(piece), `${this.i18n.t('row')} ${row + 1}`, `${this.i18n.t('column')} ${column + 1}`]
             if (this.selected === index) labels.push(this.i18n.t('selected'))
             if (legalTargets.has(index)) labels.push(this.i18n.t('legalMove'))
+            if (last && (last.from === index || last.to === index)) labels.push(this.i18n.t('lastMove'))
             const token = piece ? `<span class="piece ${this.engine.sideOf(piece) === this.engine.RED ? 'red' : 'black'}">${glyphs[piece]}</span>` : ''
             return `<button type="button" role="gridcell" class="${classes.join(' ')}" data-index="${index}" aria-label="${labels.join(', ')}" style="left:${column / 8 * 100}%;top:${row / 9 * 100}%">${token}</button>`
         }).join('')
