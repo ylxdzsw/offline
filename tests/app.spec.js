@@ -5,7 +5,8 @@ const gamesRoot = path.resolve('games')
 const games = fs.readdirSync(gamesRoot, {withFileTypes: true})
     .filter(entry => entry.isDirectory() && fs.existsSync(path.join(gamesRoot, entry.name, 'page.ymd')))
     .map(entry => entry.name)
-const pageFiles = ['index.html', ...games.map(game => `${game}.html`)]
+const gamePageFiles = games.map(game => `${game}.html`)
+const pageFiles = ['index.html', ...gamePageFiles]
 const guideAssets = games.map(game => {
     const extension = fs.existsSync(path.join(gamesRoot, game, 'guide.svg')) ? 'svg' : 'webp'
     return `guides/${game}.${extension}`
@@ -179,18 +180,35 @@ test('app shell suppresses page bounce and browser zoom gestures', async ({page}
     await expect(page.locator('html')).toHaveCSS('background-color', 'rgb(245, 244, 242)')
 })
 
-test('copyright stays below the first screen on every page', async ({page}) => {
+test('gallery copyright stays reachable below the first screen', async ({page}) => {
     for (const viewport of [{width: 390, height: 844}, {width: 1024, height: 768}]) {
         await page.setViewportSize(viewport)
-        for (const url of pageFiles.map(file => '/' + file)) {
-            await page.goto(url)
-            const footer = page.locator('offline-shell footer')
-            expect(await footer.evaluate(element => element.getBoundingClientRect().top), url)
-                .toBeGreaterThanOrEqual(viewport.height)
-            await footer.scrollIntoViewIfNeeded()
-            await expect(footer).toBeInViewport()
-        }
+        await page.goto('/index.html')
+        const footer = page.locator('offline-shell footer')
+        expect(await footer.evaluate(element => element.getBoundingClientRect().top))
+            .toBeGreaterThanOrEqual(viewport.height)
+        await footer.scrollIntoViewIfNeeded()
+        await expect(footer).toBeInViewport()
     }
+})
+
+test('game viewport setup waits for a parser-delayed game element', async ({page}) => {
+    await page.setViewportSize({width: 320, height: 480})
+    await page.goto('/2048.html')
+    await page.evaluate(async () => {
+        document.querySelector('offline-shell').remove()
+        const shell = document.createElement('offline-shell')
+        shell.setAttribute('page', '2048')
+        shell.setAttribute('guide', './guides/2048.svg')
+        document.body.append(shell)
+        await new Promise(resolve => setTimeout(resolve, 50))
+        shell.append(document.createElement('game-2048'))
+    })
+
+    await page.waitForFunction(() =>
+        document.querySelector('offline-shell')?._fitSurface?.dataset.fitScale !== undefined
+    )
+    expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(480)
 })
 
 test('navigator language auto-detects Chinese without a saved preference', async ({browser}) => {
@@ -376,6 +394,7 @@ test('Sudoku supports long-press notes, entries, undo, and persistence without h
 test('2048 merges, scores, persists, reloads, undoes, and accepts a swipe', async ({page}) => {
     await page.goto('/2048.html')
     await expect(page.locator('game-2048 .cell:not([data-value="0"])')).toHaveCount(2)
+    await expect(page.locator('game-2048 .direction')).toHaveCount(0)
     await page.locator('game-2048').evaluate(game => {
         Object.assign(game.state, {
             seed: 7,
@@ -1191,12 +1210,80 @@ test('Spider animates deals and moves, blocks empty-column deals, and completes 
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:spider')).outcome)).toBe('won')
 })
 
-for (const viewport of [{width: 320, height: 568}, {width: 390, height: 844}, {width: 430, height: 932}]) {
-    test(`all pages fit a ${viewport.width}x${viewport.height} mobile viewport`, async ({page}) => {
+for (const viewport of [
+    {width: 320, height: 480},
+    {width: 390, height: 844},
+    {width: 844, height: 390},
+    {width: 1024, height: 768},
+]) {
+    test(`game pages stay within a ${viewport.width}x${viewport.height} viewport`, async ({page}) => {
         await page.setViewportSize(viewport)
-        for (const url of pageFiles.map(file => '/' + file)) {
+        for (const file of gamePageFiles) {
+            const url = '/' + file
             await page.goto(url)
-            expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), url).toBeTruthy()
+            await page.waitForFunction(() =>
+                document.querySelector('offline-shell')?._fitSurface?.dataset.fitScale !== undefined
+            )
+            await page.evaluate(() => new Promise(resolve =>
+                requestAnimationFrame(() => requestAnimationFrame(resolve))
+            ))
+            const layout = await page.evaluate(() => {
+                const shell = document.querySelector('offline-shell')
+                const main = shell.shadowRoot.querySelector('main')
+                const footer = shell.shadowRoot.querySelector('footer')
+                const game = shell.firstElementChild
+                const surface = shell._fitSurface
+                const mainRect = main.getBoundingClientRect()
+                const mainStyle = getComputedStyle(main)
+                const padding = {
+                    top: parseFloat(mainStyle.paddingTop) || 0,
+                    right: parseFloat(mainStyle.paddingRight) || 0,
+                    bottom: parseFloat(mainStyle.paddingBottom) || 0,
+                    left: parseFloat(mainStyle.paddingLeft) || 0,
+                }
+                const children = [...game.shadowRoot.children].filter(element =>
+                    element instanceof HTMLElement &&
+                    element.tagName !== 'STYLE' &&
+                    getComputedStyle(element).display !== 'none'
+                ).map(element => element.getBoundingClientRect())
+                const surfaceRect = surface.getBoundingClientRect()
+                return {
+                    innerWidth,
+                    innerHeight,
+                    scrollWidth: document.documentElement.scrollWidth,
+                    scrollHeight: document.documentElement.scrollHeight,
+                    footerDisplay: getComputedStyle(footer).display,
+                    scale: Number(surface.dataset.fitScale),
+                    usable: {
+                        top: mainRect.top + padding.top,
+                        right: mainRect.right - padding.right,
+                        bottom: mainRect.bottom - padding.bottom,
+                        left: mainRect.left + padding.left,
+                    },
+                    content: {
+                        top: Math.min(...children.map(rect => rect.top)),
+                        right: Math.max(...children.map(rect => rect.right)),
+                        bottom: Math.max(...children.map(rect => rect.bottom)),
+                        left: Math.min(...children.map(rect => rect.left)),
+                    },
+                    surface: {
+                        right: surfaceRect.right,
+                        left: surfaceRect.left,
+                    },
+                }
+            })
+
+            expect(layout.scrollWidth, url).toBeLessThanOrEqual(layout.innerWidth)
+            expect(layout.scrollHeight, url).toBe(layout.innerHeight)
+            expect(layout.footerDisplay, url).toBe('none')
+            expect(layout.scale, url).toBeGreaterThan(0)
+            expect(layout.scale, url).toBeLessThanOrEqual(1)
+            expect(layout.content.top, url).toBeGreaterThanOrEqual(layout.usable.top - 1)
+            expect(layout.content.right, url).toBeLessThanOrEqual(layout.usable.right + 1)
+            expect(layout.content.bottom, url).toBeLessThanOrEqual(layout.usable.bottom + 1)
+            expect(layout.content.left, url).toBeGreaterThanOrEqual(layout.usable.left - 1)
+            expect(layout.surface.right, url).toBeLessThanOrEqual(layout.usable.right + 1)
+            expect(layout.surface.left, url).toBeGreaterThanOrEqual(layout.usable.left - 1)
         }
     })
 }

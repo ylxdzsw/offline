@@ -92,7 +92,6 @@
         .piece:focus-visible, .target:focus-visible { z-index: 9; outline: 3px solid var(--focus); outline-offset: -3px; }
         .board.solved .piece.cao { z-index: 8; animation: escape .7s ease-in-out alternate 2; }
         @keyframes escape { to { transform: translateY(8%) scale(1.03); filter: brightness(1.15); } }
-        .gesture-note { margin: 9px 0 0; color: var(--ink-faint); font-size: .72rem; line-height: 1.4; text-align: center; }
         @media (prefers-reduced-motion: reduce) {
             .piece { transition: none; }
             .hint.thinking::after, .piece.hinted, .target.hinted::after, .board.solved .piece.cao { animation: none; }
@@ -120,7 +119,6 @@
     <div class="board" role="grid" aria-label="">
         <span class="exit-label"></span>
     </div>
-    <p class="gesture-note"></p>
 </template>
 
 <script>
@@ -233,7 +231,6 @@ OfflineGames.wasm.defineElement('huarong', 'huarong-game', class extends HTMLEle
         s.querySelector('.moves-label').textContent = t('huarongMoves')
         s.querySelector('.warning').textContent = t('storageWarning')
         s.querySelector('.exit-label').textContent = t('huarongExit')
-        s.querySelector('.gesture-note').textContent = t('huarongGesture')
         s.querySelector('.board').setAttribute('aria-label', t('huarongBoard'))
     }
     save() {

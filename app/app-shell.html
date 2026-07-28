@@ -9,10 +9,20 @@
             background: var(--bg-shell);
             box-shadow: var(--shadow);
         }
+        :host(:not([page="gallery"])) {
+            height: var(--app-height);
+            min-height: 0;
+            overflow: hidden;
+        }
         .layout {
             display: grid;
             min-height: var(--app-height);
             grid-template-rows: auto 1fr auto;
+        }
+        :host(:not([page="gallery"])) .layout {
+            height: 100%;
+            min-height: 0;
+            grid-template-rows: auto minmax(0, 1fr);
         }
         header {
             position: sticky;
@@ -90,6 +100,13 @@
                 24px
                 max(14px, var(--safe-left));
         }
+        :host(:not([page="gallery"])) main {
+            min-width: 0;
+            min-height: 0;
+            padding-top: 12px;
+            padding-bottom: max(12px, var(--safe-bottom));
+            overflow: hidden;
+        }
         footer {
             padding: 10px 14px calc(12px + var(--safe-bottom));
             color: var(--ink-faint);
@@ -103,6 +120,7 @@
             text-decoration: underline;
             text-underline-offset: 2px;
         }
+        :host(:not([page="gallery"])) footer { display: none; }
         @media (max-width: 340px) {
             main { padding-inline: 10px; }
         }
@@ -153,6 +171,9 @@ customElements.define('offline-shell', class extends HTMLElement {
     }
 
     async connectedCallback() {
+        const page = this.getAttribute('page') || 'gallery'
+        const gamePage = page !== 'gallery'
+        document.documentElement.classList.toggle('game-page', gamePage)
         await Promise.all([
             customElements.whenDefined('offline-drawer'),
             customElements.whenDefined('offline-guide'),
@@ -160,7 +181,6 @@ customElements.define('offline-shell', class extends HTMLElement {
         await new Promise(resolve => setTimeout(resolve, 0))
         if (!this.isConnected) return
         const {i18n, theme} = OfflineGames
-        const page = this.getAttribute('page') || 'gallery'
         const s = this.shadowRoot
 
         /* Titles */
@@ -196,6 +216,110 @@ customElements.define('offline-shell', class extends HTMLElement {
             guideBtn.hidden = false
             guideBtn.addEventListener('click', () => guide.open())
         }
+
+        if (gamePage) this.setupGameViewport(s.querySelector('main'))
+    }
+
+    setupGameViewport(main) {
+        const setupGame = () => {
+            const game = this.firstElementChild
+            if (!game) return false
+
+            this._fitChildObserver?.disconnect()
+            this._fitChildObserver = null
+
+            const schedule = () => {
+                cancelAnimationFrame(this._fitFrame)
+                this._fitFrame = requestAnimationFrame(() => this.fitGameSurface(main, game))
+            }
+            const setupSurface = () => {
+                if (!this.isConnected || game !== this.firstElementChild) return
+                const surface = game.shadowRoot?.querySelector('.board-wrap, .board, .table')
+                if (!surface) {
+                    this._fitInitFrame = requestAnimationFrame(setupSurface)
+                    return
+                }
+
+                this._fitInitFrame = 0
+                this._fitSurface = surface
+                this._fitOriginal = {
+                    marginBottom: surface.style.marginBottom,
+                    transform: surface.style.transform,
+                    transformOrigin: surface.style.transformOrigin,
+                }
+                this._fitObserver = new ResizeObserver(schedule)
+                this._fitObserver.observe(main)
+                for (const child of game.shadowRoot.children) {
+                    if (child instanceof HTMLElement && child.tagName !== 'STYLE') {
+                        this._fitObserver.observe(child)
+                    }
+                }
+                window.addEventListener('resize', schedule)
+                window.visualViewport?.addEventListener('resize', schedule)
+                this._fitSchedule = schedule
+                schedule()
+            }
+
+            customElements.whenDefined(game.localName).then(setupSurface)
+            return true
+        }
+
+        if (setupGame()) return
+        this._fitChildObserver = new MutationObserver(() => setupGame())
+        this._fitChildObserver.observe(this, {childList: true})
+    }
+
+    fitGameSurface(main, game) {
+        const surface = this._fitSurface
+        if (!surface?.isConnected || !main.isConnected) return
+        const original = this._fitOriginal
+        surface.style.marginBottom = original.marginBottom
+        surface.style.transform = original.transform
+        surface.style.transformOrigin = original.transformOrigin
+
+        const mainRect = main.getBoundingClientRect()
+        const mainStyle = getComputedStyle(main)
+        const gameRect = game.getBoundingClientRect()
+        const surfaceRect = surface.getBoundingClientRect()
+        const paddingBottom = parseFloat(mainStyle.paddingBottom) || 0
+        const paddingLeft = parseFloat(mainStyle.paddingLeft) || 0
+        const paddingRight = parseFloat(mainStyle.paddingRight) || 0
+        const trailingHeight = Math.max(0, gameRect.bottom - surfaceRect.bottom)
+        const availableHeight = mainRect.bottom - paddingBottom - surfaceRect.top - trailingHeight
+        const availableWidth = mainRect.width - paddingLeft - paddingRight
+        const scale = Math.max(0, Math.min(
+            1,
+            availableHeight / surfaceRect.height,
+            availableWidth / surfaceRect.width
+        ))
+
+        surface.dataset.fitScale = scale.toFixed(4)
+        if (scale >= .9999) return
+        const marginBottom = parseFloat(getComputedStyle(surface).marginBottom) || 0
+        const scaledWidth = surfaceRect.width * scale
+        const targetLeft = mainRect.left + paddingLeft + (availableWidth - scaledWidth) / 2
+        const translateX = targetLeft - surfaceRect.left
+        surface.style.transformOrigin = 'top left'
+        surface.style.transform = `translateX(${translateX}px) scale(${scale})`
+        surface.style.marginBottom = `${marginBottom - surfaceRect.height * (1 - scale)}px`
+    }
+
+    disconnectedCallback() {
+        cancelAnimationFrame(this._fitInitFrame)
+        cancelAnimationFrame(this._fitFrame)
+        this._fitChildObserver?.disconnect()
+        this._fitObserver?.disconnect()
+        if (this._fitSchedule) {
+            window.removeEventListener('resize', this._fitSchedule)
+            window.visualViewport?.removeEventListener('resize', this._fitSchedule)
+        }
+        if (this._fitSurface && this._fitOriginal) {
+            this._fitSurface.style.marginBottom = this._fitOriginal.marginBottom
+            this._fitSurface.style.transform = this._fitOriginal.transform
+            this._fitSurface.style.transformOrigin = this._fitOriginal.transformOrigin
+            delete this._fitSurface.dataset.fitScale
+        }
+        document.documentElement.classList.remove('game-page')
     }
 })
 </script>

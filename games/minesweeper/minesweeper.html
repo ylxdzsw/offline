@@ -115,10 +115,6 @@
         }
         .reveal { color: var(--accent-ink); border-color: transparent; background: var(--accent); }
         .flag { color: var(--danger); background: var(--bg-surface); }
-        .gesture-note {
-            margin: 9px auto 0; max-width: 420px; color: var(--ink-faint);
-            font-size: .71rem; line-height: 1.45; text-align: center;
-        }
         @media (prefers-reduced-motion: reduce) {
             .cell { transition: none; }
             .cell.just-revealed, .cell.flag-change, .cell.exploded.just-revealed { animation: none; }
@@ -149,7 +145,6 @@
         <button class="reveal" type="button"></button>
         <button class="flag" type="button"></button>
     </div>
-    <p class="gesture-note"></p>
 </template>
 
 <script>
@@ -268,7 +263,6 @@ customElements.define('minesweeper-game', class extends HTMLElement {
         s.querySelector('.mines-label').textContent = t('minesweeperMines')
         s.querySelector('.time-label').textContent = t('minesweeperTime')
         s.querySelector('.warning').textContent = t('storageWarning')
-        s.querySelector('.gesture-note').textContent = t('minesweeperGesture')
         s.querySelector('.board').setAttribute('aria-label', t('minesweeperBoard'))
     }
 

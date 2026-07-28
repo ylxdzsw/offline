@@ -162,10 +162,6 @@
         .pile > .card.face + .card {
             margin-top: clamp(-43px, -8.5vw, -23px);
         }
-        .gesture-note {
-            margin: 9px auto 0; max-width: 440px; color: var(--ink-faint);
-            font-size: .7rem; line-height: 1.45; text-align: center;
-        }
         .celebration {
             position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 50;
         }
@@ -223,7 +219,6 @@
         <div class="tableau"></div>
         <div class="celebration" hidden></div>
     </div>
-    <p class="gesture-note"></p>
 </template>
 
 <script>
@@ -319,7 +314,6 @@ customElements.define('spider-game', class extends HTMLElement {
         s.querySelector('.runs-label').textContent = t('spiderRuns')
         s.querySelector('.deals-label').textContent = t('spiderDeals')
         s.querySelector('.warning').textContent = t('storageWarning')
-        s.querySelector('.gesture-note').textContent = t('spiderGesture')
         s.querySelector('.table').setAttribute('aria-label', t('spiderTable'))
     }
 

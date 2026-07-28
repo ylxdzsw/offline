@@ -201,6 +201,13 @@ body {
     text-rendering: optimizeLegibility;
 }
 
+html.game-page,
+html.game-page body {
+    height: var(--app-height);
+    min-height: 0;
+    overflow: hidden;
+}
+
 /* WebKit standalone mode reports dynamic viewport heights without the safe
    areas on some iPadOS/iOS releases; 100vh includes the full app canvas. */
 @media (display-mode: standalone) {
