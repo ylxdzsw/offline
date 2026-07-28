@@ -12,6 +12,7 @@ A mobile-first bilingual collection of classic board and puzzle games that remai
 - English Draughts with compulsory multi-jumps and an on-device AI
 - Five-point Backgammon with the doubling cube, Crawford rule, and expectiminimax AI
 - Huarong Dao with three layouts and optimal on-device path hints
+- Sliding Puzzle with solvable 3×3, classic 4×4, and 5×5 boards
 - Minesweeper with confirmation-first mobile controls and irreversible reveals
 - Klondike Solitaire with draw-one and draw-three play
 - Spider Solitaire with one-, two-, and four-suit modes

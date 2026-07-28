@@ -13,10 +13,11 @@ GAMES := \
 	checkers \
 	backgammon \
 	huarong \
+	sliding \
 	minesweeper \
 	solitaire \
 	spider
-JS_GAMES := sudoku 2048 minesweeper solitaire spider
+JS_GAMES := sudoku 2048 sliding minesweeper solitaire spider
 WASM_GAMES := $(filter-out $(JS_GAMES),$(GAMES))
 PAGES := index $(GAMES)
 APP_SOURCES := $(shell find app -type f -not -name '*.test.js' -not -path 'app/icons/*')

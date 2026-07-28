@@ -38,6 +38,7 @@
     .game-gallery article[data-game="checkers"] .preview { color: var(--piece-white); background: color-mix(in srgb, var(--board-dark) 48%, var(--bg-elevated)); }
     .game-gallery article[data-game="backgammon"] .preview { color: #f4e6cf; background: color-mix(in srgb, #a75c42 68%, var(--bg-elevated)); }
     .game-gallery article[data-game="huarong"] .preview { color: var(--piece-red); background: color-mix(in srgb, var(--board-wood) 62%, var(--bg-elevated)); }
+    .game-gallery article[data-game="sliding"] .preview { color: var(--ink); background: color-mix(in srgb, #40534c 48%, var(--bg-elevated)); }
     .game-gallery article[data-game="minesweeper"] .preview { color: var(--ink); background: color-mix(in srgb, var(--selected) 14%, var(--bg-elevated)); }
     .game-gallery article[data-game="solitaire"] .preview { color: #fff; background: color-mix(in srgb, #246449 78%, var(--bg-elevated)); }
     .game-gallery article[data-game="spider"] .preview { color: #fff; background: color-mix(in srgb, #174633 82%, var(--bg-elevated)); }
@@ -183,6 +184,27 @@
     .game-gallery .huarong-mark .s2 { top: 41px; left: 25px; width: 9px; height: 9px; }
     .game-gallery .huarong-mark .s3 { bottom: 3px; left: 3px; width: 9px; height: 9px; }
     .game-gallery .huarong-mark .s4 { right: 3px; bottom: 3px; width: 9px; height: 9px; }
+    .game-gallery .sliding-mark {
+        display: grid; width: 64px; height: 64px; box-sizing: border-box;
+        grid-template: repeat(4, minmax(0, 1fr)) / repeat(4, minmax(0, 1fr));
+        gap: 3px; padding: 5px; border: 2px solid var(--board-wood-edge);
+        border-radius: 6px; background: var(--board-wood-deep);
+        box-shadow: inset 0 1px 5px rgba(25,20,14,.32);
+    }
+    .game-gallery .sliding-mark i {
+        display: grid; min-width: 0; min-height: 0; border-top: 2px solid var(--accent);
+        border-radius: 3px; place-items: center; color: var(--ink);
+        background: var(--piece-face); box-shadow: 0 1px 2px rgba(31,24,16,.24);
+        font-family: var(--font-display); font-size: .48rem; font-style: normal; font-weight: 800;
+        line-height: 1;
+    }
+    .game-gallery .sliding-mark i:nth-child(n+5):nth-child(-n+8) { border-top-color: var(--selected); }
+    .game-gallery .sliding-mark i:nth-child(n+9):nth-child(-n+12) { border-top-color: var(--danger); }
+    .game-gallery .sliding-mark i:nth-child(n+13) { border-top-color: var(--board-wood-edge); }
+    .game-gallery .sliding-mark i:last-child {
+        border: 0; background: color-mix(in srgb, var(--board-wood-edge) 56%, transparent);
+        box-shadow: inset 0 2px 4px rgba(18,18,16,.32);
+    }
     .game-gallery .minesweeper-mark {
         display: grid; width: 62px; height: 62px; box-sizing: border-box;
         grid-template: repeat(4, minmax(0, 1fr)) / repeat(4, minmax(0, 1fr));
@@ -316,6 +338,7 @@
             checkers: '<span class="checkers-mark"></span>',
             backgammon: '<span class="backgammon-mark"><i></i><i></i><i></i><i></i><i></i></span>',
             huarong: '<span class="huarong-mark"><i class="cao"></i><i class="guan"></i><i class="g1"></i><i class="g2"></i><i class="g3"></i><i class="g4"></i><i class="s1"></i><i class="s2"></i><i class="s3"></i><i class="s4"></i></span>',
+            sliding: '<span class="sliding-mark">' + Array.from({length: 16}, (_, index) => `<i>${index < 15 ? index + 1 : ''}</i>`).join('') + '</span>',
             minesweeper: '<span class="minesweeper-mark"><i></i><i class="one">1</i><i class="covered"></i><i class="covered"></i><i></i><i class="one">1</i><i class="two">2</i><i class="covered flag">⚑</i><i></i><i></i><i class="one">1</i><i class="covered"></i><i></i><i></i><i class="one">1</i><i class="covered"></i></span>',
             solitaire: '<span class="solitaire-mark"><i>♥</i><i>♣</i><i>♦</i></span>',
             spider: '<span class="spider-mark"><i>K♠</i><i>Q♥</i><i>J♣</i></span>',

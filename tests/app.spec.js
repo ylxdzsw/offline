@@ -46,6 +46,7 @@ test('gallery grid logos stay centered and contained', async ({page}) => {
     const geometry = await page.locator([
         'article[data-game="sudoku"] .preview > span',
         'article[data-game="huarong"] .preview > span',
+        'article[data-game="sliding"] .preview > span',
         'article[data-game="minesweeper"] .preview > span',
     ].join(',')).evaluateAll(marks => marks.map(mark => {
         const preview = mark.parentElement.getBoundingClientRect()
@@ -969,6 +970,108 @@ test('Huarong Dao hints and animates an optimal slide, persists, reloads, and un
     await expect(page.locator('huarong-game .target[data-to="16"]')).toHaveCount(0)
 })
 
+test('Sliding Puzzle changes size, slides with touch and keyboard, persists, and undoes', async ({page}) => {
+    await page.goto('/sliding.html')
+    await expect(page.locator('offline-shell h1')).toHaveText('Sliding Puzzle')
+    await expect(page.locator('sliding-puzzle .board')).toHaveAttribute('data-size', '4')
+    await expect(page.locator('sliding-puzzle .tile')).toHaveCount(15)
+    await expect(page.locator('sliding-puzzle .timer')).toHaveText('00:00')
+    await page.locator('offline-shell .guide-btn').click()
+    await expect(page.locator('offline-shell .guide-image')).toHaveAttribute('src', './guides/sliding.svg')
+    await expect(page.locator('offline-shell .rule-group')).toHaveCount(3)
+    await expect(page.locator('offline-shell .rule-group').first()).toContainText('called the 15 Puzzle')
+    await page.keyboard.press('Escape')
+
+    await page.locator('sliding-puzzle').evaluate(game => {
+        game.pauseTimer(false)
+        Object.assign(game.state, {
+            size: 4,
+            seed: 7,
+            board: [1,2,3,4, 5,6,7,8, 9,10,11,12, 13,14,0,15],
+            history: [],
+            elapsedMs: 65000,
+            progress: false,
+            outcome: null,
+        })
+        game.notice = null
+        game.rebuildBoard = true
+        game.save()
+        game.render()
+    })
+    const motion = await page.locator('sliding-puzzle .tile[data-value="15"]').evaluate(tile => {
+        tile.getBoundingClientRect()
+        tile.click()
+        const transition = tile.getAnimations().find(animation =>
+            ['left', 'top'].includes(animation.transitionProperty))
+        return transition?.effect.getTiming().duration
+    })
+    expect(motion).toBe(180)
+    await expect(page.locator('sliding-puzzle .move-count')).toHaveText('1')
+    await expect(page.locator('sliding-puzzle .status')).toHaveText('Puzzle solved in 1 move · 01:05')
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:sliding')).outcome)).toBe('solved')
+
+    await page.reload()
+    await expect(page.locator('sliding-puzzle .status')).toContainText('Puzzle solved')
+    await page.locator('sliding-puzzle .undo').click()
+    await expect(page.locator('sliding-puzzle .move-count')).toHaveText('0')
+    await expect(page.locator('sliding-puzzle .status')).toHaveText('Slide the numbered tiles into order')
+
+    page.once('dialog', dialog => dialog.accept())
+    await page.locator('sliding-puzzle .size [data-value="3"]').click()
+    await expect(page.locator('sliding-puzzle .board')).toHaveAttribute('data-size', '3')
+    await expect(page.locator('sliding-puzzle .tile')).toHaveCount(8)
+    await page.locator('sliding-puzzle').evaluate(game => {
+        game.pauseTimer(false)
+        Object.assign(game.state, {
+            board: [1,2,3, 4,5,6, 7,0,8],
+            history: [],
+            elapsedMs: 0,
+            progress: false,
+            outcome: null,
+        })
+        game.rebuildBoard = true
+        game.save()
+        game.render()
+    })
+    await page.locator('sliding-puzzle .board').press('ArrowRight')
+    await expect(page.locator('sliding-puzzle .status')).toContainText('Puzzle solved')
+
+    await page.locator('sliding-puzzle .size [data-value="5"]').click()
+    await expect(page.locator('sliding-puzzle .tile')).toHaveCount(24)
+    await page.locator('sliding-puzzle').evaluate(game => {
+        game.pauseTimer(false)
+        Object.assign(game.state, {
+            board: [
+                1,2,3,4,5, 6,7,8,9,10, 11,12,13,14,15,
+                16,17,18,19,20, 21,22,23,0,24,
+            ],
+            history: [],
+            elapsedMs: 0,
+            progress: false,
+            outcome: null,
+        })
+        game.rebuildBoard = true
+        game.save()
+        game.render()
+    })
+    const tile24 = page.locator('sliding-puzzle .tile[data-value="24"]')
+    const box = await tile24.boundingBox()
+    await tile24.dispatchEvent('pointerdown', {
+        pointerId: 17, pointerType: 'touch', button: 0,
+        clientX: box.x + box.width / 2, clientY: box.y + box.height / 2,
+    })
+    await tile24.dispatchEvent('pointerup', {
+        pointerId: 17, pointerType: 'touch', button: 0,
+        clientX: box.x + box.width / 2 - 30, clientY: box.y + box.height / 2,
+    })
+    await expect(page.locator('sliding-puzzle .status')).toContainText('Puzzle solved')
+    await expect(page.locator('sliding-puzzle .board')).toHaveAttribute('data-size', '5')
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:sliding')).size)).toBe(5)
+
+    await page.emulateMedia({reducedMotion: 'reduce'})
+    await expect(page.locator('sliding-puzzle .tile').first()).toHaveCSS('transition-duration', '0s')
+})
+
 test('Minesweeper animates confirmed reveals, keeps flags reversible, persists, and has no undo', async ({page}) => {
     await page.goto('/minesweeper.html')
     await expect(page.locator('minesweeper-game .cell')).toHaveCount(256)
@@ -1323,6 +1426,9 @@ test('the installed app reloads and navigates completely offline', async ({brows
     await page.goto('/huarong.html')
     await expect(page.locator('offline-shell h1')).toHaveText('Huarong Dao')
     await expect(page.locator('huarong-game .piece')).toHaveCount(10)
+    await page.goto('/sliding.html')
+    await expect(page.locator('offline-shell h1')).toHaveText('Sliding Puzzle')
+    await expect(page.locator('sliding-puzzle .tile')).toHaveCount(15)
     await page.goto('/minesweeper.html')
     await expect(page.locator('offline-shell h1')).toHaveText('Minesweeper')
     await expect(page.locator('minesweeper-game .cell')).toHaveCount(256)

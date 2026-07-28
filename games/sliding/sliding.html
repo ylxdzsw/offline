@@ -1,0 +1,480 @@
+<template id="sliding-puzzle-template">
+    <style>
+        :host { display: block; color: var(--ink); }
+        .toolbar {
+            display: grid; grid-template-columns: minmax(0, 1fr) auto auto;
+            gap: 8px; align-items: end; margin-bottom: 9px;
+        }
+        .size-control {
+            display: grid; min-width: 0; gap: 3px;
+            color: var(--ink-muted); font-size: .7rem; font-weight: 650;
+        }
+        offline-segmented { min-width: 0; }
+        button {
+            min-height: var(--control-h, 42px); padding: 0 12px;
+            border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+            color: var(--ink); background: var(--bg-surface); font-weight: 650;
+        }
+        button:disabled { opacity: .42; }
+        .warning { margin: 0 0 9px; color: var(--danger); font-size: .77rem; text-align: center; }
+        .warning[hidden] { display: none; }
+        .dashboard {
+            display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px; margin-bottom: 9px;
+        }
+        .meter {
+            display: grid; min-width: 0; min-height: 45px; padding: 5px 9px;
+            border: 1px solid var(--border); border-radius: var(--radius-sm);
+            place-content: center; text-align: center; background: var(--bg-surface);
+            box-shadow: var(--shadow-soft);
+        }
+        .meter span {
+            color: var(--ink-muted); font-size: .62rem; font-weight: 750;
+            line-height: 1; text-transform: uppercase;
+        }
+        .meter strong {
+            margin-top: 4px; color: var(--ink); font-family: var(--font-display);
+            font-size: 1.05rem; font-variant-numeric: tabular-nums; line-height: 1;
+        }
+        .status {
+            display: flex; min-height: 40px; align-items: center; justify-content: center;
+            margin: 0 0 9px; padding: 6px 10px; border-radius: var(--radius-sm);
+            color: var(--status-ink); font-size: .85rem; font-weight: 700;
+            line-height: 1.35; text-align: center; background: var(--status-bg);
+        }
+        .board {
+            width: min(100%, 390px); aspect-ratio: 1; box-sizing: border-box;
+            margin: 0 auto; padding: clamp(8px, 2.6vw, 12px);
+            overflow: hidden; border: 3px solid var(--board-wood-edge);
+            border-radius: var(--radius-md); background: color-mix(in srgb, var(--board-wood-deep) 72%, #3d4a45);
+            box-shadow: inset 0 1px 8px rgba(25,20,14,.35), var(--shadow-soft);
+            outline: none; touch-action: none; user-select: none;
+        }
+        .board:focus-visible { box-shadow: 0 0 0 3px var(--focus), inset 0 1px 8px rgba(25,20,14,.35); }
+        .well { position: relative; width: 100%; height: 100%; }
+        .blank, .tile {
+            position: absolute; box-sizing: border-box; border-radius: 7px;
+            transition: left .18s ease, top .18s ease;
+        }
+        .blank {
+            z-index: 0; border: 1px solid rgba(18,22,20,.22);
+            background: color-mix(in srgb, var(--board-wood-edge) 50%, transparent);
+            box-shadow: inset 0 3px 8px rgba(18,18,16,.38), 0 1px rgba(255,255,255,.12);
+        }
+        .tile {
+            z-index: 1; display: grid; min-height: 0; padding: 0;
+            border: 1px solid color-mix(in srgb, var(--tile-mark) 52%, var(--border-strong));
+            border-top: 4px solid var(--tile-mark); place-items: center;
+            color: var(--ink); background: color-mix(in srgb, var(--piece-face) 86%, var(--bg-surface));
+            box-shadow: inset 0 1px rgba(255,255,255,.45), 0 2px 4px rgba(31,24,16,.30);
+            font-family: var(--font-display); font-size: clamp(1.28rem, 8.4vw, 2.3rem);
+            font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1;
+        }
+        .tile[data-group="0"] { --tile-mark: var(--accent); }
+        .tile[data-group="1"] { --tile-mark: var(--selected); }
+        .tile[data-group="2"] { --tile-mark: var(--danger); }
+        .tile[data-group="3"] { --tile-mark: var(--board-wood-edge); }
+        .tile[data-group="4"] { --tile-mark: var(--ink-muted); }
+        .tile.movable { cursor: pointer; }
+        .tile.movable:active { filter: brightness(.94); transform: scale(.97); }
+        .tile.solved {
+            border-color: var(--accent); background: var(--accent-soft);
+            box-shadow: inset 0 1px rgba(255,255,255,.35), 0 0 0 1px var(--accent);
+        }
+        .board[data-size="5"] .tile { border-top-width: 3px; font-size: clamp(1rem, 6.7vw, 1.75rem); }
+        @media (max-width: 340px) {
+            .toolbar { gap: 5px; }
+            button { padding-inline: 9px; font-size: .8rem; }
+            .board { padding: 7px; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .blank, .tile { transition: none; }
+        }
+    </style>
+    <div class="toolbar">
+        <div class="size-control">
+            <span class="size-label"></span>
+            <offline-segmented class="size"></offline-segmented>
+        </div>
+        <button class="undo" type="button"></button>
+        <button class="new" type="button"></button>
+    </div>
+    <p class="warning" hidden></p>
+    <div class="dashboard">
+        <div class="meter"><span class="moves-label"></span><strong class="move-count">0</strong></div>
+        <div class="meter"><span class="time-label"></span><strong class="timer">00:00</strong></div>
+    </div>
+    <div class="status" role="status" aria-live="polite"></div>
+    <div class="board" role="grid" tabindex="0"><div class="well"></div></div>
+</template>
+
+<script>
+customElements.define('sliding-puzzle', class extends HTMLElement {
+    constructor() {
+        super()
+        this.attachShadow({mode: 'open'}).append(
+            document.getElementById('sliding-puzzle-template').content.cloneNode(true)
+        )
+        this.notice = null
+        this.pointer = null
+        this.suppressClick = false
+        this.rebuildBoard = true
+        this.timerOrigin = null
+        this.timerInterval = null
+        this.visibilityHandler = () => this.visibilityChanged()
+    }
+
+    connectedCallback() {
+        this.engine = OfflineGames.SlidingPuzzle
+        this.i18n = OfflineGames.i18n
+        this.storage = OfflineGames.storage
+        this.load()
+        this.bind()
+        this.localize()
+        this.render()
+        this.resumeTimer()
+        document.addEventListener('visibilitychange', this.visibilityHandler)
+    }
+
+    disconnectedCallback() {
+        document.removeEventListener('visibilitychange', this.visibilityHandler)
+        this.pauseTimer(true)
+    }
+
+    fresh(size = 4) {
+        const seed = OfflineGames.runtime.randomSeed()
+        return {
+            schema: 1,
+            game: 'sliding',
+            size,
+            seed,
+            board: this.engine.newGame(size, seed),
+            history: [],
+            elapsedMs: 0,
+            progress: false,
+            outcome: null,
+        }
+    }
+
+    valid(saved) {
+        if (!saved || !this.engine.SIZES.includes(saved.size)
+            || !Number.isInteger(saved.seed) || saved.seed < 0 || saved.seed > 0xffffffff
+            || !this.engine.validate(saved.board, saved.size)
+            || !Array.isArray(saved.history)
+            || !saved.history.every(index => Number.isInteger(index)
+                && index >= 0 && index < saved.size * saved.size)
+            || !Number.isFinite(saved.elapsedMs) || saved.elapsedMs < 0
+            || typeof saved.progress !== 'boolean'
+            || ![null, 'solved'].includes(saved.outcome)
+            || (saved.history.length > 0 && !saved.progress)) return false
+        return this.engine.isSolved(saved.board, saved.size) === (saved.outcome === 'solved')
+    }
+
+    load() {
+        const saved = this.storage.read('sliding')
+        this.state = this.valid(saved) ? saved : this.fresh()
+    }
+
+    bind() {
+        const s = this.shadowRoot
+        const board = s.querySelector('.board')
+        board.addEventListener('click', event => {
+            const tile = event.target.closest('.tile')
+            if (!tile) return
+            if (this.suppressClick) {
+                this.suppressClick = false
+                return
+            }
+            this.moveTile(Number(tile.dataset.index))
+        })
+        board.addEventListener('keydown', event => {
+            const direction = {
+                ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+                w: 'up', W: 'up', s: 'down', S: 'down',
+                a: 'left', A: 'left', d: 'right', D: 'right',
+            }[event.key]
+            if (!direction) return
+            event.preventDefault()
+            this.applyMove(this.engine.moveBlank(this.state.board, this.state.size, direction))
+        })
+        board.addEventListener('pointerdown', event => this.beginSwipe(event))
+        board.addEventListener('pointerup', event => this.endSwipe(event))
+        board.addEventListener('pointercancel', () => { this.pointer = null })
+        s.querySelector('.undo').addEventListener('click', () => this.undo())
+        s.querySelector('.new').addEventListener('click', () => this.newGame())
+        s.querySelector('.size').addEventListener('change', event => {
+            const previous = this.state.size
+            if (!this.newGame(Number(event.detail.value))) {
+                this.setSizeControl(previous)
+            }
+        })
+    }
+
+    localize() {
+        const s = this.shadowRoot, t = key => this.i18n.t(key)
+        const options = this.engine.SIZES.map(size => ({
+            value: String(size),
+            label: `${size}×${size}`,
+        }))
+        const segmented = s.querySelector('.size')
+        segmented.setAttribute('options', JSON.stringify(options))
+        segmented.setAttribute('value', String(this.state.size))
+        segmented.setAttribute('aria-label', t('slidingSize'))
+        s.querySelector('.size-label').textContent = t('slidingSize')
+        s.querySelector('.undo').textContent = t('undo')
+        s.querySelector('.new').textContent = t('newGame')
+        s.querySelector('.moves-label').textContent = t('slidingMoves')
+        s.querySelector('.time-label').textContent = t('slidingTime')
+        s.querySelector('.warning').textContent = t('storageWarning')
+        s.querySelector('.board').setAttribute('aria-label', t('slidingBoard'))
+    }
+
+    beginSwipe(event) {
+        const tile = event.target.closest('.tile')
+        if (!tile || event.button !== 0 || this.state.outcome) return
+        this.pointer = {
+            id: event.pointerId,
+            index: Number(tile.dataset.index),
+            x: event.clientX,
+            y: event.clientY,
+        }
+        try { tile.setPointerCapture(event.pointerId) } catch {}
+    }
+
+    endSwipe(event) {
+        if (!this.pointer || this.pointer.id !== event.pointerId) return
+        const pointer = this.pointer
+        this.pointer = null
+        const blank = this.state.board.indexOf(0)
+        const size = this.state.size
+        const tileRow = Math.floor(pointer.index / size)
+        const tileColumn = pointer.index % size
+        const blankRow = Math.floor(blank / size)
+        const blankColumn = blank % size
+        if (Math.abs(tileRow - blankRow) + Math.abs(tileColumn - blankColumn) !== 1) return
+        const dx = event.clientX - pointer.x
+        const dy = event.clientY - pointer.y
+        const threshold = 16
+        const horizontal = tileColumn !== blankColumn
+        const towardBlank = horizontal
+            ? Math.abs(dx) >= threshold && Math.abs(dx) > Math.abs(dy)
+                && Math.sign(dx) === Math.sign(blankColumn - tileColumn)
+            : Math.abs(dy) >= threshold && Math.abs(dy) > Math.abs(dx)
+                && Math.sign(dy) === Math.sign(blankRow - tileRow)
+        if (!towardBlank) return
+        this.suppressClick = true
+        setTimeout(() => { this.suppressClick = false }, 0)
+        this.moveTile(pointer.index)
+    }
+
+    moveTile(index) {
+        this.applyMove(this.engine.move(this.state.board, this.state.size, index))
+    }
+
+    applyMove(result) {
+        if (this.state.outcome) return
+        if (!result.moved) {
+            this.notice = 'blocked'
+            this.render()
+            return
+        }
+        this.state.history.push(result.to)
+        this.state.board = result.board
+        this.state.progress = true
+        this.state.outcome = result.solved ? 'solved' : null
+        this.notice = null
+        if (result.solved) this.pauseTimer(false)
+        else this.resumeTimer()
+        this.save()
+        this.render()
+    }
+
+    undo() {
+        const previousBlank = this.state.history.pop()
+        if (previousBlank == null) return
+        const result = this.engine.move(this.state.board, this.state.size, previousBlank)
+        if (!result.moved) {
+            this.state = this.fresh(this.state.size)
+            this.rebuildBoard = true
+        } else {
+            this.state.board = result.board
+            this.state.outcome = null
+        }
+        this.notice = null
+        this.resumeTimer()
+        this.save()
+        this.render()
+        this.shadowRoot.querySelector('.board').focus()
+    }
+
+    newGame(size = this.state.size, force = false) {
+        if (!force && this.state.progress && !this.state.outcome
+            && !confirm(this.i18n.t('confirmNew'))) return false
+        this.pauseTimer(false)
+        this.state = this.fresh(size)
+        this.notice = null
+        this.rebuildBoard = true
+        this.save()
+        this.render()
+        this.shadowRoot.querySelector('.board').focus()
+        return true
+    }
+
+    syncTimer() {
+        if (this.timerOrigin != null) {
+            this.state.elapsedMs = Math.max(0, performance.now() - this.timerOrigin)
+        }
+    }
+
+    resumeTimer() {
+        if (!this.state.progress || this.state.outcome || this.timerOrigin != null
+            || document.visibilityState === 'hidden') return
+        this.timerOrigin = performance.now() - this.state.elapsedMs
+        this.timerInterval = setInterval(() => {
+            this.syncTimer()
+            this.renderTimer()
+        }, 250)
+    }
+
+    pauseTimer(persist) {
+        this.syncTimer()
+        if (this.timerInterval != null) clearInterval(this.timerInterval)
+        this.timerInterval = null
+        this.timerOrigin = null
+        if (persist && this.state) this.writeState()
+    }
+
+    visibilityChanged() {
+        if (document.visibilityState === 'hidden') this.pauseTimer(true)
+        else this.resumeTimer()
+    }
+
+    save() {
+        this.syncTimer()
+        this.writeState()
+    }
+
+    writeState() {
+        if (!this.storage.write('sliding', this.state)) {
+            this.shadowRoot.querySelector('.warning').hidden = false
+        }
+    }
+
+    timeText() {
+        const seconds = Math.floor(this.state.elapsedMs / 1000)
+        const minutes = Math.floor(seconds / 60)
+        if (minutes < 60) {
+            return `${String(minutes).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
+        }
+        return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
+    }
+
+    renderTimer() {
+        this.shadowRoot.querySelector('.timer').textContent = this.timeText()
+    }
+
+    format(template, values) {
+        return Object.entries(values).reduce(
+            (text, [key, value]) => text.replaceAll(`{${key}}`, value),
+            template,
+        )
+    }
+
+    setSizeControl(size) {
+        const control = this.shadowRoot.querySelector('.size')
+        if (typeof control.setValue === 'function') control.setValue(String(size))
+        else control.setAttribute('value', String(size))
+    }
+
+    position(element, index, size, gap) {
+        const row = Math.floor(index / size)
+        const column = index % size
+        const tilePercent = 100 / size
+        const tileGap = (size - 1) * gap / size
+        element.style.width = `calc(${tilePercent}% - ${tileGap}px)`
+        element.style.height = `calc(${tilePercent}% - ${tileGap}px)`
+        element.style.left = `calc(${column * tilePercent}% + ${column * gap / size}px)`
+        element.style.top = `calc(${row * tilePercent}% + ${row * gap / size}px)`
+        element.setAttribute('aria-rowindex', String(row + 1))
+        element.setAttribute('aria-colindex', String(column + 1))
+    }
+
+    renderBoard() {
+        const s = this.shadowRoot
+        const board = s.querySelector('.board')
+        const well = board.querySelector('.well')
+        const size = this.state.size
+        const cells = size * size
+        const gap = size === 5 ? 5 : size === 4 ? 7 : 9
+        if (this.rebuildBoard || well.querySelectorAll('.tile').length !== cells - 1) {
+            const blank = Object.assign(document.createElement('div'), {className: 'blank'})
+            blank.setAttribute('role', 'gridcell')
+            well.replaceChildren(
+                blank,
+                ...Array.from({length: cells - 1}, (_, index) => {
+                    const tile = document.createElement('button')
+                    tile.type = 'button'
+                    tile.className = 'tile'
+                    tile.dataset.value = index + 1
+                    tile.dataset.group = Math.floor(index / size)
+                    tile.setAttribute('role', 'gridcell')
+                    tile.tabIndex = -1
+                    tile.textContent = String(index + 1)
+                    return tile
+                }),
+            )
+            this.rebuildBoard = false
+        }
+
+        const legal = new Set(this.engine.legalTiles(this.state.board, size))
+        const blankIndex = this.state.board.indexOf(0)
+        const blank = well.querySelector('.blank')
+        this.position(blank, blankIndex, size, gap)
+        blank.setAttribute('aria-label', this.format(this.i18n.t('slidingEmptyLabel'), {
+            row: Math.floor(blankIndex / size) + 1,
+            column: blankIndex % size + 1,
+        }))
+        for (const tile of well.querySelectorAll('.tile')) {
+            const value = Number(tile.dataset.value)
+            const index = this.state.board.indexOf(value)
+            tile.dataset.index = index
+            tile.dataset.group = Math.floor((value - 1) / size)
+            tile.classList.toggle('movable', legal.has(index) && !this.state.outcome)
+            tile.classList.toggle('solved', Boolean(this.state.outcome))
+            tile.setAttribute('aria-disabled', String(!legal.has(index) || Boolean(this.state.outcome)))
+            tile.setAttribute('aria-label', this.format(
+                this.i18n.t(legal.has(index) && !this.state.outcome
+                    ? 'slidingMovableTileLabel'
+                    : 'slidingTileLabel'),
+                {
+                    tile: value,
+                    row: Math.floor(index / size) + 1,
+                    column: index % size + 1,
+                },
+            ))
+            this.position(tile, index, size, gap)
+        }
+        board.dataset.size = size
+        board.setAttribute('aria-rowcount', String(size))
+        board.setAttribute('aria-colcount', String(size))
+        board.setAttribute('aria-disabled', String(Boolean(this.state.outcome)))
+    }
+
+    render() {
+        const s = this.shadowRoot
+        this.setSizeControl(this.state.size)
+        s.querySelector('.move-count').textContent = String(this.state.history.length)
+        s.querySelector('.undo').disabled = this.state.history.length === 0
+        this.renderTimer()
+        s.querySelector('.status').textContent = this.state.outcome
+            ? this.format(this.i18n.t(this.state.history.length === 1
+                ? 'slidingSolvedOne'
+                : 'slidingSolved'), {
+                moves: this.state.history.length,
+                time: this.timeText(),
+            })
+            : this.i18n.t(this.notice === 'blocked' ? 'slidingBlocked' : 'slidingPrompt')
+        this.renderBoard()
+    }
+})
+</script>
