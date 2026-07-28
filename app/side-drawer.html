@@ -107,6 +107,20 @@
             text-transform: uppercase;
         }
         offline-segmented { display: block; }
+        footer {
+            margin-top: auto;
+            padding: 20px 4px 0;
+            border-top: 1px solid var(--separator);
+            color: var(--ink-faint);
+            font-size: .6rem;
+            line-height: 1.55;
+            text-align: center;
+        }
+        footer a {
+            color: inherit;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
     </style>
     <button class="backdrop" type="button" tabindex="-1" aria-hidden="true"></button>
     <aside aria-hidden="true" inert>
@@ -123,6 +137,10 @@
             <p class="section-label theme-label"></p>
             <offline-segmented class="theme-seg"></offline-segmented>
         </section>
+        <footer>
+            <span class="copyright"></span><br>
+            <a href="https://github.com/ylxdzsw/offline" rel="external noopener"></a>
+        </footer>
     </aside>
 </template>
 <script>
@@ -150,6 +168,8 @@ customElements.define('offline-drawer', class extends HTMLElement {
         s.querySelector('.close-btn').setAttribute('aria-label', i18n.t('close'))
         s.querySelector('.lang-label').textContent = i18n.t('language')
         s.querySelector('.theme-label').textContent = i18n.t('appearance')
+        s.querySelector('.copyright').textContent = i18n.t('copyright')
+        s.querySelector('footer a').textContent = i18n.t('source')
 
         /* Navigation */
         const pages = games.map(id => ({id, page: id + '.html'}))

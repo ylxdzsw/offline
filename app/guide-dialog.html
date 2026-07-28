@@ -1,9 +1,14 @@
 <template id="offline-guide-template">
     <style>
         dialog {
-            width: min(calc(100vw - 24px), 560px);
-            max-height: min(calc(100dvh - 24px), 760px);
+            position: fixed;
+            inset: auto;
+            top: calc(var(--safe-top) + (100dvh - var(--safe-top) - var(--safe-bottom)) / 2);
+            left: calc(var(--safe-left) + (100vw - var(--safe-left) - var(--safe-right)) / 2);
+            width: min(calc(100vw - var(--safe-left) - var(--safe-right) - 24px), 560px);
+            max-height: min(calc(100dvh - var(--safe-top) - var(--safe-bottom) - 24px), 760px);
             overflow-y: auto;
+            margin: 0;
             padding: 0;
             border: none;
             border-radius: var(--radius-lg);
@@ -11,6 +16,7 @@
             background: var(--bg-surface);
             box-shadow: var(--shadow-modal);
             overscroll-behavior: contain;
+            transform: translate(-50%, -50%);
         }
         dialog::backdrop {
             background: var(--drawer-scrim);

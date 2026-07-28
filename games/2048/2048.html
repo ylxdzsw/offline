@@ -60,22 +60,15 @@
         .cell.beyond { color: #f9f6f2; background: #3c3a32; font-size: clamp(.92rem, 5.2vw, 1.55rem); }
         .cell.spawn { animation: spawn .18s ease-out; }
         .cell.merged { animation: merge .22s ease-out; }
-        .board.move-left { --slide-x: 18%; --slide-y: 0; }
-        .board.move-right { --slide-x: -18%; --slide-y: 0; }
-        .board.move-up { --slide-x: 0; --slide-y: 18%; }
-        .board.move-down { --slide-x: 0; --slide-y: -18%; }
-        .board.moving .cell:not(.spawn) { animation: slide .18s ease-out; }
-        .board.moving .cell.merged { animation: slide .18s ease-out, merge .22s ease-out; }
         @keyframes spawn { from { opacity: 0; transform: scale(.45); } }
         @keyframes merge { 45% { transform: scale(1.13); } }
-        @keyframes slide { from { translate: var(--slide-x) var(--slide-y); } }
         @media (max-width: 340px) {
             .toolbar { gap: 4px; }
             .score { padding-inline: 5px; }
             button { padding-inline: 8px; font-size: .8rem; }
         }
         @media (prefers-reduced-motion: reduce) {
-            .cell.spawn, .cell.merged, .board.moving .cell:not(.spawn) { animation: none; }
+            .cell.spawn, .cell.merged { animation: none; }
         }
     </style>
     <div class="toolbar">
@@ -213,7 +206,7 @@ customElements.define('game-2048', class extends HTMLElement {
         this.state.outcome = result.gameOver ? 'over' : null
         this.announcement = this.state.outcome ? 'game2048Over' : firstWin ? 'game2048Reached' : null
         clearTimeout(this.animationTimer)
-        this.animation = {direction, spawned: result.spawned?.index, merged: result.merged}
+        this.animation = {spawned: result.spawned?.index, merged: result.merged}
         this.save()
         this.render()
         const animation = this.animation
@@ -222,7 +215,6 @@ customElements.define('game-2048', class extends HTMLElement {
             this.animation = null
             this.animationTimer = null
             for (const cell of this.shadowRoot.querySelectorAll('.spawn, .merged')) cell.classList.remove('spawn', 'merged')
-            this.shadowRoot.querySelector('.board').classList.remove('moving', 'move-left', 'move-right', 'move-up', 'move-down')
         }, 260)
     }
     undo() {
@@ -258,8 +250,6 @@ customElements.define('game-2048', class extends HTMLElement {
             this.announcement || (this.state.outcome ? 'game2048Over' : 'game2048Prompt')
         )
         const board = s.querySelector('.board')
-        board.classList.remove('moving', 'move-left', 'move-right', 'move-up', 'move-down')
-        if (this.animation?.direction) board.classList.add('moving', `move-${this.animation.direction}`)
         board.setAttribute('aria-disabled', String(Boolean(this.state.outcome)))
         board.replaceChildren(...this.state.board.map((value, index) => {
             const cell = document.createElement('div')

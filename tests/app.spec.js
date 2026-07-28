@@ -82,6 +82,11 @@ test('gallery grid logos stay centered and contained', async ({page}) => {
         ]
     })
     for (const offset of huarongOffsets) expect(Math.abs(offset)).toBeLessThanOrEqual(.01)
+
+    const slidingBorders = await page.locator('.sliding-mark i:not(:last-child)').evaluateAll(cells =>
+        new Set(cells.map(cell => getComputedStyle(cell).borderTopColor)).size
+    )
+    expect(slidingBorders).toBe(1)
 })
 
 test('language preference persists across pages without changing their URLs', async ({page}) => {
@@ -144,6 +149,13 @@ test('drawer controls remain reachable on a short phone viewport', async ({page}
     await expect(darkTheme).toBeInViewport()
     await darkTheme.click()
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+
+    const drawerFooter = page.locator('offline-shell offline-drawer footer')
+    await drawerFooter.scrollIntoViewIfNeeded()
+    await expect(drawerFooter).toBeInViewport()
+    await expect(drawerFooter.locator('.copyright')).toHaveText('© 2026 ylxdzsw')
+    await expect(drawerFooter.locator('a')).toHaveText('Source code available under the MIT license')
+    await expect(drawerFooter.locator('a')).toHaveAttribute('href', 'https://github.com/ylxdzsw/offline')
 
     await page.locator('offline-shell offline-drawer .close-btn').click()
     await expect(drawer).toHaveAttribute('inert', '')
@@ -214,6 +226,25 @@ test('game viewport setup waits for a parser-delayed game element', async ({page
     expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(480)
 })
 
+test('Spider uses the available width on a short phone viewport', async ({page}) => {
+    await page.setViewportSize({width: 320, height: 480})
+    await page.goto('/spider.html')
+    await page.waitForFunction(() =>
+        document.querySelector('offline-shell')?._fitSurface?.dataset.fitScale !== undefined
+    )
+    const geometry = await page.locator('spider-game').evaluate(game => {
+        const table = game.shadowRoot.querySelector('.table').getBoundingClientRect()
+        const host = game.getBoundingClientRect()
+        return {
+            scale: Number(document.querySelector('offline-shell')._fitSurface.dataset.fitScale),
+            tableWidth: table.width,
+            hostWidth: host.width,
+        }
+    })
+    expect(geometry.scale).toBe(1)
+    expect(geometry.tableWidth).toBeGreaterThanOrEqual(geometry.hostWidth - 1)
+})
+
 test('navigator language auto-detects Chinese without a saved preference', async ({browser}) => {
     const context = await browser.newContext({locale: 'zh-CN', viewport: {width: 390, height: 844}})
     const page = await context.newPage()
@@ -229,6 +260,10 @@ test('game intro opens localized rules and tips without appearing in the gallery
 
     await page.setViewportSize({width: 320, height: 568})
     await page.goto('/wuziqi.html')
+    await page.evaluate(() => {
+        document.documentElement.style.setProperty('--safe-top', '47px')
+        document.documentElement.style.setProperty('--safe-bottom', '34px')
+    })
     const intro = page.locator('offline-shell .guide-btn')
     await expect(intro).toHaveAttribute('aria-label', 'How to play')
     await intro.click()
@@ -244,7 +279,8 @@ test('game intro opens localized rules and tips without appearing in the gallery
     expect(await dialog.locator('.guide-image').evaluate(image => image.complete && image.naturalWidth > 0)).toBeTruthy()
     expect(await dialog.evaluate(element => {
         const rect = element.getBoundingClientRect()
-        return rect.left >= 0 && rect.right <= innerWidth && rect.top >= 0 && rect.bottom <= innerHeight
+        return rect.left >= 0 && rect.right <= innerWidth
+            && rect.top >= 47 && rect.bottom <= innerHeight - 34
     })).toBeTruthy()
     await page.keyboard.press('Escape')
     await expect(dialog).toBeHidden()
@@ -445,11 +481,13 @@ test('2048 merges, scores, persists, reloads, undoes, and accepts a swipe', asyn
             className: element.className,
             merged: getComputedStyle(element.querySelector('.merged')).animationName,
             spawned: getComputedStyle(element.querySelector('.spawn')).animationName,
+            background: getComputedStyle(element.querySelector('[data-value="0"]')).animationName,
         }
     })
-    expect(cue.className).toContain('move-left')
-    expect(cue.merged).toBe('slide, merge')
+    expect(cue.className).not.toContain('move-left')
+    expect(cue.merged).toBe('merge')
     expect(cue.spawned).toBe('spawn')
+    expect(cue.background).toBe('none')
     await expect(page.locator('game-2048 .current-score')).toHaveText('4')
     await expect(page.locator('game-2048 .cell[data-value="4"]')).toHaveCount(1)
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:2048')).history.length)).toBe(1)
@@ -1027,14 +1065,40 @@ test('Sliding Puzzle changes size, slides with touch and keyboard, persists, and
         game.save()
         game.render()
     })
+    await expect(page.locator('sliding-puzzle .slot')).toHaveCount(16)
+    const tileColors = await page.locator('sliding-puzzle .tile').evaluateAll(tiles => ({
+        backgrounds: new Set(tiles.map(tile => getComputedStyle(tile).backgroundColor)).size,
+        borders: new Set(tiles.map(tile => getComputedStyle(tile).borderTopColor)).size,
+    }))
+    expect(tileColors).toEqual({backgrounds: 1, borders: 1})
     const motion = await page.locator('sliding-puzzle .tile[data-value="15"]').evaluate(tile => {
+        const root = tile.getRootNode()
+        const slots = [...root.querySelectorAll('.slot')]
+        const before = slots.map(slot => {
+            const rect = slot.getBoundingClientRect()
+            return [rect.x, rect.y, rect.width, rect.height]
+        })
         tile.getBoundingClientRect()
         tile.click()
         const transition = tile.getAnimations().find(animation =>
             ['left', 'top'].includes(animation.transitionProperty))
-        return transition?.effect.getTiming().duration
+        const after = slots.map(slot => {
+            const rect = slot.getBoundingClientRect()
+            return [rect.x, rect.y, rect.width, rect.height]
+        })
+        return {
+            duration: transition?.effect.getTiming().duration,
+            fixedBackground: JSON.stringify(before) === JSON.stringify(after),
+            emptyIndex: root.querySelector('.slot.empty')?.dataset.index,
+            backgroundAnimations: slots.flatMap(slot => slot.getAnimations()).length,
+        }
     })
-    expect(motion).toBe(180)
+    expect(motion).toEqual({
+        duration: 180,
+        fixedBackground: true,
+        emptyIndex: '15',
+        backgroundAnimations: 0,
+    })
     await expect(page.locator('sliding-puzzle .move-count')).toHaveText('1')
     await expect(page.locator('sliding-puzzle .status')).toHaveText('Puzzle solved in 1 move · 01:05')
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:sliding')).outcome)).toBe('solved')
