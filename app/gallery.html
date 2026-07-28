@@ -30,6 +30,7 @@
     /* Per-game preview tints */
     .game-gallery article[data-game="xiangqi"] .preview { color: var(--piece-red); background: color-mix(in srgb, var(--board-wood) 55%, var(--bg-elevated)); }
     .game-gallery article[data-game="wuziqi"]  .preview { color: var(--board-wood-line); background: color-mix(in srgb, var(--board-wood) 50%, var(--bg-elevated)); }
+    .game-gallery article[data-game="go"] .preview { color: var(--board-wood-line); background: color-mix(in srgb, var(--board-wood) 62%, var(--bg-elevated)); }
     .game-gallery article[data-game="sudoku"]  .preview { color: var(--ink); background: var(--board-paper); }
     .game-gallery article[data-game="2048"]    .preview { color: #776e65; background: color-mix(in srgb, #8f7a66 55%, var(--bg-elevated)); }
     .game-gallery article[data-game="junqi"]   .preview { color: var(--piece-red); background: color-mix(in srgb, var(--board-wood) 40%, var(--bg-elevated)); }
@@ -64,6 +65,22 @@
     }
     .game-gallery .gomoku-mark::before { top: 8px; left: 8px; background: radial-gradient(circle at 35% 30%, #4a4a48, var(--stone-black) 70%); }
     .game-gallery .gomoku-mark::after  { right: 8px; bottom: 8px; border: 1px solid var(--stone-white-edge); background: radial-gradient(circle at 35% 30%, #fff, var(--stone-white) 72%); }
+    .game-gallery .go-mark {
+        position: relative; width: 50px; height: 50px;
+        border-right: 1px solid currentColor; border-bottom: 1px solid currentColor;
+        background-image:
+            linear-gradient(currentColor 1px, transparent 1px),
+            linear-gradient(90deg, currentColor 1px, transparent 1px);
+        background-size: 12.5px 12.5px;
+    }
+    .game-gallery .go-mark i {
+        position: absolute; width: 12px; height: 12px; border-radius: 50%;
+        transform: translate(-50%, -50%); box-shadow: 0 1px 2px rgba(0,0,0,.28);
+    }
+    .game-gallery .go-mark i:nth-child(1) { top: 25%; left: 25%; background: var(--stone-black); }
+    .game-gallery .go-mark i:nth-child(2) { top: 50%; left: 50%; border: 1px solid var(--stone-white-edge); background: var(--stone-white); }
+    .game-gallery .go-mark i:nth-child(3) { top: 75%; left: 50%; background: var(--stone-black); }
+    .game-gallery .go-mark i:nth-child(4) { top: 75%; left: 75%; border: 1px solid var(--stone-white-edge); background: var(--stone-white); }
     .game-gallery .sudoku-mark {
         display: grid; width: 58px; height: 58px;
         grid-template: repeat(3, minmax(0, 1fr)) / repeat(3, minmax(0, 1fr));
@@ -330,6 +347,7 @@
         const marks = {
             xiangqi: '<span class="xiangqi-mark">棋</span>',
             wuziqi:  '<span class="gomoku-mark"></span>',
+            go: '<span class="go-mark"><i></i><i></i><i></i><i></i></span>',
             sudoku:  '<span class="sudoku-mark"><i>8</i><i></i><i>2</i><i></i><i>5</i><i></i><i>1</i><i></i><i>9</i></span>',
             '2048':  '<span class="game2048-mark"><i></i><i data-value="2">2</i><i></i><i data-value="4">4</i><i data-value="2">2</i><i></i><i data-value="8">8</i><i></i><i></i><i data-value="4">4</i><i></i><i></i><i data-value="16">16</i><i></i><i></i><i></i></span>',
             junqi:   '<span class="junqi-mark"><i>司</i><i>旗</i><i>工</i><i>弹</i><i>师</i><i>雷</i></span>',

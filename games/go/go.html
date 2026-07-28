@@ -1,0 +1,489 @@
+<template id="go-game-template">
+    <style>
+        :host { display: block; color: var(--ink); }
+        .setup {
+            display: grid; grid-template-columns: minmax(0, 1fr) minmax(82px, .56fr) auto;
+            gap: 7px; align-items: end; margin-bottom: 8px;
+        }
+        .control, label {
+            display: grid; min-width: 0; gap: 3px;
+            color: var(--ink-muted); font-size: .68rem; font-weight: 650;
+        }
+        select, button {
+            min-height: 40px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+            color: var(--ink); background: var(--bg-surface); font-weight: 650;
+        }
+        select { min-width: 0; padding: 0 26px 0 8px; }
+        button { padding: 0 10px; }
+        button:disabled { opacity: .4; }
+        .new { min-width: 48px; }
+        .playbar {
+            display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto;
+            gap: 6px; align-items: center; margin-bottom: 8px;
+        }
+        .captures {
+            display: flex; min-width: 0; min-height: 40px; align-items: center; gap: 10px;
+            padding: 0 9px; overflow: hidden; border-block: 1px solid var(--separator);
+            color: var(--ink-muted); font-size: .7rem;
+        }
+        .capture-side { display: inline-flex; min-width: 0; align-items: center; gap: 5px; }
+        .capture-side strong { color: var(--ink); font-size: .84rem; font-variant-numeric: tabular-nums; }
+        .mini { width: 17px; height: 17px; flex: 0 0 auto; border-radius: 50%; box-shadow: 0 1px 2px rgba(0,0,0,.28); }
+        .mini.black { background: radial-gradient(circle at 35% 28%, #555, var(--stone-black) 70%); }
+        .mini.white { border: 1px solid var(--stone-white-edge); background: radial-gradient(circle at 35% 28%, #fff, var(--stone-white) 72%); }
+        .resign { color: var(--danger); }
+        .warning { margin: 0 0 8px; color: var(--danger); font-size: .75rem; text-align: center; }
+        .warning[hidden] { display: none; }
+        .status {
+            display: flex; min-height: 38px; align-items: center; justify-content: center;
+            margin: 0 0 8px; padding: 5px 9px; border-radius: var(--radius-sm);
+            color: var(--status-ink); font-size: .84rem; font-weight: 700;
+            line-height: 1.28; text-align: center; background: var(--status-bg);
+        }
+        .status.thinking::after {
+            width: 5px; height: 5px; margin-left: 7px; border-radius: 50%; content: "";
+            background: currentColor; animation: go-pulse .8s ease-in-out infinite alternate;
+        }
+        @keyframes go-pulse { to { opacity: .2; transform: scale(.7); } }
+        .board {
+            --edge: clamp(14px, 4.6vw, 22px);
+            --segments: 12;
+            position: relative; width: min(100%, 414px); aspect-ratio: 1; margin: 0 auto;
+            overflow: hidden; border: 2px solid var(--board-wood-edge); border-radius: var(--radius-sm);
+            background:
+                radial-gradient(circle at 28% 18%, color-mix(in srgb, var(--board-wood-deep) 35%, transparent), transparent 54%),
+                var(--board-wood);
+            box-shadow: inset 0 0 24px color-mix(in srgb, var(--board-wood-line) 17%, transparent), var(--shadow-soft);
+            touch-action: manipulation; user-select: none;
+        }
+        .field {
+            position: absolute; inset: var(--edge);
+            border-right: 1px solid var(--board-wood-line); border-bottom: 1px solid var(--board-wood-line);
+            background-image:
+                linear-gradient(var(--board-wood-line) 1px, transparent 1px),
+                linear-gradient(90deg, var(--board-wood-line) 1px, transparent 1px);
+            background-size: calc(100% / var(--segments)) calc(100% / var(--segments));
+        }
+        .star {
+            position: absolute; z-index: 0; width: 6px; height: 6px;
+            border-radius: 50%; background: var(--board-wood-line); transform: translate(-50%, -50%);
+        }
+        .spot {
+            position: absolute; z-index: 1; display: grid;
+            width: calc(100% / var(--segments)); aspect-ratio: 1; min-width: 0; min-height: 0;
+            padding: 0; border: 0; border-radius: 50%; place-items: center;
+            background: transparent; transform: translate(-50%, -50%); pointer-events: none;
+        }
+        .spot.legal:active::after {
+            width: 28%; height: 28%; border-radius: 50%; content: "";
+            background: color-mix(in srgb, var(--ink) 30%, transparent);
+        }
+        .spot:focus-visible { z-index: 4; outline: 3px solid var(--focus); outline-offset: -3px; }
+        .stone {
+            box-sizing: border-box; width: 88%; height: 88%; border-radius: 50%;
+            box-shadow: 0 2px 3px rgba(0, 0, 0, .32);
+        }
+        .stone.black { background: radial-gradient(circle at 35% 28%, #555, var(--stone-black) 69%); }
+        .stone.white { border: 1px solid var(--stone-white-edge); background: radial-gradient(circle at 35% 28%, #fff, var(--stone-white) 73%); }
+        .spot.last::after {
+            position: absolute; z-index: 3; width: 22%; height: 22%;
+            border-radius: 50%; content: ""; background: var(--hint);
+            box-shadow: 0 0 0 1px color-mix(in srgb, var(--bg-surface) 72%, transparent);
+        }
+        .spot.last .stone { animation: go-place .22s ease-out; }
+        .spot.captured .stone { animation: go-capture .34s ease-in forwards; }
+        @keyframes go-place { from { opacity: .35; transform: scale(.58); } }
+        @keyframes go-capture { to { opacity: 0; transform: scale(.45); filter: brightness(1.25); } }
+        .board[data-size="19"] { --edge: clamp(11px, 3.7vw, 18px); }
+        .board[data-size="19"] .star { width: 5px; height: 5px; }
+        .board[data-size="19"] .spot.last::after { width: 27%; height: 27%; }
+        .board[aria-disabled="true"] { cursor: wait; }
+        @media (max-width: 340px) {
+            .setup, .playbar { gap: 4px; }
+            button { padding-inline: 7px; font-size: .77rem; }
+            select { font-size: .78rem; }
+            .captures { gap: 6px; padding-inline: 5px; }
+            .capture-side { gap: 3px; }
+            .mini { width: 15px; height: 15px; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .status.thinking::after, .spot.last .stone, .spot.captured .stone { animation: none; }
+        }
+    </style>
+    <div class="setup">
+        <div class="control"><span class="size-label"></span><offline-segmented class="size"></offline-segmented></div>
+        <label><span class="difficulty-label"></span><select class="difficulty">
+            <option value="easy"></option>
+            <option value="medium"></option>
+            <option value="hard"></option>
+        </select></label>
+        <button class="new" type="button"></button>
+    </div>
+    <div class="playbar">
+        <div class="captures" aria-live="polite">
+            <span class="capture-side"><i class="mini black"></i><span class="black-label"></span><strong class="black-captures">0</strong></span>
+            <span class="capture-side"><i class="mini white"></i><span class="white-label"></span><strong class="white-captures">0</strong></span>
+        </div>
+        <button class="undo" type="button"></button>
+        <button class="pass" type="button"></button>
+        <button class="resign" type="button"></button>
+    </div>
+    <p class="warning" hidden></p>
+    <div class="status" role="status" aria-live="polite"></div>
+    <div class="board" role="grid">
+        <div class="field"><div class="stars"></div><div class="spots"></div></div>
+    </div>
+</template>
+
+<script>
+const GO_MIN_AI_TURN_MS = 440
+const GO_CAPTURE_MS = 360
+
+OfflineGames.wasm.defineElement('go', 'go-game', class extends HTMLElement {
+    constructor() {
+        super()
+        this.attachShadow({mode: 'open'}).append(document.getElementById('go-game-template').content.cloneNode(true))
+        this.thinking = false
+        this.worker = null
+        this.aiTimer = null
+        this.aiStartedAt = 0
+        this.requestId = 0
+        this.notice = null
+        this.captureFlash = new Map()
+        this.captureTimer = null
+    }
+
+    connectedCallback() {
+        this.engine = OfflineGames.Go
+        this.i18n = OfflineGames.i18n
+        this.storage = OfflineGames.storage
+        this.load()
+        this.bind()
+        this.localize()
+        this.render()
+        if (this.position.turn === this.engine.WHITE && !this.position.outcome.ended) this.requestAI()
+    }
+
+    disconnectedCallback() {
+        this.cancelAI()
+        if (this.captureTimer) clearTimeout(this.captureTimer)
+    }
+
+    fresh(size = this.engine.DEFAULT_SIZE, difficulty = 'medium') {
+        return {
+            schema: 1,
+            game: 'go',
+            size,
+            difficulty,
+            seed: OfflineGames.runtime.randomSeed(),
+            history: [],
+            progress: false,
+        }
+    }
+
+    valid(saved) {
+        return saved && this.engine.SIZES.includes(saved.size)
+            && ['easy', 'medium', 'hard'].includes(saved.difficulty)
+            && Number.isInteger(saved.seed) && saved.seed >= 0 && saved.seed <= 0xffffffff
+            && typeof saved.progress === 'boolean'
+            && Array.isArray(saved.history)
+            && saved.history.every(move => move && ['play', 'pass', 'resign'].includes(move.kind)
+                && (move.kind !== 'play' || Number.isInteger(move.index)
+                    && move.index >= 0 && move.index < saved.size * saved.size))
+    }
+
+    load() {
+        const saved = this.storage.read('go')
+        this.state = this.valid(saved) ? saved : this.fresh()
+        try {
+            this.position = this.engine.state(this.state.size, this.state.history)
+        } catch {
+            this.state = this.fresh()
+            this.position = this.engine.state(this.state.size, this.state.history)
+        }
+    }
+
+    bind() {
+        const s = this.shadowRoot
+        s.querySelector('.field').addEventListener('click', event => this.boardClick(event))
+        s.querySelector('.undo').addEventListener('click', () => this.undo())
+        s.querySelector('.pass').addEventListener('click', () => this.pass())
+        s.querySelector('.resign').addEventListener('click', () => this.resign())
+        s.querySelector('.new').addEventListener('click', () => this.newGame())
+        s.querySelector('.difficulty').addEventListener('change', event => {
+            this.state.difficulty = event.target.value
+            this.save()
+        })
+        s.querySelector('.size').addEventListener('change', event => {
+            const previous = this.state.size
+            if (!this.newGame(Number(event.detail.value))) this.setSizeControl(previous)
+        })
+    }
+
+    localize() {
+        const s = this.shadowRoot, t = key => this.i18n.t(key)
+        s.querySelector('.size-label').textContent = t('goBoardSize')
+        s.querySelector('.difficulty-label').textContent = t('difficulty')
+        s.querySelector('.new').textContent = t('newGame')
+        s.querySelector('.undo').textContent = t('undo')
+        s.querySelector('.pass').textContent = t('goPass')
+        s.querySelector('.resign').textContent = t('goResign')
+        s.querySelector('.black-label').textContent = t('goBlackCaptures')
+        s.querySelector('.white-label').textContent = t('goWhiteCaptures')
+        s.querySelector('.warning').textContent = t('storageWarning')
+        for (const option of s.querySelectorAll('.difficulty option')) option.textContent = t(option.value)
+        s.querySelector('.size').setAttribute('options', JSON.stringify(this.engine.SIZES.map(size => ({
+            value: String(size),
+            label: `${size}×${size}`,
+        }))))
+        this.setSizeControl(this.state.size)
+    }
+
+    setSizeControl(size) {
+        const control = this.shadowRoot.querySelector('.size')
+        control.setAttribute('value', String(size))
+        control.setValue?.(String(size))
+    }
+
+    save() {
+        this.state.progress = this.state.history.length > 0
+        if (!this.storage.write('go', this.state)) this.shadowRoot.querySelector('.warning').hidden = false
+    }
+
+    boardClick(event) {
+        const direct = event.target.closest?.('.spot')
+        if (direct) {
+            this.tap(Number(direct.dataset.index))
+            return
+        }
+        const field = this.shadowRoot.querySelector('.field')
+        const rect = field.getBoundingClientRect()
+        const column = Math.max(0, Math.min(this.state.size - 1,
+            Math.round((event.clientX - rect.left) / rect.width * (this.state.size - 1))))
+        const row = Math.max(0, Math.min(this.state.size - 1,
+            Math.round((event.clientY - rect.top) / rect.height * (this.state.size - 1))))
+        this.tap(this.engine.at(row, column, this.state.size))
+    }
+
+    tap(index) {
+        if (this.thinking || this.position.outcome.ended || this.position.turn !== this.engine.BLACK) return
+        if (this.position.board[index] !== this.engine.EMPTY) {
+            this.notice = 'goOccupied'
+            this.render()
+            return
+        }
+        const check = this.engine.checkMove(this.state.size, this.state.history, index)
+        if (!check.legal) {
+            this.notice = check.reason === 'ko' ? 'goKo' : check.reason === 'suicide' ? 'goSuicide' : 'goIllegal'
+            this.render()
+            return
+        }
+        this.commit('play', index)
+        if (!this.position.outcome.ended) this.requestAI()
+    }
+
+    pass() {
+        if (this.thinking || this.position.outcome.ended || this.position.turn !== this.engine.BLACK) return
+        this.commit('pass')
+        if (!this.position.outcome.ended) this.requestAI()
+    }
+
+    resign() {
+        if (this.thinking || this.position.outcome.ended || this.position.turn !== this.engine.BLACK) return
+        if (!confirm(this.i18n.t('goConfirmResign'))) return
+        this.commit('resign')
+    }
+
+    commit(kind, index = null) {
+        const previous = this.position.board
+        const next = kind === 'play'
+            ? this.engine.play(this.state.size, this.state.history, index)
+            : kind === 'pass'
+                ? this.engine.pass(this.state.size, this.state.history)
+                : this.engine.resign(this.state.size, this.state.history)
+        const move = kind === 'play' ? {kind, index} : {kind}
+        this.state.history.push(move)
+        this.position = next
+        this.notice = null
+        this.showCaptures(previous, next.board)
+        this.save()
+        this.render()
+    }
+
+    showCaptures(previous, next) {
+        this.captureFlash = new Map(previous.flatMap((stone, index) =>
+            stone !== this.engine.EMPTY && next[index] === this.engine.EMPTY ? [[index, stone]] : []))
+        if (this.captureTimer) clearTimeout(this.captureTimer)
+        if (!this.captureFlash.size) return
+        this.captureTimer = setTimeout(() => {
+            this.captureTimer = null
+            this.captureFlash.clear()
+            if (this.isConnected) this.render()
+        }, GO_CAPTURE_MS)
+    }
+
+    requestAI() {
+        if (this.position.outcome.ended || this.position.turn !== this.engine.WHITE) return
+        this.cancelAI()
+        this.thinking = true
+        this.aiStartedAt = performance.now()
+        const id = ++this.requestId
+        this.worker = OfflineGames.runtime.createWorker('go-worker-payload')
+        this.worker.onmessage = event => {
+            if (event.data.id !== id || !this.thinking) return
+            const move = event.data.move
+            const valid = move == null || Number.isInteger(move) && this.position.legal.includes(move)
+            if (this.worker) this.worker.terminate()
+            this.worker = null
+            const delay = Math.max(0, GO_MIN_AI_TURN_MS - (performance.now() - this.aiStartedAt))
+            this.aiTimer = setTimeout(() => {
+                this.aiTimer = null
+                if (id !== this.requestId || !this.thinking) return
+                this.thinking = false
+                if (valid) this.commit(move == null ? 'pass' : 'play', move)
+                else this.render()
+            }, delay)
+        }
+        this.worker.onerror = error => {
+            console.error(error)
+            this.cancelAI(false)
+            this.notice = 'goAiUnavailable'
+            this.render()
+        }
+        this.worker.postMessage({
+            id,
+            size: this.state.size,
+            moves: this.state.history,
+            difficulty: this.state.difficulty,
+            seed: OfflineGames.runtime.moveSeed(this.state.seed, this.state.history.length),
+        })
+        this.render()
+    }
+
+    cancelAI(invalidate = true) {
+        if (invalidate) this.requestId++
+        if (this.worker) this.worker.terminate()
+        if (this.aiTimer) clearTimeout(this.aiTimer)
+        this.worker = null
+        this.aiTimer = null
+        this.thinking = false
+    }
+
+    undo() {
+        if (!this.state.history.length) return
+        const wasThinking = this.thinking
+        this.cancelAI()
+        const last = this.state.history.at(-1)
+        let count = wasThinking || this.state.history.length % 2 === 1 || last.kind === 'resign' ? 1 : 2
+        while (count-- > 0 && this.state.history.length) this.state.history.pop()
+        this.position = this.engine.state(this.state.size, this.state.history)
+        this.notice = null
+        this.captureFlash.clear()
+        this.save()
+        this.render()
+    }
+
+    newGame(size = this.state.size) {
+        if (this.state.history.length && !confirm(this.i18n.t('confirmNew'))) return false
+        const difficulty = this.state.difficulty
+        this.cancelAI()
+        this.state = this.fresh(size, difficulty)
+        this.position = this.engine.state(size, [])
+        this.notice = null
+        this.captureFlash.clear()
+        this.save()
+        this.localize()
+        this.render()
+        return true
+    }
+
+    format(key, values) {
+        return Object.entries(values).reduce((text, [name, value]) =>
+            text.replaceAll(`{${name}}`, String(value)), this.i18n.t(key))
+    }
+
+    score(value) {
+        return Number.isInteger(value) ? String(value) : Number(value).toFixed(1)
+    }
+
+    statusText() {
+        const outcome = this.position.outcome
+        if (outcome.ended) {
+            if (outcome.reason === 'resign') return this.i18n.t('goResigned')
+            if (!outcome.winner) return this.format('goScoreDraw', {
+                black: this.score(outcome.black),
+                white: this.score(outcome.white),
+            })
+            return this.format(outcome.winner === this.engine.BLACK ? 'goScoreYouWin' : 'goScoreAiWins', {
+                black: this.score(outcome.black),
+                white: this.score(outcome.white),
+                margin: this.score(outcome.margin),
+            })
+        }
+        if (this.notice) return this.i18n.t(this.notice)
+        const last = this.state.history.at(-1)
+        if (this.thinking || this.position.turn === this.engine.WHITE) {
+            return this.i18n.t(last?.kind === 'pass' ? 'goYouPass' : 'aiThinking')
+        }
+        if (last?.kind === 'pass') return this.i18n.t('goAiPass')
+        return this.i18n.t('yourTurn')
+    }
+
+    starPoints() {
+        if (this.state.size === 19) {
+            return [3, 9, 15].flatMap(row => [3, 9, 15].map(column => [row, column]))
+        }
+        const near = this.state.size === 9 ? 2 : 3
+        const far = this.state.size - 1 - near
+        const middle = (this.state.size - 1) / 2
+        return [[near, near], [near, far], [middle, middle], [far, near], [far, far]]
+    }
+
+    render() {
+        const s = this.shadowRoot
+        const size = this.state.size
+        const segments = size - 1
+        const board = s.querySelector('.board')
+        const field = s.querySelector('.field')
+        board.dataset.size = String(size)
+        board.style.setProperty('--segments', String(segments))
+        board.setAttribute('aria-label', this.format('goBoard', {size}))
+        board.setAttribute('aria-rowcount', String(size))
+        board.setAttribute('aria-colcount', String(size))
+        board.setAttribute('aria-disabled', String(this.thinking || this.position.outcome.ended))
+        field.querySelector('.stars').innerHTML = this.starPoints().map(([row, column]) =>
+            `<i class="star" style="left:${column / segments * 100}%;top:${row / segments * 100}%"></i>`).join('')
+
+        const lastPlay = this.state.history.findLast(move => move.kind === 'play')?.index
+        const legal = new Set(!this.thinking && !this.position.outcome.ended && this.position.turn === this.engine.BLACK
+            ? this.position.legal : [])
+        field.querySelector('.spots').innerHTML = this.position.board.map((stone, index) => {
+            const row = this.engine.rowOf(index, size)
+            const column = this.engine.columnOf(index, size)
+            const captured = this.captureFlash.get(index)
+            const visible = stone || captured || this.engine.EMPTY
+            const classes = ['spot', stone ? 'occupied' : 'empty']
+            if (legal.has(index)) classes.push('legal')
+            if (index === lastPlay && stone) classes.push('last')
+            if (captured) classes.push('captured')
+            const color = visible === this.engine.BLACK ? 'black' : visible === this.engine.WHITE ? 'white' : ''
+            const token = visible ? `<span class="stone ${color}"></span>` : ''
+            const name = visible === this.engine.BLACK ? this.i18n.t('blackStone')
+                : visible === this.engine.WHITE ? this.i18n.t('whiteStone') : this.i18n.t('empty')
+            const state = index === lastPlay && stone ? `, ${this.i18n.t('lastMove')}` : ''
+            return `<button type="button" role="gridcell" class="${classes.join(' ')}" data-index="${index}" aria-rowindex="${row + 1}" aria-colindex="${column + 1}" aria-label="${name}, ${this.i18n.t('row')} ${row + 1}, ${this.i18n.t('column')} ${column + 1}${state}" style="left:${column / segments * 100}%;top:${row / segments * 100}%">${token}</button>`
+        }).join('')
+
+        const status = s.querySelector('.status')
+        status.textContent = this.statusText()
+        status.classList.toggle('thinking', this.thinking)
+        s.querySelector('.black-captures').textContent = String(this.position.captures.black)
+        s.querySelector('.white-captures').textContent = String(this.position.captures.white)
+        s.querySelector('.difficulty').value = this.state.difficulty
+        s.querySelector('.undo').disabled = !this.state.history.length
+        s.querySelector('.pass').disabled = this.thinking || this.position.outcome.ended || this.position.turn !== this.engine.BLACK
+        s.querySelector('.resign').disabled = this.thinking || this.position.outcome.ended || this.position.turn !== this.engine.BLACK
+        this.setSizeControl(size)
+    }
+})
+</script>

@@ -45,6 +45,7 @@ test('gallery grid logos stay centered and contained', async ({page}) => {
 
     const geometry = await page.locator([
         'article[data-game="sudoku"] .preview > span',
+        'article[data-game="go"] .preview > span',
         'article[data-game="huarong"] .preview > span',
         'article[data-game="sliding"] .preview > span',
         'article[data-game="minesweeper"] .preview > span',
@@ -99,6 +100,7 @@ test('language preference persists across pages without changing their URLs', as
     await expect(page.locator('offline-shell offline-drawer nav a')).toHaveCount(games.length)
     await expect(page.locator('offline-shell offline-drawer nav a[href*="index.html"]')).toHaveCount(0)
     await expect(page.locator('offline-shell offline-drawer a[href*="xiangqi.html"]')).toHaveAttribute('href', /xiangqi\.html$/)
+    await expect(page.locator('offline-shell offline-drawer a[href*="go.html"]')).toHaveAttribute('href', /go\.html$/)
     await expect(page.locator('offline-shell offline-drawer a[href*="reversi.html"]')).toHaveAttribute('href', /reversi\.html$/)
     await expect(page.locator('offline-shell offline-drawer a[href*="checkers.html"]')).toHaveAttribute('href', /checkers\.html$/)
     await expect(page.locator('offline-shell offline-drawer a[href*="backgammon.html"]')).toHaveAttribute('href', /backgammon\.html$/)
@@ -368,6 +370,33 @@ test('Wuziqi keeps a fast AI reply visible and settles the latest stone', async 
     expect(await page.evaluate(started => performance.now() - started, midpoint.started)).toBeGreaterThanOrEqual(320)
     await expect(page.locator('wuziqi-game .status')).toHaveText('Your turn')
     await expect(page.locator('wuziqi-game .spot.last .stone.white')).toHaveCount(1)
+})
+
+test('Go defaults to 13x13, plays offline AI replies, persists, and switches standard sizes', async ({page}) => {
+    await page.goto('/go.html')
+    await expect(page.locator('offline-shell h1')).toHaveText('Go')
+    await expect(page.locator('go-game .board')).toHaveAttribute('data-size', '13')
+    await expect(page.locator('go-game .spot')).toHaveCount(169)
+    await expect(page.locator('go-game .star')).toHaveCount(5)
+    await page.locator('offline-shell .guide-btn').click()
+    await expect(page.locator('offline-shell .guide-image')).toHaveAttribute('src', './guides/go.svg')
+    await expect(page.locator('offline-shell .rule-group')).toHaveCount(4)
+    await page.keyboard.press('Escape')
+
+    await page.locator('go-game .field').click()
+    await expect(page.locator('go-game .status')).toHaveText('Your turn', {timeout: 6000})
+    await expect(page.locator('go-game .stone')).toHaveCount(2)
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:go')).history.length)).toBe(2)
+    await page.reload()
+    await expect(page.locator('go-game .stone')).toHaveCount(2)
+    await page.locator('go-game .undo').click()
+    await expect(page.locator('go-game .stone')).toHaveCount(0)
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:go')).history.length)).toBe(0)
+
+    await page.locator('go-game .size [data-value="9"]').click()
+    await expect(page.locator('go-game .board')).toHaveAttribute('data-size', '9')
+    await expect(page.locator('go-game .spot')).toHaveCount(81)
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:go')).size)).toBe(9)
 })
 
 test('Sudoku supports long-press notes, entries, undo, and persistence without hints', async ({page}) => {
@@ -1411,6 +1440,9 @@ test('the installed app reloads and navigates completely offline', async ({brows
     await expect(page.locator('offline-shell h1')).toHaveText('Wuziqi')
     await page.locator('wuziqi-game .spot[data-index="112"]').click()
     await expect(page.locator('wuziqi-game .status')).toHaveText('Your turn', {timeout: 6000})
+    await page.goto('/go.html')
+    await expect(page.locator('offline-shell h1')).toHaveText('Go')
+    await expect(page.locator('go-game .board')).toHaveAttribute('data-size', '13')
     await page.goto('/reversi.html')
     await expect(page.locator('offline-shell h1')).toHaveText('Reversi')
     await expect(page.locator('reversi-game .cell.legal')).toHaveCount(4)

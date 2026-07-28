@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+[offline-pwa-head]
+<meta name="author" content="ylxdzsw">
+<meta name="license" content="MIT">
+<meta name="github" content="https://github.com/ylxdzsw/offline">
+<title>Go / 围棋</title>
+[require](../../app/tokens.css)
+[require](../../app/theme.js)
+[require](../../app/i18n.js)
+[require](../../app/storage.js)
+[require](../../app/runtime.js)
+[require](../../app/wasm.js)
+[offline-wasm](go)(../target/wasm32-unknown-unknown/release/offline_go.wasm)
+[require](./api.js)
+</head>
+<body>
+[require](../../app/segmented-control.html)
+[require](../../app/guide-dialog.html)
+[require](../../app/side-drawer.html)
+[require](../../app/app-shell.html)
+[require](./go.html)
+[offline-worker](go-worker-payload)(go)(../../app/wasm.js)(./api.js)(./worker.js)
+<offline-shell page="go" guide="./guides/go.svg">
+<go-game></go-game>
+</offline-shell>
+</body>
+</html>
+
+[mixin] ../../app/macros.ymd
+[mixin] common.ymd

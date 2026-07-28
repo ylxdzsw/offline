@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="420" viewBox="0 0 720 420" role="img" aria-labelledby="title desc">
+  <title id="title">Go capture and territory guide</title>
+  <desc id="desc">A wooden Go board showing black surrounding white stones and outlined territory.</desc>
+  <defs>
+    <radialGradient id="black" cx=".35" cy=".28">
+      <stop offset="0" stop-color="#555"/>
+      <stop offset=".72" stop-color="#171817"/>
+      <stop offset="1" stop-color="#050505"/>
+    </radialGradient>
+    <radialGradient id="white" cx=".35" cy=".28">
+      <stop offset="0" stop-color="#fff"/>
+      <stop offset=".76" stop-color="#eee9dd"/>
+      <stop offset="1" stop-color="#bbb3a5"/>
+    </radialGradient>
+    <pattern id="grid" width="42" height="42" patternUnits="userSpaceOnUse">
+      <path d="M42 0H0V42" fill="none" stroke="#6a4a2f" stroke-width="2"/>
+    </pattern>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="3" stdDeviation="2.5" flood-opacity=".32"/>
+    </filter>
+  </defs>
+  <rect width="720" height="420" rx="24" fill="#d4b07a"/>
+  <rect x="66" y="42" width="588" height="336" fill="url(#grid)" stroke="#6f4d33" stroke-width="4"/>
+  <g fill="#6a4a2f">
+    <circle cx="234" cy="168" r="5"/>
+    <circle cx="486" cy="168" r="5"/>
+    <circle cx="360" cy="252" r="5"/>
+  </g>
+  <path d="M150 84h168v168H150z" fill="#2d6357" fill-opacity=".13" stroke="#2d6357" stroke-width="5" stroke-dasharray="10 8"/>
+  <g filter="url(#shadow)">
+    <g fill="url(#black)">
+      <circle cx="192" cy="126" r="18"/>
+      <circle cx="234" cy="126" r="18"/>
+      <circle cx="276" cy="126" r="18"/>
+      <circle cx="192" cy="168" r="18"/>
+      <circle cx="276" cy="168" r="18"/>
+      <circle cx="192" cy="210" r="18"/>
+      <circle cx="234" cy="210" r="18"/>
+      <circle cx="276" cy="210" r="18"/>
+      <circle cx="444" cy="210" r="18"/>
+      <circle cx="486" cy="210" r="18"/>
+      <circle cx="528" cy="210" r="18"/>
+      <circle cx="444" cy="252" r="18"/>
+    </g>
+    <g fill="url(#white)" stroke="#aaa294" stroke-width="1.5">
+      <circle cx="234" cy="168" r="18"/>
+      <circle cx="486" cy="252" r="18"/>
+      <circle cx="528" cy="252" r="18"/>
+      <circle cx="444" cy="294" r="18"/>
+      <circle cx="486" cy="294" r="18"/>
+      <circle cx="528" cy="294" r="18"/>
+    </g>
+  </g>
+  <circle cx="276" cy="168" r="6" fill="#d34b43"/>
+</svg>

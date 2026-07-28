@@ -5,6 +5,7 @@ DIST := dist
 GAMES := \
 	xiangqi \
 	wuziqi \
+	go \
 	sudoku \
 	2048 \
 	junqi \

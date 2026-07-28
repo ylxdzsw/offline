@@ -4,6 +4,7 @@ A mobile-first bilingual collection of classic board and puzzle games that remai
 
 - Chinese Xiangqi against an on-device AI
 - 15×15 Freestyle Wuziqi against an on-device AI
+- Go under Chinese area-scoring rules on 9×9, 13×13, and 19×19 boards
 - Uniquely solvable Sudoku puzzles in three difficulty levels
 - Seeded 2048 with swipe, keyboard, undo, and persistent best score
 - Hidden-rank Junqi (Luzhanqi) against an on-device AI
@@ -90,3 +91,7 @@ All application URLs and service-worker resources are relative, so the site also
 The Backgammon rules engine includes the BSD-2-Clause `backgammon` crate. Its
 copyright and license text are preserved in
 [`games/backgammon/THIRD_PARTY_LICENSE`](games/backgammon/THIRD_PARTY_LICENSE).
+
+The Go rules engine includes the MIT-licensed `goban` crate. Its copyright and
+license text are preserved in
+[`games/go/THIRD_PARTY_LICENSE`](games/go/THIRD_PARTY_LICENSE).
