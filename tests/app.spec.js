@@ -199,7 +199,7 @@ test('gallery copyright stays reachable below the first screen', async ({page}) 
     for (const viewport of [{width: 390, height: 844}, {width: 1024, height: 768}]) {
         await page.setViewportSize(viewport)
         await page.goto('/index.html')
-        const footer = page.locator('offline-shell footer')
+        const footer = page.locator('offline-shell .layout > footer')
         expect(await footer.evaluate(element => element.getBoundingClientRect().top))
             .toBeGreaterThanOrEqual(viewport.height)
         await footer.scrollIntoViewIfNeeded()
