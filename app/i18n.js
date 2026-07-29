@@ -703,7 +703,7 @@
                 tips: [
                     'Start with rows, columns, or boxes that have only a few missing numbers.',
                     'Long-press a digit to keep it as a small candidate note; placing a number clears that note from its peers.',
-                    'Red entries conflict with the solution. Undo restores your latest entry or note change.',
+                    'Red entries repeat a digit in the same row, column, or box. Undo restores your latest entry or note change.',
                 ],
             },
             '2048': {
@@ -900,7 +900,7 @@
                 tips: [
                     '从只缺少数数字的行、列或宫开始排查。',
                     '长按数字可将其记为小号候选数；正式填数后，相关格的同数笔记会自动清除。',
-                    '红色数字表示有错误；“悔棋”可恢复最近一次填数或笔记变化。',
+                    '红色数字表示同一行、列或宫内出现重复；“悔棋”可恢复最近一次填数或笔记变化。',
                 ],
             },
             '2048': {
@@ -1175,7 +1175,7 @@
                     {
                         title: 'Entries and notes',
                         items: [
-                            'Tap an editable cell, then a digit. Erase clears it. Red entries do not match the solution and should be reconsidered.',
+                            'Tap an editable cell, then a digit. Erase clears it. Red entries repeat a digit in the same row, column, or box.',
                             'Long-press a digit to toggle it as a small candidate note. A final digit automatically removes that candidate from related notes.',
                             'Undo restores the latest entry or note change.',
                             'On a keyboard, use 1–9 to enter, Shift+1–9 for notes, and Backspace/Delete to erase. Changing difficulty starts a fresh puzzle immediately.',
@@ -1658,7 +1658,7 @@
                     {
                         title: '填数与笔记',
                         items: [
-                            '点选可编辑格，再选择数字；“清除”会擦除该格。红色数字与答案不符，需要重新检查。',
+                            '点选可编辑格，再选择数字；“清除”会擦除该格。红色数字表示同一行、列或宫内出现重复。',
                             '长按数字可将其作为小候选数开关；正式填数后，相关格里的同数候选会自动清除。',
                             '“悔棋”可撤销最近一次填数或笔记变化。',
                             '使用键盘时，1–9 填数，Shift+1–9 记笔记，Backspace/Delete 清除。更改难度会立即开始一道新题。',

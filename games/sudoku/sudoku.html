@@ -49,9 +49,13 @@
         .notes i { display: grid; place-items: center; font-style: normal; }
         .pad {
             display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px; margin-top: 10px;
-            user-select: none; -webkit-touch-callout: none;
+            user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
         }
-        .digit { min-width: 0; min-height: 45px; padding: 0; border-color: var(--border-strong); color: var(--ink); background: var(--bg-elevated); font-size: 1.1rem; }
+        .digit {
+            min-width: 0; min-height: 45px; padding: 0; border-color: var(--border-strong);
+            color: var(--ink); background: var(--bg-elevated); font-size: 1.1rem; touch-action: manipulation;
+            user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+        }
         .digit.complete { opacity: .36; }
         .tools { display: grid; margin-top: 8px; }
         @media (prefers-reduced-motion: reduce) {
@@ -82,6 +86,9 @@ customElements.define('sudoku-game', class extends HTMLElement {
         this.changedIndex = null
         this.longPressTimer = null
         this.longPressHandled = false
+        this.touchDigit = null
+        this.touchStartedAt = 0
+        this.ignoreClickUntil = 0
     }
     connectedCallback() {
         this.engine = OfflineGames.Sudoku
@@ -104,22 +111,47 @@ customElements.define('sudoku-game', class extends HTMLElement {
         const shadow = this.shadowRoot
         shadow.querySelector('.board').addEventListener('click', event => { const cell = event.target.closest('.cell'); if (cell) { this.selected = Number(cell.dataset.index); this.render() } })
         const pad = shadow.querySelector('.pad')
-        pad.addEventListener('pointerdown', event => {
-            const digit = event.target.closest('.digit')
-            if (!digit || event.button !== 0) return
+        const beginPress = digit => {
             clearTimeout(this.longPressTimer)
             this.longPressHandled = false
             this.longPressTimer = setTimeout(() => {
                 this.longPressHandled = true
-                this.enter(Number(digit.dataset.digit), true)
+                this.enter(digit, true)
             }, 500)
-        })
+        }
         const endPress = () => { clearTimeout(this.longPressTimer); this.longPressTimer = null }
+        pad.addEventListener('pointerdown', event => {
+            const digit = event.target.closest('.digit')
+            if (!digit || event.pointerType === 'touch' || event.button !== 0) return
+            beginPress(Number(digit.dataset.digit))
+        })
         pad.addEventListener('pointerup', endPress)
         pad.addEventListener('pointercancel', endPress)
+        pad.addEventListener('touchstart', event => {
+            const digit = event.target.closest('.digit')
+            if (!digit) return
+            event.preventDefault()
+            this.touchDigit = Number(digit.dataset.digit)
+            this.touchStartedAt = performance.now()
+        }, {passive: false})
+        pad.addEventListener('touchend', event => {
+            if (this.touchDigit == null) return
+            event.preventDefault()
+            const digit = this.touchDigit
+            const asNote = performance.now() - this.touchStartedAt >= 500
+            this.touchDigit = null
+            this.touchStartedAt = 0
+            this.ignoreClickUntil = performance.now() + 1000
+            this.enter(digit, asNote)
+        }, {passive: false})
+        pad.addEventListener('touchcancel', () => {
+            this.touchDigit = null
+            this.touchStartedAt = 0
+        })
         pad.addEventListener('click', event => {
             const digit = event.target.closest('.digit')
             if (!digit) return
+            if (event.detail > 0 && performance.now() < this.ignoreClickUntil) return
             if (this.longPressHandled && event.detail > 0) {
                 this.longPressHandled = false
                 return
@@ -184,7 +216,7 @@ customElements.define('sudoku-game', class extends HTMLElement {
             if (this.state.puzzle[index]) classes.push('given')
             if (this.selected != null && (row === this.engine.rowOf(this.selected) || column === this.engine.columnOf(this.selected) || this.engine.boxOf(index) === this.engine.boxOf(this.selected))) classes.push('related')
             if (selectedValue && value === selectedValue) classes.push('same')
-            if (this.engine.conflicts(this.state.board, index).length || (value && value !== this.state.solution[index])) classes.push('conflict')
+            if (this.engine.conflicts(this.state.board, index).length) classes.push('conflict')
             if (index === this.selected) classes.push('selected')
             if (index === changedIndex) classes.push('changed')
             const notes = !value ? `<span class="notes">${this.engine.DIGITS.map(digit => `<i>${this.state.notes[index] & (1 << digit) ? digit : ''}</i>`).join('')}</span>` : ''

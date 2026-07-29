@@ -457,6 +457,78 @@ test('Sudoku supports long-press notes, entries, undo, and persistence without h
     await expect(editable).toHaveClass(/changed/)
 })
 
+test('Sudoku handles iPhone-style touches without selecting number-pad text', async ({page}) => {
+    await page.goto('/sudoku.html')
+    const editable = page.locator('sudoku-game .cell:not(.given)').first()
+    const digit = page.locator('sudoku-game .digit:not(:disabled)').first()
+    const value = await digit.getAttribute('data-digit')
+    await editable.click()
+
+    const longTouch = await digit.evaluate(async button => {
+        const start = new Event('touchstart', {bubbles: true, cancelable: true})
+        button.dispatchEvent(start)
+        await new Promise(resolve => setTimeout(resolve, 550))
+        const style = getComputedStyle(button)
+        const userSelect = style.userSelect
+        const webkitUserSelect = style.webkitUserSelect
+        const end = new Event('touchend', {bubbles: true, cancelable: true})
+        button.dispatchEvent(end)
+        return {
+            startPrevented: start.defaultPrevented,
+            endPrevented: end.defaultPrevented,
+            userSelect,
+            webkitUserSelect,
+        }
+    })
+
+    expect(longTouch).toEqual({
+        startPrevented: true,
+        endPrevented: true,
+        userSelect: 'none',
+        webkitUserSelect: 'none',
+    })
+    await expect(editable.locator('.notes')).toContainText(value)
+
+    const shortTouch = await digit.evaluate(button => {
+        const start = new Event('touchstart', {bubbles: true, cancelable: true})
+        button.dispatchEvent(start)
+        const end = new Event('touchend', {bubbles: true, cancelable: true})
+        button.dispatchEvent(end)
+        return {startPrevented: start.defaultPrevented, endPrevented: end.defaultPrevented}
+    })
+    expect(shortTouch).toEqual({startPrevented: true, endPrevented: true})
+    await expect(editable).toHaveText(value)
+})
+
+test('Sudoku marks only direct row, column, or box conflicts', async ({page}) => {
+    await page.goto('/sudoku.html')
+    const game = page.locator('sudoku-game')
+    const alternate = await game.evaluate(element => {
+        Object.assign(element.state, {
+            puzzle: Array(81).fill(0),
+            board: Array(81).fill(0),
+            notes: Array(81).fill(0),
+            history: [],
+            outcome: null,
+        })
+        element.selected = 0
+        element.render()
+        return element.state.solution[0] === 1 ? 2 : 1
+    })
+    const first = page.locator('sudoku-game .cell[data-index="0"]')
+    const second = page.locator('sudoku-game .cell[data-index="1"]')
+    const digit = page.locator(`sudoku-game .digit[data-digit="${alternate}"]`)
+
+    await digit.click()
+    await expect(first).toHaveText(String(alternate))
+    await expect(first).not.toHaveClass(/conflict/)
+
+    await second.click()
+    await digit.click()
+    await expect(first).toHaveClass(/conflict/)
+    await expect(second).toHaveClass(/conflict/)
+})
+
 test('2048 merges, scores, persists, reloads, undoes, and accepts a swipe', async ({page}) => {
     await page.goto('/2048.html')
     await expect(page.locator('game-2048 .cell:not([data-value="0"])')).toHaveCount(2)
