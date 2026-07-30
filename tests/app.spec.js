@@ -226,23 +226,25 @@ test('game viewport setup waits for a parser-delayed game element', async ({page
     expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(480)
 })
 
-test('Spider uses the available width on a short phone viewport', async ({page}) => {
-    await page.setViewportSize({width: 320, height: 480})
-    await page.goto('/spider.html')
-    await page.waitForFunction(() =>
-        document.querySelector('offline-shell')?._fitSurface?.dataset.fitScale !== undefined
-    )
-    const geometry = await page.locator('spider-game').evaluate(game => {
-        const table = game.shadowRoot.querySelector('.table').getBoundingClientRect()
-        const host = game.getBoundingClientRect()
-        return {
-            scale: Number(document.querySelector('offline-shell')._fitSurface.dataset.fitScale),
-            tableWidth: table.width,
-            hostWidth: host.width,
-        }
-    })
-    expect(geometry.scale).toBe(1)
-    expect(geometry.tableWidth).toBeGreaterThanOrEqual(geometry.hostWidth - 1)
+test('Spider uses the available width on compact phone viewports', async ({page}) => {
+    for (const viewport of [{width: 320, height: 480}, {width: 375, height: 667}]) {
+        await page.setViewportSize(viewport)
+        await page.goto('/spider.html')
+        await page.waitForFunction(() =>
+            document.querySelector('offline-shell')?._fitSurface?.dataset.fitScale !== undefined
+        )
+        const geometry = await page.locator('spider-game').evaluate(game => {
+            const table = game.shadowRoot.querySelector('.table').getBoundingClientRect()
+            const host = game.getBoundingClientRect()
+            return {
+                scale: Number(document.querySelector('offline-shell')._fitSurface.dataset.fitScale),
+                tableWidth: table.width,
+                hostWidth: host.width,
+            }
+        })
+        expect(geometry.scale).toBe(1)
+        expect(geometry.tableWidth).toBeGreaterThanOrEqual(geometry.hostWidth - 1)
+    }
 })
 
 test('navigator language auto-detects Chinese without a saved preference', async ({browser}) => {
@@ -1161,15 +1163,26 @@ test('Sliding Puzzle changes size, slides with touch and keyboard, persists, and
         return {
             duration: transition?.effect.getTiming().duration,
             fixedBackground: JSON.stringify(before) === JSON.stringify(after),
-            emptyIndex: root.querySelector('.slot.empty')?.dataset.index,
+            emptyIndex: root.querySelector('.slot[aria-hidden="false"]')?.dataset.index,
+            emptyIsBackground: (() => {
+                const style = getComputedStyle(slots[0])
+                return style.backgroundColor === 'rgba(0, 0, 0, 0)'
+                    && style.borderStyle === 'none' && style.boxShadow === 'none'
+            })(),
             backgroundAnimations: slots.flatMap(slot => slot.getAnimations()).length,
+            animatedTiles: [...root.querySelectorAll('.tile')]
+                .filter(element => element.getAnimations().some(animation =>
+                    ['left', 'top'].includes(animation.transitionProperty)))
+                .map(element => element.dataset.value),
         }
     })
     expect(motion).toEqual({
         duration: 180,
         fixedBackground: true,
         emptyIndex: '15',
+        emptyIsBackground: true,
         backgroundAnimations: 0,
+        animatedTiles: ['15'],
     })
     await expect(page.locator('sliding-puzzle .move-count')).toHaveText('1')
     await expect(page.locator('sliding-puzzle .status')).toHaveText('Puzzle solved in 1 move · 01:05')

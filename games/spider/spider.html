@@ -185,8 +185,15 @@
             .toolbar button { padding-inline: 8px; }
             .meter { min-height: 42px; }
         }
-        @media (max-height: 600px) {
-            .table, .pile { min-height: 0; }
+        @media (max-height: 700px) {
+            :host {
+                display: flex; height: 100%; min-height: 0; flex-direction: column;
+            }
+            .table {
+                display: flex; min-height: 0; flex: 1; flex-direction: column;
+            }
+            .tableau { min-height: 0; flex: 1; }
+            .pile { height: 100%; min-height: 0; }
         }
         @media (max-width: 300px) {
             .dashboard { grid-template-columns: repeat(2, minmax(0, 1fr)); }

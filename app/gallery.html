@@ -39,7 +39,7 @@
     .game-gallery article[data-game="checkers"] .preview { color: var(--piece-white); background: color-mix(in srgb, var(--board-dark) 48%, var(--bg-elevated)); }
     .game-gallery article[data-game="backgammon"] .preview { color: #f4e6cf; background: color-mix(in srgb, #a75c42 68%, var(--bg-elevated)); }
     .game-gallery article[data-game="huarong"] .preview { color: var(--piece-red); background: color-mix(in srgb, var(--board-wood) 62%, var(--bg-elevated)); }
-    .game-gallery article[data-game="sliding"] .preview { color: var(--ink); background: color-mix(in srgb, #40534c 48%, var(--bg-elevated)); }
+    .game-gallery article[data-game="sliding"] .preview { color: var(--ink); background: color-mix(in srgb, var(--accent) 9%, var(--bg-elevated)); }
     .game-gallery article[data-game="minesweeper"] .preview { color: var(--ink); background: color-mix(in srgb, var(--selected) 14%, var(--bg-elevated)); }
     .game-gallery article[data-game="solitaire"] .preview { color: #fff; background: color-mix(in srgb, #246449 78%, var(--bg-elevated)); }
     .game-gallery article[data-game="spider"] .preview { color: #fff; background: color-mix(in srgb, #174633 82%, var(--bg-elevated)); }
@@ -204,20 +204,19 @@
     .game-gallery .sliding-mark {
         display: grid; width: 64px; height: 64px; box-sizing: border-box;
         grid-template: repeat(4, minmax(0, 1fr)) / repeat(4, minmax(0, 1fr));
-        gap: 3px; padding: 5px; border: 2px solid var(--board-wood-edge);
-        border-radius: 6px; background: var(--board-wood-deep);
-        box-shadow: inset 0 1px 5px rgba(25,20,14,.32);
+        gap: 3px; padding: 5px; border: 1px solid var(--border-strong);
+        border-radius: 6px; background: var(--bg-elevated);
+        box-shadow: inset 0 1px 3px color-mix(in srgb, var(--ink) 10%, transparent);
     }
     .game-gallery .sliding-mark i {
         display: grid; min-width: 0; min-height: 0; border: 1px solid var(--border-strong);
         border-radius: 3px; place-items: center; color: var(--ink);
-        background: var(--piece-face); box-shadow: 0 1px 2px rgba(31,24,16,.24);
+        background: var(--bg-surface); box-shadow: 0 1px 2px color-mix(in srgb, var(--ink) 12%, transparent);
         font-family: var(--font-display); font-size: .48rem; font-style: normal; font-weight: 800;
         line-height: 1;
     }
     .game-gallery .sliding-mark i:last-child {
-        border: 0; background: color-mix(in srgb, var(--board-wood-edge) 56%, transparent);
-        box-shadow: inset 0 2px 4px rgba(18,18,16,.32);
+        border: 0; background: transparent; box-shadow: none;
     }
     .game-gallery .minesweeper-mark {
         display: grid; width: 62px; height: 62px; box-sizing: border-box;

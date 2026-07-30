@@ -45,26 +45,27 @@
         .board {
             width: min(100%, 390px); aspect-ratio: 1; box-sizing: border-box;
             margin: 0 auto; padding: clamp(8px, 2.6vw, 12px);
-            overflow: hidden; border: 3px solid var(--board-wood-edge);
-            border-radius: var(--radius-md); background: color-mix(in srgb, var(--board-wood-deep) 72%, #3d4a45);
-            box-shadow: inset 0 1px 8px rgba(25,20,14,.35), var(--shadow-soft);
+            overflow: hidden; border: 1px solid var(--border-strong);
+            border-radius: var(--radius-md); background: var(--bg-elevated);
+            box-shadow: inset 0 1px 4px color-mix(in srgb, var(--ink) 12%, transparent), var(--shadow-soft);
             outline: none; touch-action: none; user-select: none;
         }
-        .board:focus-visible { box-shadow: 0 0 0 3px var(--focus), inset 0 1px 8px rgba(25,20,14,.35); }
+        .board:focus-visible {
+            box-shadow: 0 0 0 3px var(--focus), inset 0 1px 4px color-mix(in srgb, var(--ink) 12%, transparent);
+        }
+        .board.solved { border-color: color-mix(in srgb, var(--accent) 68%, var(--border-strong)); }
         .well { position: relative; width: 100%; height: 100%; }
         .slot, .tile {
-            position: absolute; box-sizing: border-box; border-radius: 7px;
+            position: absolute; box-sizing: border-box; border-radius: clamp(6px, 2vw, 9px);
         }
         .slot {
-            z-index: 0; border: 1px solid rgba(18,22,20,.22);
-            background: color-mix(in srgb, var(--board-wood-edge) 50%, transparent);
-            box-shadow: inset 0 3px 8px rgba(18,18,16,.38), 0 1px rgba(255,255,255,.12);
+            z-index: 0; border: 0; pointer-events: none; background: transparent;
         }
         .tile {
             z-index: 1; display: grid; min-height: 0; padding: 0;
             border: 1px solid var(--border-strong); place-items: center;
             color: var(--ink); background: var(--bg-surface);
-            box-shadow: inset 0 1px rgba(255,255,255,.35), var(--shadow-soft);
+            box-shadow: 0 1px 3px color-mix(in srgb, var(--ink) 14%, transparent);
             font-family: var(--font-display); font-size: clamp(1.28rem, 8.4vw, 2.3rem);
             font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1;
             transition: left .18s ease, top .18s ease;
@@ -72,8 +73,8 @@
         .tile.movable { cursor: pointer; }
         .tile.movable:active { filter: brightness(.94); transform: scale(.97); }
         .tile.solved {
-            border-color: color-mix(in srgb, var(--accent) 65%, var(--border-strong));
-            background: color-mix(in srgb, var(--accent-soft) 48%, var(--bg-surface));
+            color: var(--accent);
+            border-color: color-mix(in srgb, var(--accent) 42%, var(--border-strong));
         }
         .board[data-size="5"] .tile { font-size: clamp(1rem, 6.7vw, 1.75rem); }
         @media (max-width: 340px) {
@@ -429,7 +430,6 @@ customElements.define('sliding-puzzle', class extends HTMLElement {
         for (const slot of well.querySelectorAll('.slot')) {
             const index = Number(slot.dataset.index)
             const empty = index === blankIndex
-            slot.classList.toggle('empty', empty)
             slot.setAttribute('aria-hidden', String(!empty))
             if (empty) {
                 slot.setAttribute('aria-label', this.format(this.i18n.t('slidingEmptyLabel'), {
@@ -460,6 +460,7 @@ customElements.define('sliding-puzzle', class extends HTMLElement {
             this.position(tile, index, size, gap)
         }
         board.dataset.size = size
+        board.classList.toggle('solved', Boolean(this.state.outcome))
         board.setAttribute('aria-rowcount', String(size))
         board.setAttribute('aria-colcount', String(size))
         board.setAttribute('aria-disabled', String(Boolean(this.state.outcome)))
