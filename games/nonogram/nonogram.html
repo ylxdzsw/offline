@@ -95,7 +95,7 @@
         .board {
             display: grid; min-width: 0; aspect-ratio: 1;
             grid-template-columns: repeat(var(--size), minmax(0, 1fr));
-            background: var(--border); outline: none; touch-action: none;
+            background: var(--border); outline: none; touch-action: manipulation;
         }
         .cell {
             position: relative; min-width: 0; min-height: 0; aspect-ratio: 1;
@@ -161,8 +161,6 @@ customElements.define('nonogram-game', class extends HTMLElement {
             document.getElementById('nonogram-game-template').content.cloneNode(true)
         )
         this.mode = 1
-        this.pointer = null
-        this.suppressClick = false
         this.rebuildBoard = true
         this.timerOrigin = null
         this.timerInterval = null
@@ -228,13 +226,8 @@ customElements.define('nonogram-game', class extends HTMLElement {
         board.addEventListener('click', event => {
             const cell = event.target.closest('.cell')
             if (!cell || this.state.outcome) return
-            if (this.suppressClick) return
             this.applyMark(Number(cell.dataset.index), this.mode)
         })
-        board.addEventListener('pointerdown', event => this.beginPaint(event))
-        board.addEventListener('pointermove', event => this.continuePaint(event))
-        board.addEventListener('pointerup', event => this.endPaint(event))
-        board.addEventListener('pointercancel', event => this.endPaint(event))
         s.querySelector('.undo').addEventListener('click', () => this.undo())
         s.querySelector('.new').addEventListener('click', () => this.newGame())
         s.querySelector('.difficulty').addEventListener('change', event => {
@@ -272,49 +265,6 @@ customElements.define('nonogram-game', class extends HTMLElement {
         s.querySelector('.board').setAttribute('aria-label', t('nonogramBoard'))
     }
 
-    beginPaint(event) {
-        const cell = event.target.closest('.cell')
-        if (!cell || event.button !== 0 || this.state.outcome) return
-        event.preventDefault()
-        const index = Number(cell.dataset.index)
-        const source = this.state.cells[index]
-        this.pointer = {
-            id: event.pointerId,
-            index,
-            source,
-            target: source === this.mode ? this.engine.MARKS.empty : this.mode,
-        }
-        this.suppressClick = true
-        try { event.currentTarget.setPointerCapture(event.pointerId) } catch {}
-        this.paint(index)
-    }
-
-    continuePaint(event) {
-        if (!this.pointer || this.pointer.id !== event.pointerId || this.state.outcome) return
-        const cell = this.shadowRoot.elementFromPoint(event.clientX, event.clientY)?.closest('.cell')
-        if (!cell) return
-        const index = Number(cell.dataset.index)
-        if (index === this.pointer.index) return
-        this.pointer.index = index
-        this.paint(index)
-    }
-
-    endPaint(event) {
-        if (!this.pointer || this.pointer.id !== event.pointerId) return
-        this.pointer = null
-        setTimeout(() => { this.suppressClick = false }, 0)
-    }
-
-    paint(index) {
-        const {source, target} = this.pointer
-        if (target === this.engine.MARKS.empty) {
-            if (this.state.cells[index] !== source) return
-            this.applyMark(index, source)
-        } else if (this.state.cells[index] !== target) {
-            this.applyMark(index, target)
-        }
-    }
-
     applyMark(index, mark) {
         if (this.state.outcome) return
         const result = this.engine.apply(
@@ -329,7 +279,6 @@ customElements.define('nonogram-game', class extends HTMLElement {
         this.state.cells = result.cells
         this.state.outcome = result.solved ? 'won' : null
         if (result.solved) {
-            this.pointer = null
             this.pauseTimer(false)
         } else {
             this.resumeTimer()

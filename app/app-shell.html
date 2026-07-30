@@ -1,6 +1,7 @@
 <template id="offline-shell-template">
     <style>
         :host {
+            --header-size: 48px;
             display: block;
             width: min(100%, var(--shell-max));
             min-height: var(--app-height);
@@ -10,6 +11,7 @@
             box-shadow: var(--shadow);
         }
         :host(:not([page="gallery"])) {
+            --header-size: 40px;
             height: var(--app-height);
             min-height: 0;
             overflow: hidden;
@@ -29,9 +31,9 @@
             z-index: 20;
             top: 0;
             display: grid;
-            grid-template-columns: 48px 1fr 48px;
+            grid-template-columns: var(--header-size) 1fr var(--header-size);
             align-items: center;
-            min-height: calc(48px + var(--safe-top));
+            min-height: calc(var(--header-size) + var(--safe-top));
             padding: var(--safe-top) 4px 0;
             color: var(--ink);
             background: var(--header-bg);
@@ -52,8 +54,8 @@
         }
         .icon-btn {
             display: grid;
-            width: 44px;
-            height: 44px;
+            width: min(44px, var(--header-size));
+            height: min(44px, var(--header-size));
             place-items: center;
             border: 0;
             border-radius: 50%;
@@ -94,7 +96,7 @@
             opacity: .7;
         }
         main {
-            min-height: calc(var(--app-height) - 48px);
+            min-height: calc(var(--app-height) - var(--header-size));
             padding: 16px
                 max(14px, var(--safe-right))
                 24px

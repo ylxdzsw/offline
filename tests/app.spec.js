@@ -1251,15 +1251,38 @@ test('Sliding Puzzle changes size, slides with touch and keyboard, persists, and
     await expect(page.locator('sliding-puzzle .tile').first()).toHaveCSS('transition-duration', '0s')
 })
 
-test('Nonogram supports fill and cross drawing, undo, completion, sizes, and persistence', async ({page}) => {
+test('Nonogram toggles one cell per tap, supports undo, completion, sizes, and persistence', async ({page}) => {
     await page.goto('/nonogram.html')
     const game = page.locator('nonogram-game')
+    await expect(page.locator('offline-shell header')).toHaveCSS('min-height', '40px')
     await expect(game.locator('.board-wrap')).toHaveAttribute('data-size', '10')
     await expect(game.locator('.cell')).toHaveCount(100)
     await expect(game.locator('.timer')).toHaveText('00:00')
     await expect(page.locator('offline-shell .guide-image')).toHaveAttribute('src', './guides/nonogram.svg')
 
     const first = game.locator('.cell[data-index="0"]')
+    const second = game.locator('.cell[data-index="1"]')
+    const firstBox = await first.boundingBox()
+    const secondBox = await second.boundingBox()
+    await first.dispatchEvent('pointerdown', {
+        pointerId: 17, pointerType: 'touch', button: 0,
+        clientX: firstBox.x + firstBox.width / 2,
+        clientY: firstBox.y + firstBox.height / 2,
+    })
+    await game.locator('.board').dispatchEvent('pointermove', {
+        pointerId: 17, pointerType: 'touch', button: 0,
+        clientX: secondBox.x + secondBox.width / 2,
+        clientY: secondBox.y + secondBox.height / 2,
+    })
+    await game.locator('.board').dispatchEvent('pointerup', {
+        pointerId: 17, pointerType: 'touch', button: 0,
+        clientX: secondBox.x + secondBox.width / 2,
+        clientY: secondBox.y + secondBox.height / 2,
+    })
+    await expect(first).not.toHaveClass(/filled/)
+    await expect(second).not.toHaveClass(/filled/)
+    await expect(game.locator('.board')).toHaveCSS('touch-action', 'manipulation')
+
     await first.click()
     await expect(first).toHaveClass(/filled/)
     expect(await page.evaluate(() =>

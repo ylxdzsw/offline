@@ -854,7 +854,7 @@
                 tips: [
                     'Start with long clues whose groups have very little room to move.',
                     'Once every group in a line is placed, cross out all of its remaining cells.',
-                    'Drag across several cells to paint quickly. Undo restores the most recent changed cell.',
+                    'Tap one cell at a time to toggle the selected mark. Undo restores the most recent changed cell.',
                 ],
             },
             minesweeper: {
@@ -1064,7 +1064,7 @@
                 tips: [
                     '先找较长、可移动空间很小的线索，它们通常能确定一部分黑格。',
                     '一条线上的所有组都确定后，把其余格子全部排除。',
-                    '可拖过多个格子快速标记；“悔棋”每次恢复最近改变的一格。',
+                    '每次点击一格即可切换当前标记；“悔棋”每次恢复最近改变的一格。',
                 ],
             },
             minesweeper: {
@@ -1523,7 +1523,7 @@
                         title: 'Sizes and controls',
                         items: [
                             'Easy puzzles use 5×5 grids, Medium uses 10×10, and Hard uses 15×15. Each size draws from an original set of uniquely solvable pictures.',
-                            'Choose Fill or Cross, then tap or drag across cells. Starting a drag on the selected mark erases matching marks instead.',
+                            'Choose Fill or Cross, then tap a cell to toggle that mark. Each tap changes only one cell.',
                             'Undo restores one changed cell. Puzzle, difficulty, marks, and elapsed time save locally and remain available offline.',
                         ],
                     },
@@ -2035,7 +2035,7 @@
                         title: '大小与操作',
                         items: [
                             '简单使用 5×5，中等使用 10×10，困难使用 15×15；每种大小都从一组原创且唯一解的图案中选题。',
-                            '选择“涂黑”或“排除”后点击格子，也可拖过多格连续标记；从相同标记上开始拖动会执行擦除。',
+                            '选择“涂黑”或“排除”后点击一格即可切换该标记；每次点击只会改变一格。',
                             '“悔棋”每次恢复最近改变的一格；题目、难度、标记和用时都会保存在本机，可离线继续。',
                         ],
                     },
