@@ -228,12 +228,23 @@ test('game viewport setup waits for a parser-delayed game element', async ({page
 })
 
 test('Spider uses the available width on compact phone viewports', async ({page}) => {
-    for (const viewport of [{width: 320, height: 480}, {width: 375, height: 667}]) {
+    for (const viewport of [
+        {width: 320, height: 480},
+        {width: 375, height: 667},
+        {width: 393, height: 852, safeTop: 59, safeBottom: 34},
+    ]) {
         await page.setViewportSize(viewport)
         await page.goto('/spider.html')
+        await page.evaluate(({safeTop = 0, safeBottom = 0}) => {
+            document.documentElement.style.setProperty('--safe-top', `${safeTop}px`)
+            document.documentElement.style.setProperty('--safe-bottom', `${safeBottom}px`)
+        }, viewport)
         await page.waitForFunction(() =>
             document.querySelector('offline-shell')?._fitSurface?.dataset.fitScale !== undefined
         )
+        await page.evaluate(() => new Promise(resolve =>
+            requestAnimationFrame(() => requestAnimationFrame(resolve))
+        ))
         const geometry = await page.locator('spider-game').evaluate(game => {
             const table = game.shadowRoot.querySelector('.table').getBoundingClientRect()
             const host = game.getBoundingClientRect()
