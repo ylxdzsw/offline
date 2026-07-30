@@ -48,6 +48,7 @@ test('gallery grid logos stay centered and contained', async ({page}) => {
         'article[data-game="go"] .preview > span',
         'article[data-game="huarong"] .preview > span',
         'article[data-game="sliding"] .preview > span',
+        'article[data-game="nonogram"] .preview > span',
         'article[data-game="minesweeper"] .preview > span',
     ].join(',')).evaluateAll(marks => marks.map(mark => {
         const preview = mark.parentElement.getBoundingClientRect()
@@ -1250,6 +1251,60 @@ test('Sliding Puzzle changes size, slides with touch and keyboard, persists, and
     await expect(page.locator('sliding-puzzle .tile').first()).toHaveCSS('transition-duration', '0s')
 })
 
+test('Nonogram supports fill and cross drawing, undo, completion, sizes, and persistence', async ({page}) => {
+    await page.goto('/nonogram.html')
+    const game = page.locator('nonogram-game')
+    await expect(game.locator('.board-wrap')).toHaveAttribute('data-size', '10')
+    await expect(game.locator('.cell')).toHaveCount(100)
+    await expect(game.locator('.timer')).toHaveText('00:00')
+    await expect(page.locator('offline-shell .guide-image')).toHaveAttribute('src', './guides/nonogram.svg')
+
+    const first = game.locator('.cell[data-index="0"]')
+    await first.click()
+    await expect(first).toHaveClass(/filled/)
+    expect(await page.evaluate(() =>
+        JSON.parse(localStorage.getItem('offline-games:v1:nonogram')).history.length)).toBe(1)
+    await first.click()
+    await expect(first).not.toHaveClass(/filled/)
+
+    await game.locator('.mode [data-value="2"]').click()
+    await first.click()
+    await expect(first).toHaveClass(/crossed/)
+    await game.locator('.undo').click()
+    await expect(first).not.toHaveClass(/crossed/)
+
+    await game.locator('.mode [data-value="1"]').click()
+    const finalIndex = await game.evaluate(element => {
+        const target = element.puzzle.solution.findLastIndex(Boolean)
+        element.pauseTimer(false)
+        element.state.cells = element.puzzle.solution.map((filled, index) =>
+            filled && index !== target ? element.engine.MARKS.filled : element.engine.MARKS.empty)
+        element.state.history = []
+        element.state.elapsedMs = 65000
+        element.state.outcome = null
+        element.save()
+        element.render()
+        return target
+    })
+    await game.locator(`.cell[data-index="${finalIndex}"]`).click()
+    await expect(game.locator('.status')).toHaveText('Picture complete in 1 mark · 01:05')
+    await expect(game.locator('.clue.complete')).toHaveCount(20)
+    expect(await page.evaluate(() =>
+        JSON.parse(localStorage.getItem('offline-games:v1:nonogram')).outcome)).toBe('won')
+
+    await page.reload()
+    await expect(game.locator('.status')).toContainText('Picture complete')
+    await game.locator('.difficulty [data-value="easy"]').click()
+    await expect(game.locator('.board-wrap')).toHaveAttribute('data-size', '5')
+    await expect(game.locator('.cell')).toHaveCount(25)
+    await game.locator('.difficulty [data-value="hard"]').click()
+    await expect(game.locator('.board-wrap')).toHaveAttribute('data-size', '15')
+    await expect(game.locator('.cell')).toHaveCount(225)
+
+    await page.emulateMedia({reducedMotion: 'reduce'})
+    await expect(game.locator('.cell').first()).toHaveCSS('transition-duration', '0s')
+})
+
 test('Minesweeper animates confirmed reveals, keeps flags reversible, persists, and has no undo', async ({page}) => {
     await page.goto('/minesweeper.html')
     await expect(page.locator('minesweeper-game .cell')).toHaveCount(256)
@@ -1610,6 +1665,9 @@ test('the installed app reloads and navigates completely offline', async ({brows
     await page.goto('/sliding.html')
     await expect(page.locator('offline-shell h1')).toHaveText('Sliding Puzzle')
     await expect(page.locator('sliding-puzzle .tile')).toHaveCount(15)
+    await page.goto('/nonogram.html')
+    await expect(page.locator('offline-shell h1')).toHaveText('Nonogram')
+    await expect(page.locator('nonogram-game .cell')).toHaveCount(100)
     await page.goto('/minesweeper.html')
     await expect(page.locator('offline-shell h1')).toHaveText('Minesweeper')
     await expect(page.locator('minesweeper-game .cell')).toHaveCount(256)

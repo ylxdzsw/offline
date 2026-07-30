@@ -1,0 +1,545 @@
+<template id="nonogram-game-template">
+    <style>
+        :host { display: block; color: var(--ink); }
+        .toolbar {
+            display: grid; grid-template-columns: minmax(0, 1fr) auto auto;
+            gap: 8px; align-items: end; margin-bottom: 9px;
+        }
+        .difficulty-control {
+            display: grid; min-width: 0; gap: 3px;
+            color: var(--ink-muted); font-size: .7rem; font-weight: 650;
+        }
+        offline-segmented { min-width: 0; }
+        button {
+            min-height: var(--control-h, 42px); padding: 0 12px;
+            border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
+            color: var(--ink); background: var(--bg-surface); font-weight: 650;
+            touch-action: manipulation;
+        }
+        button:disabled { opacity: .42; }
+        .warning { margin: 0 0 9px; color: var(--danger); font-size: .77rem; text-align: center; }
+        .warning[hidden] { display: none; }
+        .dashboard {
+            display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px; margin-bottom: 9px;
+        }
+        .meter {
+            display: grid; min-width: 0; min-height: 43px; padding: 5px 9px;
+            border: 1px solid var(--border); border-radius: var(--radius-sm);
+            place-content: center; text-align: center; background: var(--bg-surface);
+            box-shadow: var(--shadow-soft);
+        }
+        .meter span {
+            color: var(--ink-muted); font-size: .62rem; font-weight: 750;
+            line-height: 1; text-transform: uppercase;
+        }
+        .meter strong {
+            margin-top: 4px; color: var(--ink); font-family: var(--font-display);
+            font-size: 1.02rem; font-variant-numeric: tabular-nums; line-height: 1;
+        }
+        .status {
+            display: flex; min-height: 40px; align-items: center; justify-content: center;
+            margin: 0 0 9px; padding: 6px 10px; border-radius: var(--radius-sm);
+            color: var(--status-ink); font-size: .84rem; font-weight: 700;
+            line-height: 1.35; text-align: center; background: var(--status-bg);
+        }
+        .status.won { color: var(--accent); }
+        .mode-row {
+            display: grid; grid-template-columns: auto minmax(0, 220px);
+            gap: 9px; align-items: center; justify-content: center; margin-bottom: 9px;
+        }
+        .mode-label {
+            color: var(--ink-muted); font-size: .7rem; font-weight: 700;
+        }
+        .board-wrap {
+            --size: 10;
+            --clue-space: 64px;
+            width: min(100%, 440px); margin: 0 auto; transform-origin: top center;
+        }
+        .board-wrap[data-size="5"] { --clue-space: 50px; }
+        .board-wrap[data-size="15"] { --clue-space: 78px; }
+        .puzzle {
+            display: grid; width: 100%; box-sizing: border-box;
+            grid-template: var(--clue-space) auto / var(--clue-space) minmax(0, 1fr);
+            overflow: hidden; border: 1px solid var(--border-strong);
+            border-radius: var(--radius-md); background: var(--board-paper);
+            box-shadow: var(--shadow-soft); user-select: none; -webkit-touch-callout: none;
+        }
+        .corner {
+            border-right: 2px solid var(--border-strong);
+            border-bottom: 2px solid var(--border-strong);
+            background: var(--bg-elevated);
+        }
+        .column-clues {
+            display: grid; grid-template-columns: repeat(var(--size), minmax(0, 1fr));
+            border-bottom: 2px solid var(--border-strong); background: var(--bg-surface);
+        }
+        .row-clues {
+            display: grid; grid-template-rows: repeat(var(--size), minmax(0, 1fr));
+            border-right: 2px solid var(--border-strong); background: var(--bg-surface);
+        }
+        .clue {
+            display: flex; min-width: 0; min-height: 0; gap: 2px;
+            align-items: center; justify-content: flex-end; padding: 1px 3px;
+            color: var(--ink-muted); font-family: var(--font-mono);
+            font-size: clamp(.45rem, 2.25vw, .68rem); font-weight: 750; line-height: 1;
+        }
+        .column-clues .clue {
+            flex-direction: column; justify-content: flex-end; padding: 3px 1px;
+            border-right: 1px solid var(--border);
+        }
+        .row-clues .clue { border-bottom: 1px solid var(--border); }
+        .clue.major { border-color: var(--border-strong); }
+        .clue.complete { color: var(--accent); opacity: .62; }
+        .clue.complete span { text-decoration: line-through; text-decoration-thickness: 1.5px; }
+        .board {
+            display: grid; min-width: 0; aspect-ratio: 1;
+            grid-template-columns: repeat(var(--size), minmax(0, 1fr));
+            background: var(--border); outline: none; touch-action: none;
+        }
+        .cell {
+            position: relative; min-width: 0; min-height: 0; aspect-ratio: 1;
+            padding: 0; border: 0; border-right: 1px solid var(--border);
+            border-bottom: 1px solid var(--border); border-radius: 0;
+            background: var(--board-paper); box-shadow: none;
+            transition: background-color .1s ease, transform .1s ease;
+        }
+        .cell.major-column { border-right: 2px solid var(--border-strong); }
+        .cell.major-row { border-bottom: 2px solid var(--border-strong); }
+        .cell.filled { background: var(--ink); }
+        .cell.crossed::before, .cell.crossed::after {
+            position: absolute; top: 50%; left: 16%; width: 68%; height: 1.5px;
+            border-radius: 2px; background: var(--danger); content: "";
+        }
+        .cell.crossed::before { transform: rotate(45deg); }
+        .cell.crossed::after { transform: rotate(-45deg); }
+        .cell:active { transform: scale(.88); }
+        .cell:focus-visible { z-index: 2; outline: 2px solid var(--focus); outline-offset: -2px; }
+        .board.solved .cell.filled { background: var(--accent); }
+        @media (max-width: 340px) {
+            .toolbar { gap: 5px; }
+            button { padding-inline: 9px; font-size: .8rem; }
+            .mode-row { gap: 6px; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .cell { transition: none; }
+        }
+    </style>
+    <div class="toolbar">
+        <div class="difficulty-control">
+            <span class="difficulty-label"></span>
+            <offline-segmented class="difficulty"></offline-segmented>
+        </div>
+        <button class="undo" type="button"></button>
+        <button class="new" type="button"></button>
+    </div>
+    <p class="warning" hidden></p>
+    <div class="dashboard">
+        <div class="meter"><span class="lines-label"></span><strong class="lines">0/0</strong></div>
+        <div class="meter"><span class="time-label"></span><strong class="timer">00:00</strong></div>
+    </div>
+    <div class="status" role="status" aria-live="polite"></div>
+    <div class="mode-row">
+        <span class="mode-label"></span>
+        <offline-segmented class="mode"></offline-segmented>
+    </div>
+    <div class="board-wrap">
+        <div class="puzzle">
+            <div class="corner" aria-hidden="true"></div>
+            <div class="column-clues"></div>
+            <div class="row-clues"></div>
+            <div class="board" role="grid"></div>
+        </div>
+    </div>
+</template>
+
+<script>
+customElements.define('nonogram-game', class extends HTMLElement {
+    constructor() {
+        super()
+        this.attachShadow({mode: 'open'}).append(
+            document.getElementById('nonogram-game-template').content.cloneNode(true)
+        )
+        this.mode = 1
+        this.pointer = null
+        this.suppressClick = false
+        this.rebuildBoard = true
+        this.timerOrigin = null
+        this.timerInterval = null
+        this.visibilityHandler = () => this.visibilityChanged()
+    }
+
+    connectedCallback() {
+        this.engine = OfflineGames.Nonogram
+        this.i18n = OfflineGames.i18n
+        this.storage = OfflineGames.storage
+        this.load()
+        this.bind()
+        this.localize()
+        this.render()
+        this.resumeTimer()
+        document.addEventListener('visibilitychange', this.visibilityHandler)
+    }
+
+    disconnectedCallback() {
+        document.removeEventListener('visibilitychange', this.visibilityHandler)
+        this.pauseTimer(true)
+    }
+
+    fresh(difficulty = 'medium') {
+        const seed = OfflineGames.runtime.randomSeed()
+        const puzzle = this.engine.newGame(difficulty, seed)
+        return {
+            schema: 1,
+            game: 'nonogram',
+            difficulty,
+            seed,
+            cells: Array(puzzle.size * puzzle.size).fill(this.engine.MARKS.empty),
+            history: [],
+            elapsedMs: 0,
+            outcome: null,
+        }
+    }
+
+    valid(saved) {
+        if (!saved || !this.engine.DIFFICULTIES.includes(saved.difficulty)
+            || !Number.isInteger(saved.seed) || saved.seed < 0 || saved.seed > 0xffffffff
+            || !Array.isArray(saved.history)
+            || !Number.isFinite(saved.elapsedMs) || saved.elapsedMs < 0
+            || ![null, 'won'].includes(saved.outcome)) return false
+        const puzzle = this.engine.newGame(saved.difficulty, saved.seed)
+        if (!this.engine.validateCells(saved.cells, puzzle.size)
+            || !saved.history.every(entry => Array.isArray(entry) && entry.length === 2
+                && Number.isInteger(entry[0]) && entry[0] >= 0 && entry[0] < saved.cells.length
+                && Object.values(this.engine.MARKS).includes(entry[1]))) return false
+        return this.engine.isSolved(saved.cells, puzzle.solution, puzzle.size)
+            === (saved.outcome === 'won')
+    }
+
+    load() {
+        const saved = this.storage.read('nonogram')
+        this.state = this.valid(saved) ? saved : this.fresh()
+        this.puzzle = this.engine.newGame(this.state.difficulty, this.state.seed)
+    }
+
+    bind() {
+        const s = this.shadowRoot
+        const board = s.querySelector('.board')
+        board.addEventListener('click', event => {
+            const cell = event.target.closest('.cell')
+            if (!cell || this.state.outcome) return
+            if (this.suppressClick) return
+            this.applyMark(Number(cell.dataset.index), this.mode)
+        })
+        board.addEventListener('pointerdown', event => this.beginPaint(event))
+        board.addEventListener('pointermove', event => this.continuePaint(event))
+        board.addEventListener('pointerup', event => this.endPaint(event))
+        board.addEventListener('pointercancel', event => this.endPaint(event))
+        s.querySelector('.undo').addEventListener('click', () => this.undo())
+        s.querySelector('.new').addEventListener('click', () => this.newGame())
+        s.querySelector('.difficulty').addEventListener('change', event => {
+            const previous = this.state.difficulty
+            if (!this.newGame(event.detail.value)) this.setDifficultyControl(previous)
+        })
+        s.querySelector('.mode').addEventListener('change', event => {
+            this.mode = Number(event.detail.value)
+        })
+    }
+
+    localize() {
+        const s = this.shadowRoot, t = key => this.i18n.t(key)
+        const difficulty = s.querySelector('.difficulty')
+        difficulty.setAttribute('options', JSON.stringify(this.engine.DIFFICULTIES.map(value => ({
+            value,
+            label: t(value),
+        }))))
+        difficulty.setAttribute('value', this.state.difficulty)
+        difficulty.setAttribute('aria-label', t('difficulty'))
+        const mode = s.querySelector('.mode')
+        mode.setAttribute('options', JSON.stringify([
+            {value: String(this.engine.MARKS.filled), label: `■ ${t('nonogramFill')}`},
+            {value: String(this.engine.MARKS.crossed), label: `× ${t('nonogramCross')}`},
+        ]))
+        mode.setAttribute('value', String(this.mode))
+        mode.setAttribute('aria-label', t('nonogramMode'))
+        s.querySelector('.difficulty-label').textContent = t('difficulty')
+        s.querySelector('.mode-label').textContent = t('nonogramMode')
+        s.querySelector('.undo').textContent = t('undo')
+        s.querySelector('.new').textContent = t('newGame')
+        s.querySelector('.lines-label').textContent = t('nonogramLines')
+        s.querySelector('.time-label').textContent = t('nonogramTime')
+        s.querySelector('.warning').textContent = t('storageWarning')
+        s.querySelector('.board').setAttribute('aria-label', t('nonogramBoard'))
+    }
+
+    beginPaint(event) {
+        const cell = event.target.closest('.cell')
+        if (!cell || event.button !== 0 || this.state.outcome) return
+        event.preventDefault()
+        const index = Number(cell.dataset.index)
+        const source = this.state.cells[index]
+        this.pointer = {
+            id: event.pointerId,
+            index,
+            source,
+            target: source === this.mode ? this.engine.MARKS.empty : this.mode,
+        }
+        this.suppressClick = true
+        try { event.currentTarget.setPointerCapture(event.pointerId) } catch {}
+        this.paint(index)
+    }
+
+    continuePaint(event) {
+        if (!this.pointer || this.pointer.id !== event.pointerId || this.state.outcome) return
+        const cell = this.shadowRoot.elementFromPoint(event.clientX, event.clientY)?.closest('.cell')
+        if (!cell) return
+        const index = Number(cell.dataset.index)
+        if (index === this.pointer.index) return
+        this.pointer.index = index
+        this.paint(index)
+    }
+
+    endPaint(event) {
+        if (!this.pointer || this.pointer.id !== event.pointerId) return
+        this.pointer = null
+        setTimeout(() => { this.suppressClick = false }, 0)
+    }
+
+    paint(index) {
+        const {source, target} = this.pointer
+        if (target === this.engine.MARKS.empty) {
+            if (this.state.cells[index] !== source) return
+            this.applyMark(index, source)
+        } else if (this.state.cells[index] !== target) {
+            this.applyMark(index, target)
+        }
+    }
+
+    applyMark(index, mark) {
+        if (this.state.outcome) return
+        const result = this.engine.apply(
+            this.state.cells,
+            this.puzzle.solution,
+            this.puzzle.size,
+            index,
+            mark,
+        )
+        if (!result.changed) return
+        this.state.history.push([index, result.previous])
+        this.state.cells = result.cells
+        this.state.outcome = result.solved ? 'won' : null
+        if (result.solved) {
+            this.pointer = null
+            this.pauseTimer(false)
+        } else {
+            this.resumeTimer()
+        }
+        this.save()
+        this.render()
+    }
+
+    undo() {
+        const entry = this.state.history.pop()
+        if (!entry) return
+        this.state.cells[entry[0]] = entry[1]
+        this.state.outcome = null
+        this.resumeTimer()
+        this.save()
+        this.render()
+        this.shadowRoot.querySelector(`.cell[data-index="${entry[0]}"]`)?.focus()
+    }
+
+    newGame(difficulty = this.state.difficulty, force = false) {
+        if (!force && this.state.history.length && !this.state.outcome
+            && !confirm(this.i18n.t('confirmNew'))) return false
+        this.pauseTimer(false)
+        this.state = this.fresh(difficulty)
+        this.puzzle = this.engine.newGame(this.state.difficulty, this.state.seed)
+        this.rebuildBoard = true
+        this.save()
+        this.render()
+        return true
+    }
+
+    syncTimer() {
+        if (this.timerOrigin != null) {
+            this.state.elapsedMs = Math.max(0, performance.now() - this.timerOrigin)
+        }
+    }
+
+    resumeTimer() {
+        if (!this.state.history.length || this.state.outcome || this.timerOrigin != null
+            || document.visibilityState === 'hidden') return
+        this.timerOrigin = performance.now() - this.state.elapsedMs
+        this.timerInterval = setInterval(() => {
+            this.syncTimer()
+            this.renderTimer()
+        }, 250)
+    }
+
+    pauseTimer(persist) {
+        this.syncTimer()
+        if (this.timerInterval != null) clearInterval(this.timerInterval)
+        this.timerInterval = null
+        this.timerOrigin = null
+        if (persist && this.state) this.writeState()
+    }
+
+    visibilityChanged() {
+        if (document.visibilityState === 'hidden') this.pauseTimer(true)
+        else this.resumeTimer()
+    }
+
+    save() {
+        this.syncTimer()
+        this.writeState()
+    }
+
+    writeState() {
+        if (!this.storage.write('nonogram', this.state)) {
+            this.shadowRoot.querySelector('.warning').hidden = false
+        }
+    }
+
+    timeText() {
+        const seconds = Math.floor(this.state.elapsedMs / 1000)
+        const minutes = Math.floor(seconds / 60)
+        if (minutes < 60) {
+            return `${String(minutes).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
+        }
+        return `${Math.floor(minutes / 60)}:${String(minutes % 60).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`
+    }
+
+    format(template, values) {
+        return Object.entries(values).reduce(
+            (text, [key, value]) => text.replaceAll(`{${key}}`, value),
+            template,
+        )
+    }
+
+    setDifficultyControl(difficulty) {
+        const control = this.shadowRoot.querySelector('.difficulty')
+        if (typeof control.setValue === 'function') control.setValue(difficulty)
+        else control.setAttribute('value', difficulty)
+    }
+
+    renderTimer() {
+        this.shadowRoot.querySelector('.timer').textContent = this.timeText()
+    }
+
+    completeLines() {
+        if (this.state.outcome) return this.puzzle.size * 2
+        let complete = 0
+        for (let index = 0; index < this.puzzle.size; index++) {
+            if (this.engine.lineComplete(
+                this.state.cells, this.puzzle.size, 'row', index, this.puzzle.rowClues[index],
+            )) complete++
+            if (this.engine.lineComplete(
+                this.state.cells, this.puzzle.size, 'column', index, this.puzzle.columnClues[index],
+            )) complete++
+        }
+        return complete
+    }
+
+    clueElement(clues, axis, index) {
+        const clue = document.createElement('div')
+        clue.className = 'clue'
+        clue.dataset.index = index
+        clue.classList.toggle('major', (index + 1) % 5 === 0 && index + 1 < this.puzzle.size)
+        clue.setAttribute('aria-label', this.format(
+            this.i18n.t(axis === 'row' ? 'nonogramRowClue' : 'nonogramColumnClue'),
+            {index: index + 1, clues: clues.length ? clues.join(', ') : '0'},
+        ))
+        const values = clues.length ? clues : [0]
+        clue.replaceChildren(...values.map(value =>
+            Object.assign(document.createElement('span'), {textContent: String(value)})))
+        return clue
+    }
+
+    rebuild() {
+        const s = this.shadowRoot
+        const size = this.puzzle.size
+        s.querySelector('.row-clues').replaceChildren(
+            ...this.puzzle.rowClues.map((clues, index) => this.clueElement(clues, 'row', index)),
+        )
+        s.querySelector('.column-clues').replaceChildren(
+            ...this.puzzle.columnClues.map((clues, index) => this.clueElement(clues, 'column', index)),
+        )
+        s.querySelector('.board').replaceChildren(
+            ...Array.from({length: size * size}, (_, index) => {
+                const cell = document.createElement('button')
+                cell.type = 'button'
+                cell.className = 'cell'
+                cell.dataset.index = index
+                cell.setAttribute('role', 'gridcell')
+                cell.setAttribute('aria-rowindex', String(Math.floor(index / size) + 1))
+                cell.setAttribute('aria-colindex', String(index % size + 1))
+                cell.classList.toggle('major-column', (index % size + 1) % 5 === 0
+                    && index % size + 1 < size)
+                cell.classList.toggle('major-row', (Math.floor(index / size) + 1) % 5 === 0
+                    && Math.floor(index / size) + 1 < size)
+                return cell
+            }),
+        )
+        const wrap = s.querySelector('.board-wrap')
+        wrap.dataset.size = size
+        wrap.style.setProperty('--size', size)
+        this.rebuildBoard = false
+    }
+
+    render() {
+        if (this.rebuildBoard) this.rebuild()
+        const s = this.shadowRoot
+        const size = this.puzzle.size
+        const complete = this.completeLines()
+        this.setDifficultyControl(this.state.difficulty)
+        s.querySelector('.undo').disabled = this.state.history.length === 0
+        s.querySelector('.lines').textContent = `${complete}/${size * 2}`
+        this.renderTimer()
+        const status = s.querySelector('.status')
+        status.classList.toggle('won', Boolean(this.state.outcome))
+        status.textContent = this.state.outcome
+            ? this.format(this.i18n.t(this.state.history.length === 1
+                ? 'nonogramSolvedOne'
+                : 'nonogramSolved'), {
+                moves: this.state.history.length,
+                time: this.timeText(),
+            })
+            : this.format(this.i18n.t('nonogramPrompt'), {
+                complete,
+                total: size * 2,
+            })
+        const board = s.querySelector('.board')
+        board.classList.toggle('solved', Boolean(this.state.outcome))
+        for (const cell of board.querySelectorAll('.cell')) {
+            const index = Number(cell.dataset.index)
+            const mark = this.state.cells[index]
+            cell.classList.toggle('filled', mark === this.engine.MARKS.filled)
+            cell.classList.toggle('crossed', mark === this.engine.MARKS.crossed)
+            cell.disabled = Boolean(this.state.outcome)
+            cell.setAttribute('aria-pressed', String(mark !== this.engine.MARKS.empty))
+            cell.setAttribute('aria-label', this.format(this.i18n.t('nonogramCellLabel'), {
+                row: Math.floor(index / size) + 1,
+                column: index % size + 1,
+                state: this.i18n.t(mark === this.engine.MARKS.filled
+                    ? 'nonogramFilled'
+                    : mark === this.engine.MARKS.crossed
+                        ? 'nonogramCrossed'
+                        : 'nonogramUnknown'),
+            }))
+        }
+        for (let index = 0; index < size; index++) {
+            const rowComplete = Boolean(this.state.outcome) || this.engine.lineComplete(
+                this.state.cells, size, 'row', index, this.puzzle.rowClues[index],
+            )
+            const columnComplete = Boolean(this.state.outcome) || this.engine.lineComplete(
+                this.state.cells, size, 'column', index, this.puzzle.columnClues[index],
+            )
+            s.querySelector(`.row-clues .clue[data-index="${index}"]`)
+                .classList.toggle('complete', rowComplete)
+            s.querySelector(`.column-clues .clue[data-index="${index}"]`)
+                .classList.toggle('complete', columnComplete)
+        }
+    }
+})
+</script>

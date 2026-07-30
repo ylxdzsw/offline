@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-labelledby="title desc">
+  <title id="title">Nonogram clue example</title>
+  <desc id="desc">A five by five grid forms a heart. Number clues beside each row and column describe its groups of filled cells.</desc>
+  <rect width="960" height="540" fill="#f1eee7"/>
+  <g transform="translate(257 42)">
+    <rect x="92" y="-4" width="360" height="96" rx="14" fill="#fbfaf6" stroke="#b8b4aa" stroke-width="3"/>
+    <rect x="-4" y="92" width="96" height="360" rx="14" fill="#fbfaf6" stroke="#b8b4aa" stroke-width="3"/>
+    <g fill="#59605d" font-family="ui-monospace,monospace" font-size="34" font-weight="800" text-anchor="middle">
+      <text x="128" y="60">2</text><text x="200" y="60">4</text><text x="272" y="60">5</text>
+      <text x="344" y="60">4</text><text x="416" y="60">2</text>
+      <text x="46" y="140">3</text><text x="46" y="212">5</text><text x="46" y="284">5</text>
+      <text x="46" y="356">3</text><text x="46" y="428">1</text>
+    </g>
+    <g stroke="#787d79" stroke-width="3">
+      <path fill="#fbfaf6" d="M92 92h360v360H92z"/>
+      <path d="M164 92v360M236 92v360M308 92v360M380 92v360M92 164h360M92 236h360M92 308h360M92 380h360"/>
+    </g>
+    <g fill="#26302c">
+      <path d="M164 92h216v72H164z"/>
+      <path d="M92 164h360v72H92z"/>
+      <path d="M92 236h360v72H92z"/>
+      <path d="M164 308h216v72H164z"/>
+      <path d="M236 380h72v72H236z"/>
+    </g>
+    <path d="M92 92h360v360H92z" fill="none" stroke="#3d4541" stroke-width="6"/>
+  </g>
+</svg>
