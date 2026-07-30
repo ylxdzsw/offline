@@ -1254,7 +1254,15 @@ test('Sliding Puzzle changes size, slides with touch and keyboard, persists, and
 test('Nonogram toggles one cell per tap, supports undo, completion, sizes, and persistence', async ({page}) => {
     await page.goto('/nonogram.html')
     const game = page.locator('nonogram-game')
-    await expect(page.locator('offline-shell header')).toHaveCSS('min-height', '40px')
+    await page.evaluate(() =>
+        document.documentElement.style.setProperty('--safe-top', '59px'))
+    const header = page.locator('offline-shell header')
+    await expect(header).toHaveCSS('box-sizing', 'border-box')
+    await expect(header).toHaveCSS('min-height', '99px')
+    const headerHeight = await header.evaluate(element =>
+        element.getBoundingClientRect().height)
+    expect(headerHeight).toBeGreaterThanOrEqual(99)
+    expect(headerHeight).toBeLessThanOrEqual(100)
     await expect(game.locator('.board-wrap')).toHaveAttribute('data-size', '10')
     await expect(game.locator('.cell')).toHaveCount(100)
     await expect(game.locator('.timer')).toHaveText('00:00')
