@@ -661,6 +661,41 @@ test('Junqi holds a fast AI battle reply and cues its destination', async ({page
     await expect(page.locator('junqi-game .square.last-to')).toHaveAttribute('aria-label', /last move/)
 })
 
+test('Junqi reports relative battle strength without revealing the surviving rank', async ({page}) => {
+    await page.goto('/junqi.html')
+    const battle = await page.locator('junqi-game').evaluate(game => {
+        const engine = game.engine
+        const board = Array(engine.ROWS * engine.COLS).fill(null)
+        const from = engine.at(5,2), to = engine.at(6,2)
+        board[from] = {id:'b9', side:engine.BLACK, type:'9'}
+        board[to] = {id:'r2', side:engine.RED, type:'2'}
+        board[engine.at(0,1)] = {id:'bf', side:engine.BLACK, type:engine.FLAG}
+        board[engine.at(10,0)] = {id:'r3', side:engine.RED, type:'3'}
+        board[engine.at(11,1)] = {id:'rf', side:engine.RED, type:engine.FLAG}
+        Object.assign(game.state, {
+            phase:'playing', board, turn:engine.BLACK, revealed:[], history:[],
+            lastMove:null, message:null, outcome:null,
+        })
+        game.commit({from,to}, engine.BLACK)
+        return {to, survivor:'b9'}
+    })
+
+    await expect(page.locator('junqi-game .status'))
+        .toHaveText('The attacking piece was stronger — your turn')
+    const survivor = page.locator(`junqi-game .square[data-index="${battle.to}"]`)
+    await expect(survivor.locator('.piece.hidden')).toHaveText('◆')
+    await expect(survivor).toHaveAttribute('aria-label', /hidden enemy piece/)
+    expect(await page.locator('junqi-game').evaluate(game => game.state.revealed)).toEqual([])
+
+    await page.locator('junqi-game').evaluate((game, id) => {
+        game.state.revealed = [id]
+        game.save()
+    }, battle.survivor)
+    await page.reload()
+    await expect(survivor.locator('.piece.hidden')).toHaveText('◆')
+    expect(await page.locator('junqi-game').evaluate(game => game.state.revealed)).toEqual([])
+})
+
 test('Chess makes a legal AI reply, persists, reloads, and undoes the turn',async({page})=>{
     await page.goto('/chess.html')
     await page.locator('chess-game .square[data-index="52"]').click()

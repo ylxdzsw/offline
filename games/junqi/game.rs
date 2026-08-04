@@ -366,7 +366,6 @@ pub fn apply_move(board: &[Option<Piece>], movement: Move) -> Result<ApplyResult
         None => next[movement.to] = Some(attacker.clone()),
         Some(target) => {
             result = battle(&attacker, target);
-            revealed.extend([attacker.id.clone(), target.id.clone()]);
             match result {
                 "attacker" => next[movement.to] = Some(attacker.clone()),
                 "defender" => next[movement.to] = Some(target.clone()),
@@ -545,5 +544,35 @@ mod tests {
                 .iter()
                 .any(|movement| movement.to == at(6, 2))
         );
+    }
+
+    #[test]
+    fn battle_discloses_only_a_flag_after_its_commander_is_lost() {
+        let mut board = vec![None; ROWS * COLS];
+        board[at(5, 2)] = token(RED, "2", "r2");
+        board[at(6, 2)] = token(BLACK, "9", "b9");
+        let result = apply_move(
+            &board,
+            Move {
+                from: at(5, 2),
+                to: at(6, 2),
+            },
+        )
+        .unwrap();
+        assert_eq!(result.result, "defender");
+        assert!(result.revealed.is_empty());
+
+        board[at(5, 2)] = token(RED, BOMB, "rb");
+        board[at(0, 1)] = token(BLACK, FLAG, "bf");
+        let result = apply_move(
+            &board,
+            Move {
+                from: at(5, 2),
+                to: at(6, 2),
+            },
+        )
+        .unwrap();
+        assert_eq!(result.result, "both");
+        assert_eq!(result.revealed, ["bf"]);
     }
 }

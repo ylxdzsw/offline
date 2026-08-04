@@ -108,7 +108,9 @@ OfflineGames.wasm.defineElement('junqi', 'junqi-game', class extends HTMLElement
     disconnectedCallback() { this.cancelAI() }
     fresh(difficulty = 'medium') { const seed=OfflineGames.runtime.randomSeed();return {schema: 1, game: 'junqi', seed, difficulty, phase: 'placement', board: this.engine.initialBoard(seed), turn: this.engine.RED, revealed: [], history: [], lastMove: null, message: null, outcome: null} }
     valid(saved) { return saved && Array.isArray(saved.board) && saved.board.length === 60 && [this.engine.RED,this.engine.BLACK].includes(saved.turn) && ['easy','medium','hard'].includes(saved.difficulty) && (!saved.phase||['placement','playing'].includes(saved.phase)) && Array.isArray(saved.revealed) && Array.isArray(saved.history) }
-    load() { const saved = this.storage.read('junqi'); this.state = this.valid(saved) ? saved : this.fresh();if(!this.state.phase)this.state.phase='playing';if(!Number.isInteger(this.state.seed))this.state.seed=OfflineGames.runtime.randomSeed() }
+    publicReveals(board, revealed) { const flags=new Set(board.flatMap(piece=>piece?.type===this.engine.FLAG?[piece.id]:[]));return revealed.filter(id=>flags.has(id)) }
+    normalizeReveals(state) { state.revealed=this.publicReveals(state.board,state.revealed);for(const snapshot of state.history)if(Array.isArray(snapshot.board)&&Array.isArray(snapshot.revealed))snapshot.revealed=this.publicReveals(snapshot.board,snapshot.revealed) }
+    load() { const saved = this.storage.read('junqi'); this.state = this.valid(saved) ? saved : this.fresh();this.normalizeReveals(this.state);if(!this.state.phase)this.state.phase='playing';if(!Number.isInteger(this.state.seed))this.state.seed=OfflineGames.runtime.randomSeed() }
     bind() {
         const s = this.shadowRoot
         s.querySelector('.board').addEventListener('click', event => { const square = event.target.closest('.square'); if (square) this.tap(Number(square.dataset.index)) })

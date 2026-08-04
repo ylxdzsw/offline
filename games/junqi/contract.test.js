@@ -64,6 +64,18 @@ test('camps protect occupants and combat handles ranks, bombs, mines, and flags'
     assert.equal(engine.battle(token(engine.RED,engine.ENGINEER), token(engine.BLACK,engine.MINE)), 'attacker')
     assert.equal(engine.battle(token(engine.RED,'9'), token(engine.BLACK,engine.MINE)), 'defender')
     assert.equal(engine.battle(token(engine.RED,'2'), token(engine.BLACK,engine.FLAG)), 'attacker')
+
+    board.fill(null)
+    board[engine.at(5,2)] = token(engine.RED, '2', 'r2')
+    board[engine.at(6,2)] = token(engine.BLACK, '9', 'b9')
+    assert.deepEqual(engine.applyMove(board, {from:engine.at(5,2),to:engine.at(6,2)}).revealed, [])
+
+    board[engine.at(5,2)] = token(engine.RED, engine.BOMB, 'rb')
+    board[engine.at(0,1)] = token(engine.BLACK, engine.FLAG, 'bf')
+    assert.deepEqual(
+        engine.applyMove(board, {from:engine.at(5,2),to:engine.at(6,2)}).revealed,
+        ['bf'],
+    )
 })
 
 test('capturing the flag ends the game and AI always chooses a legal move', () => {
