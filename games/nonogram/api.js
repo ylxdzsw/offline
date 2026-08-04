@@ -267,8 +267,7 @@
         const clues = readClueLine(cluesInput, size, 'clues')
         const line = Array.from({length: size}, (_, offset) =>
             cells[axis === 'row' ? index * size + offset : offset * size + index])
-        return line.every(mark => mark !== MARKS.empty)
-            && JSON.stringify(runs(line.map(mark => mark === MARKS.filled))) === JSON.stringify(clues)
+        return JSON.stringify(runs(line.map(mark => mark === MARKS.filled))) === JSON.stringify(clues)
     }
 
     const lineCandidates = (clues, size) => {

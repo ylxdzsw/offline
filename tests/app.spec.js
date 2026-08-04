@@ -1262,7 +1262,7 @@ test('Sliding Puzzle changes size, slides with touch and keyboard, persists, and
     await expect(page.locator('sliding-puzzle .tile').first()).toHaveCSS('transition-duration', '0s')
 })
 
-test('Nonogram toggles one cell per tap, supports undo, completion, sizes, and persistence', async ({page}) => {
+test('Nonogram toggles marks, completes clues promptly, supports sizes, and persists', async ({page}) => {
     await page.goto('/nonogram.html')
     const game = page.locator('nonogram-game')
     await page.evaluate(() =>
@@ -1312,10 +1312,38 @@ test('Nonogram toggles one cell per tap, supports undo, completion, sizes, and p
     await game.locator('.mode [data-value="2"]').click()
     await first.click()
     await expect(first).toHaveClass(/crossed/)
-    await game.locator('.undo').click()
+    await expect(game.locator('.undo')).toHaveCount(0)
+    await first.click()
     await expect(first).not.toHaveClass(/crossed/)
 
     await game.locator('.mode [data-value="1"]').click()
+    const promptRow = await game.evaluate(element => {
+        const size = element.puzzle.size
+        const row = Array.from({length: size}, (_, index) => index).find(index => {
+            const values = element.puzzle.solution.slice(index * size, (index + 1) * size)
+            return values.some(Boolean) && values.some(value => !value)
+        })
+        element.pauseTimer(false)
+        element.state.cells = Array(size * size).fill(element.engine.MARKS.empty)
+        element.state.history = []
+        element.state.elapsedMs = 0
+        element.state.outcome = null
+        element.save()
+        element.render()
+        return {
+            row,
+            filled: element.puzzle.solution
+                .map((value, index) => value && Math.floor(index / size) === row ? index : -1)
+                .filter(index => index >= 0),
+        }
+    })
+    for (const index of promptRow.filled) {
+        await game.locator(`.cell[data-index="${index}"]`).click()
+    }
+    await expect(game.locator(`.row-clues .clue[data-index="${promptRow.row}"]`))
+        .toHaveClass(/complete/)
+    await expect(game.locator('.cell.crossed')).toHaveCount(0)
+
     const finalIndex = await game.evaluate(element => {
         const target = element.puzzle.solution.findLastIndex(Boolean)
         element.pauseTimer(false)

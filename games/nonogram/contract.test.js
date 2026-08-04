@@ -59,12 +59,12 @@ test('marking toggles cells without mutating the input and recognizes completion
     assert.equal(engine.isSolved(cells, puzzle.solution, puzzle.size), false)
 })
 
-test('line completion requires every cell to be decided and clues to match', () => {
+test('line completion reacts as soon as the filled pattern matches the clues', () => {
     const puzzle = engine.newGame('easy', 0)
-    const cells = puzzle.solution.map(value => value ? engine.MARKS.filled : engine.MARKS.crossed)
+    const cells = puzzle.solution.map(value => value ? engine.MARKS.filled : engine.MARKS.empty)
     assert.equal(engine.lineComplete(cells, 5, 'row', 0, puzzle.rowClues[0]), true)
     assert.equal(engine.lineComplete(cells, 5, 'column', 0, puzzle.columnClues[0]), true)
-    cells[0] = engine.MARKS.empty
+    cells[0] = engine.MARKS.filled
     assert.equal(engine.lineComplete(cells, 5, 'row', 0, puzzle.rowClues[0]), false)
 })
 

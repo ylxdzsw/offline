@@ -2,7 +2,7 @@
     <style>
         :host { display: block; color: var(--ink); }
         .toolbar {
-            display: grid; grid-template-columns: minmax(0, 1fr) auto auto;
+            display: grid; grid-template-columns: minmax(0, 1fr) auto;
             gap: 8px; align-items: end; margin-bottom: 9px;
         }
         .difficulty-control {
@@ -130,7 +130,6 @@
             <span class="difficulty-label"></span>
             <offline-segmented class="difficulty"></offline-segmented>
         </div>
-        <button class="undo" type="button"></button>
         <button class="new" type="button"></button>
     </div>
     <p class="warning" hidden></p>
@@ -228,7 +227,6 @@ customElements.define('nonogram-game', class extends HTMLElement {
             if (!cell || this.state.outcome) return
             this.applyMark(Number(cell.dataset.index), this.mode)
         })
-        s.querySelector('.undo').addEventListener('click', () => this.undo())
         s.querySelector('.new').addEventListener('click', () => this.newGame())
         s.querySelector('.difficulty').addEventListener('change', event => {
             const previous = this.state.difficulty
@@ -257,7 +255,6 @@ customElements.define('nonogram-game', class extends HTMLElement {
         mode.setAttribute('aria-label', t('nonogramMode'))
         s.querySelector('.difficulty-label').textContent = t('difficulty')
         s.querySelector('.mode-label').textContent = t('nonogramMode')
-        s.querySelector('.undo').textContent = t('undo')
         s.querySelector('.new').textContent = t('newGame')
         s.querySelector('.lines-label').textContent = t('nonogramLines')
         s.querySelector('.time-label').textContent = t('nonogramTime')
@@ -285,17 +282,6 @@ customElements.define('nonogram-game', class extends HTMLElement {
         }
         this.save()
         this.render()
-    }
-
-    undo() {
-        const entry = this.state.history.pop()
-        if (!entry) return
-        this.state.cells[entry[0]] = entry[1]
-        this.state.outcome = null
-        this.resumeTimer()
-        this.save()
-        this.render()
-        this.shadowRoot.querySelector(`.cell[data-index="${entry[0]}"]`)?.focus()
     }
 
     newGame(difficulty = this.state.difficulty, force = false) {
@@ -442,7 +428,6 @@ customElements.define('nonogram-game', class extends HTMLElement {
         const size = this.puzzle.size
         const complete = this.completeLines()
         this.setDifficultyControl(this.state.difficulty)
-        s.querySelector('.undo').disabled = this.state.history.length === 0
         s.querySelector('.lines').textContent = `${complete}/${size * 2}`
         this.renderTimer()
         const status = s.querySelector('.status')
