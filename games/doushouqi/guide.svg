@@ -1,0 +1,159 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-labelledby="dsq-title dsq-desc">
+  <title id="dsq-title">Dou Shou Qi mechanics</title>
+  <desc id="dsq-desc">Left: a tiger leaps over the river; a rat in the water blocks the same jump. Right top: a rat on land captures an elephant. Right bottom: any piece captures an animal caught in a trap.</desc>
+  <defs>
+    <radialGradient id="dsq-red" cx="35%" cy="27%" r="74%">
+      <stop stop-color="#ed8b7f"/>
+      <stop offset=".42" stop-color="#c64b43"/>
+      <stop offset="1" stop-color="#902c27"/>
+    </radialGradient>
+    <radialGradient id="dsq-black" cx="35%" cy="27%" r="74%">
+      <stop stop-color="#59605e"/>
+      <stop offset=".42" stop-color="#262b2a"/>
+      <stop offset="1" stop-color="#101313"/>
+    </radialGradient>
+    <filter id="dsq-shadow" x="-30%" y="-30%" width="160%" height="170%">
+      <feDropShadow dx="0" dy="4" stdDeviation="4" flood-opacity=".25"/>
+    </filter>
+    <marker id="dsq-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0l10 5-10 5z" fill="#3a7a3a"/>
+    </marker>
+    <marker id="dsq-cross-arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0l10 5-10 5z" fill="#999"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="960" height="540" fill="#f5f0e4"/>
+
+  <!-- ===== LEFT PANEL: Tiger jump ===== -->
+  <!-- Board area for left panel: centered around x=230 -->
+  <!-- Mini board columns: 0=land, 1-2=river, 3=land.  Rows: 2(land), 3-5(river), 6(land) -->
+  <!-- Cell size: 68px. Grid origin: x=46, y=30 -->
+
+  <!-- Row labels -->
+  <text x="34" y="200" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" fill="#888">row 3</text>
+  <text x="34" y="268" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" fill="#888">row 4</text>
+  <text x="34" y="336" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" fill="#888">row 5</text>
+
+  <!-- Land cells above river (row 2) -->
+  <rect x="46"  y="128" width="68" height="68" fill="#e8d9a0" stroke="rgba(100,76,18,.3)" stroke-width="1"/>
+  <rect x="114" y="128" width="68" height="68" fill="#e8d9a0" stroke="rgba(100,76,18,.3)" stroke-width="1"/>
+  <rect x="182" y="128" width="68" height="68" fill="#e8d9a0" stroke="rgba(100,76,18,.3)" stroke-width="1"/>
+  <rect x="250" y="128" width="68" height="68" fill="#e8d9a0" stroke="rgba(100,76,18,.3)" stroke-width="1"/>
+
+  <!-- River cells rows 3-5, cols 1-2 -->
+  <rect x="114" y="196" width="68" height="68" fill="#b0cfe4" stroke="rgba(50,100,150,.28)" stroke-width="1"/>
+  <rect x="182" y="196" width="68" height="68" fill="#b0cfe4" stroke="rgba(50,100,150,.28)" stroke-width="1"/>
+  <rect x="114" y="264" width="68" height="68" fill="#b0cfe4" stroke="rgba(50,100,150,.28)" stroke-width="1"/>
+  <rect x="182" y="264" width="68" height="68" fill="#b0cfe4" stroke="rgba(50,100,150,.28)" stroke-width="1"/>
+  <rect x="114" y="332" width="68" height="68" fill="#b0cfe4" stroke="rgba(50,100,150,.28)" stroke-width="1"/>
+  <rect x="182" y="332" width="68" height="68" fill="#b0cfe4" stroke="rgba(50,100,150,.28)" stroke-width="1"/>
+
+  <!-- Land cells row 2 left/right flanks in river rows -->
+  <rect x="46"  y="196" width="68" height="68" fill="#e8d9a0" stroke="rgba(100,76,18,.3)" stroke-width="1"/>
+  <rect x="250" y="196" width="68" height="68" fill="#e8d9a0" stroke="rgba(100,76,18,.3)" stroke-width="1"/>
+  <rect x="46"  y="264" width="68" height="68" fill="#e8d9a0" stroke="rgba(100,76,18,.3)" stroke-width="1"/>
+  <rect x="250" y="264" width="68" height="68" fill="#e8d9a0" stroke="rgba(100,76,18,.3)" stroke-width="1"/>
+  <rect x="46"  y="332" width="68" height="68" fill="#e8d9a0" stroke="rgba(100,76,18,.3)" stroke-width="1"/>
+  <rect x="250" y="332" width="68" height="68" fill="#e8d9a0" stroke="rgba(100,76,18,.3)" stroke-width="1"/>
+
+  <!-- Land cells below river (row 6) -->
+  <rect x="46"  y="400" width="68" height="68" fill="#e8d9a0" stroke="rgba(100,76,18,.3)" stroke-width="1"/>
+  <rect x="114" y="400" width="68" height="68" fill="#e8d9a0" stroke="rgba(100,76,18,.3)" stroke-width="1"/>
+  <rect x="182" y="400" width="68" height="68" fill="#e8d9a0" stroke="rgba(100,76,18,.3)" stroke-width="1"/>
+  <rect x="250" y="400" width="68" height="68" fill="#e8d9a0" stroke="rgba(100,76,18,.3)" stroke-width="1"/>
+
+  <!-- River label -->
+  <text x="182" y="295" text-anchor="middle" font-family="system-ui,sans-serif" font-size="13" fill="#5580a0" font-weight="600">河</text>
+  <text x="182" y="309" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" fill="#5580a0">river</text>
+
+  <!-- Tiger (Red) at row 2, col 0 -->
+  <circle cx="80" cy="162" r="28" fill="url(#dsq-red)" stroke="#75241f" stroke-width="1" filter="url(#dsq-shadow)"/>
+  <text x="80" y="168" text-anchor="middle" font-family="system-ui,sans-serif" font-size="16" font-weight="800" fill="#fff">虎</text>
+
+  <!-- Jump arrow: col 0 row 2 → col 0 row 6 -->
+  <path d="M80 193 Q-10 296 80 397" fill="none" stroke="#3a7a3a" stroke-width="2.5" stroke-dasharray="6 3" marker-end="url(#dsq-arrow)"/>
+  <text x="14" y="300" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" fill="#3a7a3a" font-weight="600">JUMP</text>
+
+  <!-- Landing spot (row 6, col 0) highlighted -->
+  <rect x="48" y="402" width="64" height="64" fill="rgba(60,120,60,.18)" rx="4"/>
+
+  <!-- Blocking scenario: Rat in river at row 4, col 1 -->
+  <!-- Grey X over the jump arrow to show blocked -->
+  <path d="M80 193 Q-10 296 80 397" fill="none" stroke="#bbb" stroke-width="2" stroke-dasharray="4 4" opacity=".5"/>
+
+  <!-- Small rat piece in river (row 4, col 1) -->
+  <circle cx="148" cy="298" r="22" fill="url(#dsq-black)" stroke="#090b0b" stroke-width="1" opacity=".9"/>
+  <text x="148" y="304" text-anchor="middle" font-family="system-ui,sans-serif" font-size="13" font-weight="800" fill="#e8d9a0">鼠</text>
+
+  <!-- Block symbol -->
+  <line x1="62" y1="380" x2="98" y2="416" stroke="#c0392b" stroke-width="3"/>
+  <line x1="98" y1="380" x2="62" y2="416" stroke="#c0392b" stroke-width="3"/>
+
+  <!-- Caption: Rat in river blocks the jump -->
+  <text x="170" y="490" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" fill="#555">Rat in river blocks Tiger / Lion jumps</text>
+  <text x="170" y="505" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" fill="#888">河中之鼠阻断虎狮跳跃</text>
+
+  <!-- Divider -->
+  <line x1="400" y1="30" x2="400" y2="510" stroke="#ddd" stroke-width="1.5"/>
+
+  <!-- ===== RIGHT PANEL: Two mechanics ===== -->
+
+  <!-- ── TOP RIGHT: Rat captures Elephant ── -->
+  <text x="680" y="55" text-anchor="middle" font-family="system-ui,sans-serif" font-size="14" font-weight="700" fill="#444">Rat (rank 1) beats Elephant (rank 8)</text>
+  <text x="680" y="72" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" fill="#888">鼠（最弱）可在陆地吃象（最强）</text>
+
+  <!-- Rat piece (Red, on land) -->
+  <circle cx="560" cy="150" r="38" fill="url(#dsq-red)" stroke="#75241f" stroke-width="1.5" filter="url(#dsq-shadow)"/>
+  <text x="560" y="156" text-anchor="middle" font-family="system-ui,sans-serif" font-size="20" font-weight="800" fill="#fff">鼠</text>
+  <text x="560" y="200" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" fill="#555">rank 1</text>
+
+  <!-- Arrow -->
+  <line x1="610" y1="150" x2="745" y2="150" stroke="#3a7a3a" stroke-width="2.5" marker-end="url(#dsq-arrow)"/>
+  <text x="680" y="143" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" fill="#3a7a3a" font-weight="600">captures</text>
+
+  <!-- Elephant piece (Black) -->
+  <circle cx="800" cy="150" r="38" fill="url(#dsq-black)" stroke="#090b0b" stroke-width="1.5" filter="url(#dsq-shadow)"/>
+  <text x="800" y="156" text-anchor="middle" font-family="system-ui,sans-serif" font-size="20" font-weight="800" fill="#e8d9a0">象</text>
+  <text x="800" y="200" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" fill="#555">rank 8</text>
+
+  <!-- Note: only from land -->
+  <rect x="510" y="210" width="340" height="28" rx="6" fill="#fff9e6" stroke="#e0c060" stroke-width="1"/>
+  <text x="680" y="228" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" fill="#8a6010">Only from land — Rat in river cannot capture Elephant · 鼠在河中时不能吃象</text>
+
+  <!-- Horizontal divider right panel -->
+  <line x1="420" y1="260" x2="940" y2="260" stroke="#ddd" stroke-width="1"/>
+
+  <!-- ── BOTTOM RIGHT: Trap effect ── -->
+  <text x="680" y="295" text-anchor="middle" font-family="system-ui,sans-serif" font-size="14" font-weight="700" fill="#444">Trap: any piece captures the occupant</text>
+  <text x="680" y="312" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" fill="#888">陷阱：任何棋子都能吃陷入陷阱中的敌方棋子</text>
+
+  <!-- Trap cell -->
+  <rect x="636" y="335" width="88" height="88" rx="6" fill="color-mix(in srgb, #e8d9a0 65%, #e8a030)" stroke="rgba(180,90,10,.4)" stroke-width="1.5"/>
+  <!-- Trap hatching -->
+  <line x1="648" y1="335" x2="724" y2="423" stroke="rgba(180,90,10,.25)" stroke-width="1"/>
+  <line x1="664" y1="335" x2="724" y2="407" stroke="rgba(180,90,10,.25)" stroke-width="1"/>
+  <line x1="636" y1="351" x2="708" y2="423" stroke="rgba(180,90,10,.25)" stroke-width="1"/>
+  <line x1="724" y1="335" x2="648" y2="423" stroke="rgba(180,90,10,.25)" stroke-width="1"/>
+  <line x1="708" y1="335" x2="636" y2="407" stroke="rgba(180,90,10,.25)" stroke-width="1"/>
+  <line x1="724" y1="351" x2="664" y2="423" stroke="rgba(180,90,10,.25)" stroke-width="1"/>
+  <!-- Trap label -->
+  <text x="680" y="370" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" fill="#8a5010" font-weight="600">TRAP</text>
+  <text x="680" y="382" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" fill="#8a5010">陷阱</text>
+  <!-- Black Elephant in trap (rank = 0) -->
+  <circle cx="680" cy="410" r="30" fill="url(#dsq-black)" stroke="#090b0b" stroke-width="1.5" filter="url(#dsq-shadow)" opacity=".75"/>
+  <text x="680" y="416" text-anchor="middle" font-family="system-ui,sans-serif" font-size="17" font-weight="800" fill="#e8d9a0">象</text>
+  <!-- Rank 0 badge -->
+  <circle cx="700" cy="390" r="11" fill="#e05555" stroke="#fff" stroke-width="1.5"/>
+  <text x="700" y="395" text-anchor="middle" font-family="system-ui,sans-serif" font-size="11" font-weight="800" fill="#fff">0</text>
+
+  <!-- Tiny Rat attacking from left -->
+  <circle cx="560" cy="410" r="25" fill="url(#dsq-red)" stroke="#75241f" stroke-width="1" filter="url(#dsq-shadow)"/>
+  <text x="560" y="416" text-anchor="middle" font-family="system-ui,sans-serif" font-size="14" font-weight="800" fill="#fff">鼠</text>
+  <line x1="587" y1="410" x2="638" y2="410" stroke="#3a7a3a" stroke-width="2.5" marker-end="url(#dsq-arrow)"/>
+
+  <!-- Caption -->
+  <text x="680" y="500" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" fill="#555">Rank drops to 0 inside enemy traps</text>
+  <text x="680" y="515" text-anchor="middle" font-family="system-ui,sans-serif" font-size="12" fill="#888">陷入敌方陷阱后等级归零，任何棋子均可将其吃掉</text>
+</svg>

@@ -1,0 +1,499 @@
+<template id="doushouqi-game-template">
+    <style>
+        :host { display: block; color: var(--ink); }
+        .toolbar {
+            display: grid; grid-template-columns: 1fr auto auto; gap: 8px;
+            align-items: end; margin-bottom: 10px;
+        }
+        label { display: grid; gap: 3px; color: var(--ink-muted); font-size: .7rem; font-weight: 650; letter-spacing: 0; }
+        select, .action {
+            min-height: var(--control-h, 42px); border: 1px solid var(--border-strong);
+            border-radius: var(--radius-sm); color: var(--ink); background: var(--bg-surface);
+        }
+        select { min-width: 96px; padding: 0 28px 0 10px; }
+        .action { padding: 0 12px; font-weight: 650; }
+        .action:disabled { opacity: .42; }
+        .warning { margin: 0 0 9px; color: var(--danger); font-size: .77rem; text-align: center; }
+        .warning[hidden] { display: none; }
+        .scoreboard {
+            display: grid; grid-template-columns: 1fr auto 1fr; align-items: stretch;
+            min-height: 52px; margin-bottom: 9px; overflow: hidden;
+            border: 1px solid var(--border); border-radius: var(--radius-md);
+            background: var(--bg-surface); box-shadow: var(--shadow-soft);
+        }
+        .score {
+            display: grid; grid-template-columns: auto 1fr auto;
+            align-items: center; gap: 8px; min-width: 0; padding: 7px 10px;
+        }
+        .score.black { grid-template-columns: auto 1fr auto; }
+        .score-copy { display: grid; min-width: 0; gap: 1px; }
+        .score.black .score-copy { text-align: right; }
+        .score-label {
+            overflow: hidden; color: var(--ink-muted); font-size: .76rem;
+            font-weight: 650; text-overflow: ellipsis; white-space: nowrap;
+        }
+        .piece-count { color: var(--ink-faint); font-size: .62rem; white-space: nowrap; }
+        .score strong {
+            min-width: 1.35em; color: var(--ink); font-family: var(--font-display);
+            font-size: 1.35rem; font-variant-numeric: tabular-nums; text-align: center;
+        }
+        .versus { align-self: center; color: var(--ink-faint); font-size: .65rem; font-weight: 800; }
+        .mini-piece { display: flex; width: 26px; height: 26px; border-radius: 50%; align-items: center; justify-content: center; flex-shrink: 0; }
+        .mini-piece.red {
+            border: 1px solid #75241f;
+            background: radial-gradient(circle at 35% 27%, #ed8b7f 0 8%, #c64b43 38%, #902c27 78%);
+        }
+        .mini-piece.black {
+            border: 1px solid #090b0b;
+            background: radial-gradient(circle at 35% 27%, #59605e 0 8%, #262b2a 38%, #101313 76%);
+        }
+        .status {
+            display: flex; min-height: 38px; align-items: center; justify-content: center;
+            margin: 0 0 9px; padding: 6px 10px; border-radius: var(--radius-sm);
+            color: var(--status-ink); font-size: .88rem; font-weight: 700;
+            text-align: center; background: var(--status-bg);
+        }
+        .status.thinking::after {
+            width: 5px; height: 5px; margin-left: 7px; border-radius: 50%; content: "";
+            background: currentColor; animation: dsq-pulse .8s ease-in-out infinite alternate;
+        }
+        @keyframes dsq-pulse { to { opacity: .2; transform: scale(.7); } }
+        .board {
+            display: grid; width: 100%; aspect-ratio: 7 / 9;
+            grid-template: repeat(9, minmax(0, 1fr)) / repeat(7, minmax(0, 1fr));
+            overflow: hidden;
+            border: 3px solid color-mix(in srgb, #8b6914 65%, #3a2e12);
+            border-radius: var(--radius-md);
+            background: #e8d9a0;
+            box-shadow: inset 0 0 20px rgba(0,0,0,.12), var(--shadow-soft);
+            touch-action: manipulation; user-select: none;
+        }
+        .cell {
+            position: relative; display: grid; min-width: 0; min-height: 0;
+            padding: 8%; border: 0;
+            border-right: 1px solid rgba(100,76,18,.30);
+            border-bottom: 1px solid rgba(100,76,18,.30);
+            place-items: center; background: #e8d9a0; border-radius: 0;
+        }
+        .cell:nth-child(7n) { border-right: 0; }
+        .cell:nth-last-child(-n+7) { border-bottom: 0; }
+        .cell.river { background: #b0cfe4; border-color: rgba(50,100,150,.28); }
+        .cell.trap { background: color-mix(in srgb, #e8d9a0 75%, #e8a030); }
+        .cell.trap::before {
+            position: absolute; inset: 18%; content: "";
+            background: repeating-linear-gradient(45deg, rgba(180,90,10,.22) 0 1px, transparent 0 7px),
+                        repeating-linear-gradient(-45deg, rgba(180,90,10,.22) 0 1px, transparent 0 7px);
+            pointer-events: none;
+        }
+        .cell.den { background: color-mix(in srgb, #e8d9a0 55%, #d4a510); }
+        .cell.den::before {
+            position: absolute; inset: 10%; border: 2px solid rgba(140,90,0,.55); border-radius: 50%; content: "";
+            pointer-events: none;
+        }
+        .cell.movable .piece {
+            box-shadow: 0 0 0 3px var(--legal), 0 3px 5px rgba(0,0,0,.30);
+        }
+        .cell.selected .piece {
+            transform: translateY(-2px);
+            box-shadow: 0 0 0 4px var(--selected), 0 5px 8px rgba(0,0,0,.38);
+        }
+        .cell.destination::after {
+            z-index: 1; width: 22%; aspect-ratio: 1; border-radius: 50%; content: "";
+            background: color-mix(in srgb, var(--legal) 80%, transparent);
+            box-shadow: 0 0 0 4px color-mix(in srgb, var(--legal) 22%, transparent);
+            pointer-events: none;
+        }
+        .cell.capture::after {
+            width: 64%; border: 4px solid var(--capture, #e05555); border-radius: 50%;
+            background: transparent;
+            box-shadow: inset 0 0 0 3px rgba(255,255,255,.28);
+        }
+        .cell.last { background: color-mix(in srgb, var(--board-last-light, #d7e8c0) 60%, #e8d9a0); }
+        .cell.river.last { background: color-mix(in srgb, #b0cfe4 75%, #a0d090); }
+        .cell.last-to .piece { animation: dsq-land .24s ease-out; }
+        @keyframes dsq-land { from { opacity: .55; transform: scale(.72); } to { opacity: 1; transform: scale(1); } }
+        .cell:focus-visible { z-index: 4; outline: 3px solid var(--focus); outline-offset: -4px; }
+        .piece {
+            position: relative; display: flex; box-sizing: border-box;
+            width: 80%; aspect-ratio: 1; border-radius: 50%;
+            align-items: center; justify-content: center;
+            z-index: 2; pointer-events: none;
+            font-size: clamp(.45rem, 1.6vw, .75rem); font-weight: 800; line-height: 1;
+            letter-spacing: -.01em;
+        }
+        .piece.red {
+            border: 1px solid #75241f;
+            background: radial-gradient(circle at 35% 27%, #ed8b7f 0 8%, #c64b43 38%, #902c27 78%);
+            color: #fff; box-shadow: inset 0 0 0 3px rgba(255,255,255,.10), 0 2px 4px rgba(0,0,0,.28);
+        }
+        .piece.black {
+            border: 1px solid #090b0b;
+            background: radial-gradient(circle at 35% 27%, #59605e 0 8%, #262b2a 38%, #101313 76%);
+            color: #e8d9a0; box-shadow: inset 0 0 0 3px rgba(255,255,255,.055), 0 2px 4px rgba(0,0,0,.32);
+        }
+        .board[aria-disabled="true"] .cell { cursor: wait; }
+        @media (prefers-reduced-motion: reduce) {
+            .status.thinking::after, .cell.last-to .piece { animation: none; }
+        }
+        @media (max-width: 340px) {
+            .toolbar { gap: 4px; }
+            .action { padding-inline: 8px; font-size: .82rem; }
+            select { min-width: 88px; }
+            .score { gap: 5px; padding-inline: 6px; }
+            .mini-piece { width: 23px; height: 23px; }
+            .score-label { font-size: .7rem; }
+        }
+    </style>
+    <div class="toolbar">
+        <label><span class="difficulty-label"></span><select class="difficulty"><option value="easy"></option><option value="medium"></option><option value="hard"></option></select></label>
+        <button class="action undo" type="button"></button>
+        <button class="action new" type="button"></button>
+    </div>
+    <p class="warning" hidden></p>
+    <div class="scoreboard" aria-live="polite">
+        <div class="score red">
+            <span class="mini-piece red" aria-hidden="true"></span>
+            <span class="score-copy"><span class="score-label you-label"></span><span class="piece-count red-count-label"></span></span>
+            <strong class="red-count">8</strong>
+        </div>
+        <span class="versus">VS</span>
+        <div class="score black">
+            <strong class="black-count">8</strong>
+            <span class="score-copy"><span class="score-label opponent-label"></span><span class="piece-count black-count-label"></span></span>
+            <span class="mini-piece black" aria-hidden="true"></span>
+        </div>
+    </div>
+    <div class="status" role="status" aria-live="polite"></div>
+    <div class="board" role="grid"></div>
+</template>
+
+<script>
+const DSQ_MIN_AI_TURN_MS = 380
+
+OfflineGames.wasm.defineElement('doushouqi', 'doushouqi-game', class extends HTMLElement {
+    constructor() {
+        super()
+        this.attachShadow({mode: 'open'}).append(document.getElementById('doushouqi-game-template').content.cloneNode(true))
+        this.thinking = false
+        this.aiFailed = false
+        this.worker = null
+        this.aiTimer = null
+        this.aiStartedAt = 0
+        this.requestId = 0
+        this.selectedFrom = null
+        this.notice = null
+        this.initialized = false
+    }
+
+    connectedCallback() {
+        if (!this.initialized) {
+            this.initialized = true
+            this.engine = OfflineGames.Doushouqi
+            this.i18n = OfflineGames.i18n
+            this.storage = OfflineGames.storage
+            this.buildBoard()
+            this.load()
+            this.bind()
+            this.localize()
+        }
+        this.render()
+        if (this.state.turn === this.engine.BLACK && !this.state.outcome) this.requestAI()
+    }
+
+    disconnectedCallback() { this.cancelAI() }
+
+    fresh(difficulty = 'medium') {
+        return {
+            schema: 1, game: 'doushouqi', seed: OfflineGames.runtime.randomSeed(),
+            difficulty, board: this.engine.initialBoard(), turn: this.engine.RED,
+            history: [], outcome: null, lastMove: null,
+        }
+    }
+
+    valid(saved) {
+        return saved && saved.schema === 1 && saved.game === 'doushouqi'
+            && Array.isArray(saved.board) && saved.board.length === this.engine.SIZE
+            && saved.board.every(p => Number.isInteger(p) && p >= 0 && p <= 16)
+            && [this.engine.RED, this.engine.BLACK].includes(saved.turn)
+            && ['easy', 'medium', 'hard'].includes(saved.difficulty)
+            && Array.isArray(saved.history)
+            && (saved.outcome == null || typeof saved.outcome === 'object')
+    }
+
+    load() {
+        const saved = this.storage.read('doushouqi')
+        this.state = this.valid(saved) ? saved : this.fresh()
+        if (!Number.isInteger(this.state.seed)) this.state.seed = OfflineGames.runtime.randomSeed()
+    }
+
+    buildBoard() {
+        const board = this.shadowRoot.querySelector('.board')
+        board.replaceChildren(...Array.from({length: this.engine.SIZE}, (_, index) => {
+            const cell = document.createElement('button')
+            cell.type = 'button'
+            cell.className = 'cell'
+            cell.dataset.index = String(index)
+            cell.setAttribute('role', 'gridcell')
+            return cell
+        }))
+    }
+
+    bind() {
+        const shadow = this.shadowRoot
+        shadow.querySelector('.board').addEventListener('click', event => {
+            const cell = event.target.closest('.cell')
+            if (cell) this.tap(Number(cell.dataset.index))
+        })
+        shadow.querySelector('.undo').addEventListener('click', () => this.undo())
+        shadow.querySelector('.new').addEventListener('click', () => this.newGame())
+        shadow.querySelector('.difficulty').addEventListener('change', event => {
+            this.state.difficulty = event.target.value
+            this.save()
+        })
+    }
+
+    localize() {
+        const shadow = this.shadowRoot
+        shadow.querySelector('.difficulty-label').textContent = this.i18n.t('difficulty')
+        for (const opt of shadow.querySelectorAll('.difficulty option')) opt.textContent = this.i18n.t(opt.value)
+        shadow.querySelector('.undo').textContent = this.i18n.t('undo')
+        shadow.querySelector('.new').textContent = this.i18n.t('newGame')
+        shadow.querySelector('.warning').textContent = this.i18n.t('storageWarning')
+        shadow.querySelector('.you-label').textContent = this.i18n.t('you')
+        shadow.querySelector('.opponent-label').textContent = this.i18n.t('opponent')
+    }
+
+    format(key, values) {
+        let text = this.i18n.t(key)
+        for (const [k, v] of Object.entries(values)) text = text.replaceAll(`{${k}}`, String(v))
+        return text
+    }
+
+    save() {
+        if (!this.storage.write('doushouqi', this.state)) this.shadowRoot.querySelector('.warning').hidden = false
+    }
+
+    tap(index) {
+        if (this.thinking || this.aiFailed || this.state.outcome || this.state.turn !== this.engine.RED) return
+        const piece = this.state.board[index]
+        const side = this.engine.sideOf(piece)
+
+        if (this.selectedFrom == null) {
+            if (side === this.engine.RED && this.legal.some(m => m.from === index)) {
+                this.selectedFrom = index
+                this.notice = null
+            } else if (side === this.engine.RED) {
+                this.notice = 'doushouqiNoPiece'
+            } else {
+                this.notice = 'doushouqiChoosePiece'
+            }
+            this.render()
+            return
+        }
+
+        if (index === this.selectedFrom) {
+            this.selectedFrom = null
+            this.notice = null
+            this.render()
+            return
+        }
+
+        // Reselect another own piece
+        if (side === this.engine.RED && this.legal.some(m => m.from === index)) {
+            this.selectedFrom = index
+            this.notice = null
+            this.render()
+            return
+        }
+
+        const move = this.legal.find(m => m.from === this.selectedFrom && m.to === index)
+        if (move) {
+            this.commit(move, this.engine.RED)
+        } else {
+            this.notice = 'doushouqiChooseDestination'
+            this.render()
+        }
+    }
+
+    commit(move, side) {
+        const snapshot = {
+            board: this.state.board, turn: this.state.turn,
+            outcome: this.state.outcome, lastMove: this.state.lastMove, side,
+        }
+        const board = this.engine.applyMove(this.state.board, move)
+        const turn = this.engine.other(side)
+        const outcome = this.engine.status(board, turn)
+        this.state.history.push(snapshot)
+        this.state.board = board
+        this.state.turn = turn
+        this.state.lastMove = move
+        this.state.outcome = outcome.ended ? outcome : null
+        this.selectedFrom = null
+        this.notice = null
+        this.aiFailed = false
+        this.save()
+        this.render()
+        if (!this.state.outcome && this.state.turn === this.engine.BLACK) this.requestAI()
+    }
+
+    requestAI() {
+        this.cancelAI()
+        this.thinking = true
+        this.aiFailed = false
+        this.aiStartedAt = performance.now()
+        const id = ++this.requestId
+        this.worker = OfflineGames.runtime.createWorker('doushouqi-worker-payload')
+        this.worker.onmessage = event => {
+            if (event.data.id !== id || !this.thinking) return
+            const candidate = event.data.move
+            if (this.worker) this.worker.terminate()
+            this.worker = null
+            const delay = Math.max(0, DSQ_MIN_AI_TURN_MS - (performance.now() - this.aiStartedAt))
+            this.aiTimer = setTimeout(() => {
+                this.aiTimer = null
+                if (id !== this.requestId || !this.thinking) return
+                this.thinking = false
+                const move = candidate && this.legal.find(m => m.from === candidate.from && m.to === candidate.to)
+                if (move) this.commit(move, this.engine.BLACK)
+                else { this.aiFailed = true; this.render() }
+            }, delay)
+        }
+        this.worker.onerror = error => {
+            console.error(error)
+            this.cancelAI(false)
+            this.aiFailed = true
+            this.render()
+        }
+        this.worker.postMessage({
+            id, board: this.state.board, side: this.engine.BLACK,
+            difficulty: this.state.difficulty,
+            options: {seed: OfflineGames.runtime.moveSeed(this.state.seed, this.state.history.length)},
+        })
+        this.render()
+    }
+
+    cancelAI(invalidate = true) {
+        if (invalidate) this.requestId++
+        if (this.worker) this.worker.terminate()
+        if (this.aiTimer) clearTimeout(this.aiTimer)
+        this.worker = null
+        this.aiTimer = null
+        this.thinking = false
+    }
+
+    undo() {
+        if (!this.state.history.length) return
+        const wasThinking = this.thinking
+        this.cancelAI()
+        const count = wasThinking || this.state.history.at(-1).side === this.engine.RED ? 1 : 2
+        let snapshot = null
+        for (let i = 0; i < count && this.state.history.length; i++) snapshot = this.state.history.pop()
+        if (!snapshot) return
+        this.state.board = snapshot.board
+        this.state.turn = snapshot.turn
+        this.state.outcome = snapshot.outcome
+        this.state.lastMove = snapshot.lastMove
+        this.selectedFrom = null
+        this.notice = null
+        this.aiFailed = false
+        this.save()
+        this.render()
+        if (!this.state.outcome && this.state.turn === this.engine.BLACK) this.requestAI()
+    }
+
+    newGame() {
+        if (this.state.history.length && !confirm(this.i18n.t('confirmNew'))) return
+        const difficulty = this.state.difficulty
+        this.cancelAI()
+        this.state = this.fresh(difficulty)
+        this.selectedFrom = null
+        this.notice = null
+        this.aiFailed = false
+        this.save()
+        this.render()
+    }
+
+    pieceLabel(piece) {
+        if (piece === this.engine.EMPTY) return this.i18n.t('empty')
+        return this.i18n.t(`doushouqiPiece${this.engine.rankOf(piece)}${this.engine.sideOf(piece) === this.engine.RED ? 'Red' : 'Black'}`)
+    }
+
+    statusText() {
+        if (this.state.outcome) {
+            if (this.state.outcome.winner === this.engine.RED) return this.i18n.t('youWin')
+            if (this.state.outcome.winner === this.engine.BLACK) return this.i18n.t('aiWins')
+            return this.i18n.t('doushouqiDraw')
+        }
+        if (this.aiFailed) return this.i18n.t('doushouqiAiUnavailable')
+        if (this.thinking || this.state.turn === this.engine.BLACK) return this.i18n.t('aiThinking')
+        if (this.notice) return this.i18n.t(this.notice)
+        if (this.selectedFrom != null) return this.i18n.t('doushouqiChooseDestination')
+        return this.i18n.t('yourTurn')
+    }
+
+    render() {
+        this.legal = this.state.outcome ? [] : this.engine.legalMoves(this.state.board, this.state.turn)
+        const destinations = new Set(this.selectedFrom == null ? [] : this.legal.filter(m => m.from === this.selectedFrom).map(m => m.to))
+        const captures = new Set(this.selectedFrom == null ? [] : this.legal.filter(m => m.from === this.selectedFrom && this.state.board[m.to] !== this.engine.EMPTY).map(m => m.to))
+        const movable = new Set(!this.thinking && !this.state.outcome && this.state.turn === this.engine.RED ? this.legal.map(m => m.from) : [])
+        const lastFrom = this.state.lastMove?.from
+        const lastTo = this.state.lastMove?.to
+
+        for (const cell of this.shadowRoot.querySelectorAll('.cell')) {
+            const index = Number(cell.dataset.index)
+            const piece = this.state.board[index]
+            const river = this.engine.isRiver(index)
+            const trap = this.engine.RED_TRAPS.has(index) || this.engine.BLACK_TRAPS.has(index)
+            const isDen = index === this.engine.RED_DEN || index === this.engine.BLACK_DEN
+
+            cell.className = 'cell'
+            cell.classList.toggle('river', river)
+            cell.classList.toggle('trap', trap)
+            cell.classList.toggle('den', isDen)
+            cell.classList.toggle('movable', movable.has(index))
+            cell.classList.toggle('selected', this.selectedFrom === index)
+            cell.classList.toggle('destination', destinations.has(index))
+            cell.classList.toggle('capture', captures.has(index))
+            cell.classList.toggle('last', index === lastFrom || index === lastTo)
+            cell.classList.toggle('last-to', index === lastTo)
+            cell.disabled = false
+            cell.setAttribute('aria-selected', String(this.selectedFrom === index))
+
+            const states = [this.pieceLabel(piece)]
+            if (this.selectedFrom === index) states.push(this.i18n.t('selected'))
+            if (destinations.has(index)) states.push(this.i18n.t('legalMove'))
+            if (index === lastFrom || index === lastTo) states.push(this.i18n.t('lastMove'))
+            cell.setAttribute('aria-label', this.format('doushouqiCellLabel', {
+                row: this.engine.rowOf(index) + 1,
+                col: this.engine.colOf(index) + 1,
+                state: states.join(', '),
+            }))
+
+            cell.replaceChildren()
+            if (piece !== this.engine.EMPTY) {
+                const disc = document.createElement('span')
+                const side = this.engine.sideOf(piece)
+                disc.className = `piece ${side === this.engine.RED ? 'red' : 'black'}`
+                disc.setAttribute('aria-hidden', 'true')
+                disc.textContent = this.i18n.t(`doushouqiLabel${this.engine.rankOf(piece)}`)
+                cell.append(disc)
+            }
+        }
+
+        const shadow = this.shadowRoot
+        const redCount = this.state.board.filter(p => this.engine.sideOf(p) === this.engine.RED).length
+        const blackCount = this.state.board.filter(p => this.engine.sideOf(p) === this.engine.BLACK).length
+        shadow.querySelector('.red-count').textContent = String(redCount)
+        shadow.querySelector('.black-count').textContent = String(blackCount)
+        shadow.querySelector('.red-count-label').textContent = this.format('doushouqiPieceCount', {count: redCount})
+        shadow.querySelector('.black-count-label').textContent = this.format('doushouqiPieceCount', {count: blackCount})
+        shadow.querySelector('.difficulty').value = this.state.difficulty
+        shadow.querySelector('.undo').disabled = !this.state.history.length
+        const status = shadow.querySelector('.status')
+        status.textContent = this.statusText()
+        status.classList.toggle('thinking', this.thinking)
+        shadow.querySelector('.board').setAttribute('aria-label', this.i18n.t('doushouqiBoard'))
+        shadow.querySelector('.board').setAttribute('aria-disabled', String(this.thinking || Boolean(this.state.outcome)))
+    }
+})
+</script>

@@ -9,6 +9,7 @@ GAMES := \
 	sudoku \
 	2048 \
 	junqi \
+	doushouqi \
 	chess \
 	reversi \
 	checkers \
