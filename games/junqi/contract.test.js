@@ -87,6 +87,8 @@ test('capturing the flag ends the game and AI always chooses a legal move', () =
     assert.deepEqual(engine.status(result.board, engine.BLACK), {ended:true,winner:engine.RED,reason:'flag'})
 
     const initial = engine.initialBoard(seeded(9))
-    const move = ai.choose({board:initial, side:engine.BLACK, difficulty:'hard', revealed:[]})
-    assert(engine.legalMoves(initial,engine.BLACK).some(candidate => candidate.from === move.from && candidate.to === move.to))
+    for (const difficulty of ['easy','medium','hard']) {
+        const move = ai.choose({board:initial, initialBoard:initial, events:[], side:engine.BLACK, difficulty, revealed:[]})
+        assert(engine.legalMoves(initial,engine.BLACK).some(candidate => candidate.from === move.from && candidate.to === move.to))
+    }
 })

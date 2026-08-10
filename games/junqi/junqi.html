@@ -152,6 +152,43 @@ OfflineGames.wasm.defineElement('junqi', 'junqi-game', class extends HTMLElement
         this.state.phase='playing'; this.state.turn=this.engine.RED; this.selected=null; this.setupError=false; this.save(); this.render()
     }
     snapshot(mover) { return {mover, board:this.state.board, turn:this.state.turn, revealed:this.state.revealed, lastMove:this.state.lastMove, message:this.state.message, outcome:this.state.outcome} }
+    maskedBoard(board, side, aliases, revealed = []) {
+        const publicFlags = new Set(revealed)
+        return board.map(piece => {
+            if (!piece || piece.side === side) return piece
+            return {id:aliases.get(piece.id),side:piece.side,type:publicFlags.has(piece.id)?this.engine.FLAG:'?'}
+        })
+    }
+    aiKnowledge(side) {
+        const history = this.state.history
+        const initial = history[0]?.board || this.state.board
+        const aliases = new Map()
+        for (const board of [initial,...history.map(snapshot=>snapshot.board),this.state.board])
+            for (const piece of board) if (piece && piece.side !== side && !aliases.has(piece.id)) aliases.set(piece.id,`e${aliases.size}`)
+        const publicId = id => aliases.get(id) || id
+        const events = history.map((before,index) => {
+            const after = history[index + 1] || this.state
+            const move = after.lastMove
+            if (!move) return null
+            const attacker = before.board[move.from]
+            const defender = before.board[move.to]
+            const previouslyRevealed = new Set(before.revealed || [])
+            return {
+                side: before.mover,
+                move,
+                attacker: attacker ? publicId(attacker.id) : null,
+                defender: defender ? publicId(defender.id) : null,
+                result: defender ? after.message : 'move',
+                revealed: (after.revealed || []).filter(id => !previouslyRevealed.has(id)).map(publicId),
+            }
+        }).filter(event => event?.attacker)
+        return {
+            board: this.maskedBoard(this.state.board,side,aliases,this.state.revealed),
+            initialBoard: this.maskedBoard(initial,side,aliases),
+            events,
+            revealed: this.state.revealed.map(publicId),
+        }
+    }
     commit(move, side) {
         this.state.history.push(this.snapshot(side))
         const result = this.engine.applyMove(this.state.board,move)
@@ -179,7 +216,7 @@ OfflineGames.wasm.defineElement('junqi', 'junqi-game', class extends HTMLElement
             }, delay)
         }
         this.worker.onerror = error => { console.error(error); this.cancelAI(false); this.render() }
-        this.worker.postMessage({id,board:this.state.board,side:this.engine.BLACK,difficulty:this.state.difficulty,revealed:this.state.revealed,seed:OfflineGames.runtime.moveSeed(this.state.seed,this.state.history.length)}); this.render()
+        this.worker.postMessage({id,...this.aiKnowledge(this.engine.BLACK),side:this.engine.BLACK,difficulty:this.state.difficulty,seed:OfflineGames.runtime.moveSeed(this.state.seed,this.state.history.length)}); this.render()
     }
     cancelAI(invalidate=true) { if (invalidate) this.requestId++; if (this.worker) this.worker.terminate(); if (this.aiTimer) clearTimeout(this.aiTimer); this.worker=null; this.aiTimer=null; this.thinking=false }
     undo() {

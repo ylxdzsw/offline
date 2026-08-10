@@ -628,9 +628,11 @@ test('Junqi holds a fast AI battle reply and cues its destination', async ({page
     const midpoint = await page.evaluate(async () => {
         const game = document.querySelector('junqi-game')
         game.startBattle()
+        let request
         OfflineGames.runtime.createWorker = () => {
             const worker = {
                 postMessage(message) {
+                    request = message
                     const move = game.engine.legalMoves(game.state.board, game.engine.BLACK)[0]
                     queueMicrotask(() => worker.onmessage({data: {id: message.id, move}}))
                 },
@@ -648,12 +650,20 @@ test('Junqi holds a fast AI battle reply and cues its destination', async ({page
             historyLength: game.state.history.length,
             thinking: game.thinking,
             animationName: getComputedStyle(target).animationName,
+            currentEnemyKinds: [...new Set(request.board.filter(piece => piece?.side === game.engine.RED).map(piece => piece.type))],
+            initialEnemyKinds: [...new Set(request.initialBoard.filter(piece => piece?.side === game.engine.RED).map(piece => piece.type))],
+            enemyIds: request.initialBoard.filter(piece => piece?.side === game.engine.RED).map(piece => piece.id),
+            eventFields: Object.keys(request.events[0]).sort(),
         }
     })
 
     expect(midpoint.historyLength).toBe(1)
     expect(midpoint.thinking).toBeTruthy()
     expect(midpoint.animationName).toBe('junqi-target')
+    expect(midpoint.currentEnemyKinds).toEqual(['?'])
+    expect(midpoint.initialEnemyKinds).toEqual(['?'])
+    expect(midpoint.enemyIds).toEqual(Array.from({length:25},(_,index)=>`e${index}`))
+    expect(midpoint.eventFields).toEqual(['attacker', 'defender', 'move', 'result', 'revealed', 'side'])
 
     await expect.poll(() => page.evaluate(() => document.querySelector('junqi-game').state.history.length)).toBe(2)
     expect(await page.evaluate(started => performance.now() - started, midpoint.started)).toBeGreaterThanOrEqual(320)

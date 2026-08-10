@@ -9,6 +9,30 @@ use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 use wasm_abi::{DispatchError, DispatchResult};
 
+#[cfg(not(target_arch = "wasm32"))]
+use std::sync::OnceLock;
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::Instant;
+
+#[cfg(target_arch = "wasm32")]
+#[link(wasm_import_module = "env")]
+unsafe extern "C" {
+    fn now_ms() -> f64;
+}
+
+fn clock_ms() -> f64 {
+    #[cfg(target_arch = "wasm32")]
+    // SAFETY: the page and worker loaders always provide env.now_ms.
+    unsafe {
+        now_ms()
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        static STARTED: OnceLock<Instant> = OnceLock::new();
+        STARTED.get_or_init(Instant::now).elapsed().as_secs_f64() * 1_000.0
+    }
+}
+
 fn args<T: DeserializeOwned>(request: &Value) -> Result<T, DispatchError> {
     serde_json::from_value(request.get("args").cloned().unwrap_or(Value::Null))
         .map_err(|error| DispatchError::new(error.to_string()))
@@ -114,6 +138,11 @@ fn dispatch(request: Value) -> DispatchResult {
             #[derive(serde::Deserialize)]
             struct Input {
                 board: Vec<Option<Piece>>,
+                #[serde(rename = "initialBoard")]
+                #[serde(default)]
+                initial_board: Vec<Option<Piece>>,
+                #[serde(default)]
+                events: Vec<ai::Observation>,
                 side: String,
                 difficulty: String,
                 #[serde(default)]
@@ -121,12 +150,23 @@ fn dispatch(request: Value) -> DispatchResult {
                 seed: u64,
             }
             let input: Input = args(&request)?;
+            let initial = if input.initial_board.is_empty() {
+                &input.board
+            } else {
+                &input.initial_board
+            };
+            let deadline = clock_ms() + ai::config(&input.difficulty).budget_ms;
             Ok(json!(ai::choose_move(
-                &input.board,
-                &input.side,
-                &input.difficulty,
-                &input.revealed,
-                input.seed,
+                ai::SearchInput {
+                    board: &input.board,
+                    initial,
+                    events: &input.events,
+                    side: &input.side,
+                    difficulty: &input.difficulty,
+                    revealed: &input.revealed,
+                    seed: input.seed,
+                },
+                || clock_ms() >= deadline,
             )))
         }
         _ => Err(DispatchError::new(format!(
