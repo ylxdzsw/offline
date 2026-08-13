@@ -203,10 +203,12 @@ OfflineGames.wasm.defineElement('doushouqi', 'doushouqi-game', class extends HTM
     disconnectedCallback() { this.cancelAI() }
 
     fresh(difficulty = 'medium') {
+        const board = this.engine.initialBoard()
         return {
             schema: 1, game: 'doushouqi', seed: OfflineGames.runtime.randomSeed(),
-            difficulty, board: this.engine.initialBoard(), turn: this.engine.RED,
-            history: [], outcome: null, lastMove: null,
+            difficulty, board, turn: this.engine.RED, history: [],
+            keys: [this.engine.positionKey(board, this.engine.RED)],
+            outcome: null, lastMove: null,
         }
     }
 
@@ -224,6 +226,19 @@ OfflineGames.wasm.defineElement('doushouqi', 'doushouqi-game', class extends HTM
         const saved = this.storage.read('doushouqi')
         this.state = this.valid(saved) ? saved : this.fresh()
         if (!Number.isInteger(this.state.seed)) this.state.seed = OfflineGames.runtime.randomSeed()
+        this.rebuildKeys()
+        if (!this.state.outcome) {
+            const outcome = this.engine.status(this.state.board, this.state.turn, this.state.keys)
+            this.state.outcome = outcome.ended ? outcome : null
+        }
+    }
+
+    rebuildKeys() {
+        this.state.keys = [
+            ...this.state.history.map(snapshot =>
+                this.engine.positionKey(snapshot.board, snapshot.turn)),
+            this.engine.positionKey(this.state.board, this.state.turn),
+        ]
     }
 
     buildBoard() {
@@ -322,11 +337,12 @@ OfflineGames.wasm.defineElement('doushouqi', 'doushouqi-game', class extends HTM
         }
         const board = this.engine.applyMove(this.state.board, move)
         const turn = this.engine.other(side)
-        const outcome = this.engine.status(board, turn)
         this.state.history.push(snapshot)
         this.state.board = board
         this.state.turn = turn
         this.state.lastMove = move
+        this.state.keys.push(this.engine.positionKey(board, turn))
+        const outcome = this.engine.status(board, turn, this.state.keys)
         this.state.outcome = outcome.ended ? outcome : null
         this.selectedFrom = null
         this.notice = null
@@ -367,7 +383,14 @@ OfflineGames.wasm.defineElement('doushouqi', 'doushouqi-game', class extends HTM
         this.worker.postMessage({
             id, board: this.state.board, side: this.engine.BLACK,
             difficulty: this.state.difficulty,
-            options: {seed: OfflineGames.runtime.moveSeed(this.state.seed, this.state.history.length)},
+            options: {
+                seed: OfflineGames.runtime.moveSeed(this.state.seed, this.state.history.length),
+                positions: [
+                    ...this.state.history.map(snapshot =>
+                        ({board: snapshot.board, side: snapshot.turn})),
+                    {board: this.state.board, side: this.state.turn},
+                ],
+            },
         })
         this.render()
     }
@@ -393,6 +416,7 @@ OfflineGames.wasm.defineElement('doushouqi', 'doushouqi-game', class extends HTM
         this.state.turn = snapshot.turn
         this.state.outcome = snapshot.outcome
         this.state.lastMove = snapshot.lastMove
+        this.rebuildKeys()
         this.selectedFrom = null
         this.notice = null
         this.aiFailed = false

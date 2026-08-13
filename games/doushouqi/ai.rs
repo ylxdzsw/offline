@@ -1,11 +1,34 @@
 use std::collections::HashMap;
+#[cfg(not(target_arch = "wasm32"))]
+use std::sync::OnceLock;
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::Instant;
 
 use crate::game::{
-    LION, Move, RAT, Status, TIGER, col_of, den, effective_rank, is_river, legal_moves, moves_for,
-    other, rank_of, row_of, side_of, status,
+    LION, Move, RAT, TIGER, col_of, den, effective_rank, is_river, legal_moves, moves_for, other,
+    rank_of, row_of, side_of, terminal,
 };
 
 const WIN: i32 = 1_000_000;
+
+#[cfg(target_arch = "wasm32")]
+#[link(wasm_import_module = "env")]
+unsafe extern "C" {
+    fn now_ms() -> f64;
+}
+
+fn clock_ms() -> f64 {
+    #[cfg(target_arch = "wasm32")]
+    // SAFETY: the page and worker loaders always provide env.now_ms.
+    unsafe {
+        now_ms()
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        static STARTED: OnceLock<Instant> = OnceLock::new();
+        STARTED.get_or_init(Instant::now).elapsed().as_secs_f64() * 1_000.0
+    }
+}
 
 // Material values by rank (index 0 unused)
 const PIECE_VALUE: [i32; 9] = [0, 340, 170, 210, 240, 270, 390, 420, 310];
@@ -16,6 +39,7 @@ pub(crate) struct SearchConfig {
     pub max_depth: u8,
     pub root_band: i32,
     pub seed: u64,
+    pub time_budget_ms: f64,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -61,7 +85,7 @@ fn den_dist(index: usize, target: usize) -> i32 {
     dr + dc
 }
 
-pub(crate) fn evaluate(board: &[u8], side: u8) -> i32 {
+fn evaluate_with_moves(board: &[u8], side: u8, my_moves: i32) -> i32 {
     let enemy = other(side);
     let enemy_den = den(enemy);
     let my_den = den(side);
@@ -119,11 +143,14 @@ pub(crate) fn evaluate(board: &[u8], side: u8) -> i32 {
     }
 
     // Mobility
-    let my_moves = legal_moves(board, side).len() as i32;
     let their_moves = legal_moves(board, enemy).len() as i32;
     score += (my_moves - their_moves) * 3;
 
     score
+}
+
+pub(crate) fn evaluate(board: &[u8], side: u8) -> i32 {
+    evaluate_with_moves(board, side, legal_moves(board, side).len() as i32)
 }
 
 fn capture_value(board: &[u8], mv: &Move) -> i32 {
@@ -161,9 +188,11 @@ fn ordered(board: &[u8], mut moves: Vec<Move>, best: Option<&Move>) -> Vec<Move>
     moves
 }
 
-type BoardKey = ([u64; 5], u8, u16);
+type PackedBoard = [u64; 5];
+type PositionKey = (PackedBoard, u8);
+type BoardKey = (PackedBoard, u8, u16, u64);
 
-fn board_key(board: &[u8], side: u8, ply: u16) -> BoardKey {
+fn packed_board(board: &[u8]) -> PackedBoard {
     let mut packed = [0u64; 5];
     for (i, &p) in board.iter().enumerate() {
         let bit = i * 5;
@@ -174,16 +203,68 @@ fn board_key(board: &[u8], side: u8, ply: u16) -> BoardKey {
             packed[word + 1] |= (p as u64) >> (64 - offset);
         }
     }
-    (packed, side, ply)
+    packed
+}
+
+fn position_key(board: &[u8], side: u8) -> PositionKey {
+    (packed_board(board), side)
+}
+
+fn board_key(board: &[u8], side: u8, ply: u16, repetitions: u64) -> BoardKey {
+    (packed_board(board), side, ply, repetitions)
+}
+
+fn mix64(mut value: u64) -> u64 {
+    value = (value ^ (value >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    value = (value ^ (value >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+    value ^ (value >> 31)
+}
+
+fn repetition_token(key: PositionKey, occurrence: u8) -> u64 {
+    key.0.into_iter().fold(
+        mix64(u64::from(key.1) << 56 | u64::from(occurrence)),
+        |hash, word| mix64(hash ^ word),
+    )
+}
+
+fn outcome_score(winner: Option<u8>, side: u8, ply: u16) -> i32 {
+    match winner {
+        Some(winner) if winner == side => WIN - ply as i32,
+        Some(_) => -WIN + ply as i32,
+        None => 0,
+    }
 }
 
 struct Searcher {
     config: SearchConfig,
+    deadline_ms: f64,
     nodes: u32,
     table: HashMap<BoardKey, Entry>,
+    repetitions: HashMap<PositionKey, u8>,
+    repetition_hash: u64,
 }
 
 impl Searcher {
+    fn record(&mut self, key: PositionKey) -> u8 {
+        let count = self.repetitions.entry(key).or_default();
+        *count = count.saturating_add(1);
+        self.repetition_hash ^= repetition_token(key, *count);
+        *count
+    }
+
+    fn unrecord(&mut self, key: PositionKey) {
+        let count = self.repetitions.get_mut(&key).expect("recorded position");
+        self.repetition_hash ^= repetition_token(key, *count);
+        *count -= 1;
+        if *count == 0 {
+            self.repetitions.remove(&key);
+        }
+    }
+
+    fn repetition_count(&self, key: PositionKey) -> u8 {
+        self.repetitions.get(&key).copied().unwrap_or(0)
+    }
+
     fn negamax(
         &mut self,
         board: &[u8],
@@ -193,12 +274,19 @@ impl Searcher {
         mut beta: i32,
         ply: u16,
     ) -> Result<i32, ()> {
-        self.nodes = self.nodes.saturating_add(1);
-        if self.nodes > self.config.node_budget {
+        if self.nodes >= self.config.node_budget {
+            return Err(());
+        }
+        self.nodes += 1;
+        if self.nodes.is_multiple_of(1024) && clock_ms() >= self.deadline_ms {
             return Err(());
         }
 
-        let key = board_key(board, side, ply);
+        if let Some((winner, _)) = terminal(board, side, 0, true) {
+            return Ok(outcome_score(winner, side, ply));
+        }
+
+        let key = board_key(board, side, ply, self.repetition_hash);
         let original_alpha = alpha;
         let original_beta = beta;
         let cached = self.table.get(&key).cloned();
@@ -213,36 +301,17 @@ impl Searcher {
             }
         }
 
-        let s = status(board, side);
-        match s {
-            Status {
-                ended: true,
-                winner: Some(w),
-                ..
-            } => {
-                return Ok(if w == side {
-                    WIN - ply as i32
-                } else {
-                    -WIN + ply as i32
-                });
-            }
-            Status {
-                ended: true,
-                winner: None,
-                ..
-            } => return Ok(0),
-            _ => {}
+        let moves = legal_moves(board, side);
+        let repetitions = self.repetition_count(position_key(board, side));
+        if let Some((winner, _)) = terminal(board, side, repetitions, !moves.is_empty()) {
+            return Ok(outcome_score(winner, side, ply));
         }
 
         if depth == 0 {
-            return Ok(evaluate(board, side));
+            return Ok(evaluate_with_moves(board, side, moves.len() as i32));
         }
 
-        let moves = ordered(
-            board,
-            legal_moves(board, side),
-            cached.as_ref().and_then(|e| e.best.as_ref()),
-        );
+        let moves = ordered(board, moves, cached.as_ref().and_then(|e| e.best.as_ref()));
 
         let mut score = i32::MIN / 2;
         let mut best = None;
@@ -250,7 +319,12 @@ impl Searcher {
             let mut next = board.to_vec();
             next[mv.to as usize] = next[mv.from as usize];
             next[mv.from as usize] = 0;
-            let value = -self.negamax(&next, other(side), depth - 1, -beta, -alpha, ply + 1)?;
+            let next_side = other(side);
+            let next_key = position_key(&next, next_side);
+            self.record(next_key);
+            let result = self.negamax(&next, next_side, depth - 1, -beta, -alpha, ply + 1);
+            self.unrecord(next_key);
+            let value = -result?;
             if value > score {
                 score = value;
                 best = Some(mv);
@@ -297,26 +371,73 @@ fn select_root(scores: &[(Move, i32)], band: i32, seed: u64) -> (Move, i32, i32)
     (selected.0, best, selected.1)
 }
 
-pub(crate) fn search(board: &[u8], side: u8, config: SearchConfig) -> SearchResult {
+pub(crate) fn search(
+    board: &[u8],
+    side: u8,
+    positions: &[(Vec<u8>, u8)],
+    config: SearchConfig,
+) -> SearchResult {
     let initial = ordered(board, legal_moves(board, side), None);
-    if initial.is_empty() {
+    let deadline_ms = clock_ms() + config.time_budget_ms.max(0.0);
+    let mut searcher = Searcher {
+        config,
+        deadline_ms,
+        nodes: 0,
+        table: HashMap::new(),
+        repetitions: HashMap::new(),
+        repetition_hash: 0,
+    };
+    for (previous, previous_side) in positions {
+        searcher.record(position_key(previous, *previous_side));
+    }
+    let root_key = position_key(board, side);
+    if searcher.repetition_count(root_key) == 0 {
+        searcher.record(root_key);
+    }
+    let repetitions = searcher.repetition_count(root_key);
+    if let Some((winner, _)) = terminal(board, side, repetitions, !initial.is_empty()) {
+        let score = outcome_score(winner, side, 0);
         return SearchResult {
             selected: None,
-            score: -WIN,
-            selected_score: -WIN,
+            score,
+            selected_score: score,
             depth: 0,
             nodes: 0,
         };
     }
 
-    let mut searcher = Searcher {
-        config,
-        nodes: 0,
-        table: HashMap::new(),
-    };
-    let mut selected = initial[0];
-    let mut best_score = i32::MIN / 2;
-    let mut selected_score = best_score;
+    let mut fallback_scores = Vec::with_capacity(initial.len());
+    for &mv in &initial {
+        let mut child = board.to_vec();
+        child[mv.to as usize] = child[mv.from as usize];
+        child[mv.from as usize] = 0;
+        let enemy = other(side);
+        let child_key = position_key(&child, enemy);
+        let repetitions = searcher.record(child_key);
+        let score = if let Some((winner, _)) = terminal(&child, enemy, 0, true) {
+            outcome_score(winner, enemy, 1)
+        } else {
+            let replies = legal_moves(&child, enemy);
+            terminal(&child, enemy, repetitions, !replies.is_empty()).map_or_else(
+                || evaluate_with_moves(&child, enemy, replies.len() as i32),
+                |(winner, _)| outcome_score(winner, enemy, 1),
+            )
+        };
+        searcher.unrecord(child_key);
+        fallback_scores.push((mv, -score));
+    }
+    let (mut selected, mut best_score, mut selected_score) =
+        select_root(&fallback_scores, config.root_band, config.seed);
+    if best_score >= WIN - 1 {
+        return SearchResult {
+            selected: Some(selected),
+            score: best_score,
+            selected_score,
+            depth: 1,
+            nodes: 0,
+        };
+    }
+
     let mut completed_depth = 0;
 
     for depth in 1..=config.max_depth {
@@ -324,17 +445,20 @@ pub(crate) fn search(board: &[u8], side: u8, config: SearchConfig) -> SearchResu
         let mut scores = Vec::with_capacity(roots.len());
         let mut interrupted = false;
         for mv in roots {
+            if clock_ms() >= deadline_ms {
+                interrupted = true;
+                break;
+            }
             let mut child = board.to_vec();
             child[mv.to as usize] = child[mv.from as usize];
             child[mv.from as usize] = 0;
-            match searcher.negamax(
-                &child,
-                other(side),
-                depth - 1,
-                i32::MIN / 2,
-                i32::MAX / 2,
-                1,
-            ) {
+            let next_side = other(side);
+            let child_key = position_key(&child, next_side);
+            searcher.record(child_key);
+            let result =
+                searcher.negamax(&child, next_side, depth - 1, i32::MIN / 2, i32::MAX / 2, 1);
+            searcher.unrecord(child_key);
+            match result {
                 Ok(score) => scores.push((mv, -score)),
                 Err(()) => {
                     interrupted = true;
@@ -375,6 +499,7 @@ mod tests {
             max_depth: 5,
             root_band: 80,
             seed,
+            time_budget_ms: 10_000.0,
         }
     }
 
@@ -384,7 +509,7 @@ mod tests {
         // Red Wolf one step from Black den; add a distant Black piece so "no-pieces" doesn't fire
         board[at(1, 3)] = crate::game::piece_for(RED, crate::game::WOLF);
         board[at(8, 6)] = crate::game::piece_for(BLACK, crate::game::RAT);
-        let result = search(&board, RED, config(1));
+        let result = search(&board, RED, &[], config(1));
         let mv = result.selected.unwrap();
         assert_eq!(mv.to as usize, den(BLACK));
     }
@@ -395,7 +520,7 @@ mod tests {
         let mut board = vec![EMPTY; 63];
         board[at(1, 3)] = crate::game::piece_for(RED, WOLF);
         board[at(6, 0)] = crate::game::piece_for(BLACK, ELEPHANT); // gives Black a piece
-        let result = search(&board, RED, config(2));
+        let result = search(&board, RED, &[], config(2));
         let mv = result.selected.unwrap();
         assert_eq!(
             mv.to as usize,
@@ -412,12 +537,38 @@ mod tests {
             max_depth: 4,
             root_band: 60,
             seed: 42,
+            time_budget_ms: 10_000.0,
         };
-        let first = search(&board, BLACK, c);
-        let repeat = search(&board, BLACK, c);
+        let first = search(&board, BLACK, &[], c);
+        let repeat = search(&board, BLACK, &[], c);
         assert_eq!(first.selected, repeat.selected);
         let mv = first.selected.unwrap();
         assert!(legal_moves(&board, BLACK).contains(&mv));
+    }
+
+    #[test]
+    fn search_scores_a_third_repetition_as_a_draw() {
+        let mut board = vec![EMPTY; 63];
+        board[at(1, 2)] = piece_for(BLACK, RAT);
+        board[at(8, 6)] = piece_for(BLACK, ELEPHANT);
+        board[at(1, 3)] = piece_for(RED, WOLF);
+        board[at(8, 0)] = piece_for(RED, ELEPHANT);
+        let saving_move = Move {
+            from: at(1, 2) as u8,
+            to: at(1, 3) as u8,
+        };
+        let repeated = crate::game::apply_move(&board, saving_move).unwrap();
+        let history = [
+            (board.clone(), BLACK),
+            (repeated.clone(), RED),
+            (repeated, RED),
+        ];
+        let mut c = config(7);
+        c.root_band = 0;
+        let result = search(&board, BLACK, &history, c);
+        assert_eq!(result.selected, Some(saving_move));
+        assert_eq!(result.score, 0);
+        assert_eq!(result.selected_score, 0);
     }
 
     #[test]
@@ -443,6 +594,6 @@ mod tests {
         second[3] = piece_for(RED, RAT);
         second[0] = piece_for(RED, WOLF);
 
-        assert_ne!(board_key(&first, RED, 4), board_key(&second, RED, 4));
+        assert_ne!(board_key(&first, RED, 4, 0), board_key(&second, RED, 4, 0));
     }
 }

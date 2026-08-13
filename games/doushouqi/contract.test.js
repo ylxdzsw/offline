@@ -14,6 +14,27 @@ test('initial board has eight pieces per side with correct layout', () => {
     for (const t of engine.RED_TRAPS) assert.equal(board[t], engine.EMPTY)
     for (const t of engine.BLACK_TRAPS) assert.equal(board[t], engine.EMPTY)
     assert(board.every((p, i) => !engine.isRiver(i) || p === engine.EMPTY))
+    const expected = [
+        [8, 0, engine.RED, engine.TIGER],
+        [8, 6, engine.RED, engine.LION],
+        [7, 1, engine.RED, engine.CAT],
+        [7, 5, engine.RED, engine.DOG],
+        [6, 0, engine.RED, engine.ELEPHANT],
+        [6, 2, engine.RED, engine.WOLF],
+        [6, 4, engine.RED, engine.LEOPARD],
+        [6, 6, engine.RED, engine.RAT],
+        [0, 0, engine.BLACK, engine.LION],
+        [0, 6, engine.BLACK, engine.TIGER],
+        [1, 1, engine.BLACK, engine.DOG],
+        [1, 5, engine.BLACK, engine.CAT],
+        [2, 0, engine.BLACK, engine.RAT],
+        [2, 2, engine.BLACK, engine.LEOPARD],
+        [2, 4, engine.BLACK, engine.WOLF],
+        [2, 6, engine.BLACK, engine.ELEPHANT],
+    ]
+    for (const [row, col, side, rank] of expected) {
+        assert.equal(board[engine.at(row, col)], engine.pieceFor(side, rank))
+    }
 })
 
 test('rat can enter river; other pieces cannot', () => {
@@ -107,10 +128,45 @@ test('status detects no-pieces loss', () => {
     assert.equal(s.winner, engine.RED)
 })
 
+test('status detects a threefold position repetition', () => {
+    const board = engine.initialBoard()
+    const key = engine.positionKey(board, engine.RED)
+    assert.deepEqual(engine.status(board, engine.RED, [key, key, key]), {
+        ended: true,
+        winner: null,
+        reason: 'repetition',
+    })
+})
+
+test('AI treats a third repetition as a draw', () => {
+    const board = Array(engine.SIZE).fill(engine.EMPTY)
+    board[engine.at(1, 2)] = engine.pieceFor(engine.BLACK, engine.RAT)
+    board[engine.at(8, 6)] = engine.pieceFor(engine.BLACK, engine.ELEPHANT)
+    board[engine.at(1, 3)] = engine.pieceFor(engine.RED, engine.WOLF)
+    board[engine.at(8, 0)] = engine.pieceFor(engine.RED, engine.ELEPHANT)
+    const savingMove = {from: engine.at(1, 2), to: engine.at(1, 3)}
+    const repeated = engine.applyMove(board, savingMove)
+    const result = ai.search(board, engine.BLACK, 'medium', {
+        seed: 7,
+        rootBand: 0,
+        nodeBudget: 30_000,
+        maxDepth: 5,
+        timeBudget: 1_000,
+        positions: [
+            {board, side: engine.BLACK},
+            {board: repeated, side: engine.RED},
+            {board: repeated, side: engine.RED},
+        ],
+    })
+    assert.deepEqual(result.move, savingMove)
+    assert.equal(result.score, 0)
+})
+
 test('AI search is reproducible, legal, and takes an immediate den entry', () => {
     // Forced den entry
     const board = Array(engine.SIZE).fill(engine.EMPTY)
     board[engine.at(1, 3)] = engine.pieceFor(engine.RED, engine.WOLF)
+    board[engine.at(8, 6)] = engine.pieceFor(engine.BLACK, engine.RAT)
     const result = ai.search(board, engine.RED, 'easy', {seed: 7, nodeBudget: 5000, maxDepth: 3})
     assert.equal(result.move.to, engine.BLACK_DEN)
 
@@ -122,4 +178,10 @@ test('AI search is reproducible, legal, and takes an immediate den entry', () =>
     assert.deepEqual(r1.move, r2.move)
     const legal = engine.legalMoves(init, engine.BLACK)
     assert(legal.some(m => m.from === r1.move.from && m.to === r1.move.to))
+
+    const bounded = ai.search(init, engine.BLACK, 'hard', {
+        seed: 3, nodeBudget: 1_600_000, maxDepth: 11, rootBand: 0, timeBudget: 0,
+    })
+    assert.equal(bounded.depth, 0)
+    assert(legal.some(m => m.from === bounded.move.from && m.to === bounded.move.to))
 })

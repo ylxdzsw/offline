@@ -23,6 +23,8 @@
             maxDepth:   options.maxDepth ?? limit.depth,
             rootBand:   options.rootBand ?? limit.rootBand,
             seed:       options.seed ?? hash(board, side),
+            timeBudget: options.timeBudget ?? limit.time,
+            positions:  options.positions ?? [],
         })
         return {...result, elapsed: Math.round(now() - started)}
     }

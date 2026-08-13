@@ -47,6 +47,18 @@ fn board(request: &Value) -> Result<Vec<u8>, DispatchError> {
         .collect()
 }
 
+fn positions(request: &Value) -> Result<Vec<(Vec<u8>, u8)>, DispatchError> {
+    let Some(values) = request.get("positions") else {
+        return Ok(Vec::new());
+    };
+    values
+        .as_array()
+        .ok_or("positions must be an array")?
+        .iter()
+        .map(|position| Ok((board(position)?, side(position, "side")?)))
+        .collect()
+}
+
 fn move_json(mv: Move) -> Value {
     json!({"from": mv.from, "to": mv.to})
 }
@@ -115,7 +127,12 @@ fn dispatch(request: Value) -> DispatchResult {
         "status" => {
             let b = board(&request)?;
             let turn = side(&request, "turn")?;
-            Ok(status_json(&game::status(&b, turn)))
+            let repetitions = request
+                .get("repetitions")
+                .and_then(Value::as_u64)
+                .unwrap_or(0)
+                .min(u8::MAX as u64) as u8;
+            Ok(status_json(&game::status(&b, turn, repetitions)))
         }
         "evaluate" => {
             let b = board(&request)?;
@@ -125,6 +142,7 @@ fn dispatch(request: Value) -> DispatchResult {
         "search" => {
             let b = board(&request)?;
             let s = side(&request, "side")?;
+            let positions = positions(&request)?;
             let config = SearchConfig {
                 node_budget: request
                     .get("nodeBudget")
@@ -142,8 +160,13 @@ fn dispatch(request: Value) -> DispatchResult {
                     .unwrap_or(24)
                     .clamp(0, i32::MAX as i64) as i32,
                 seed: request.get("seed").and_then(Value::as_u64).unwrap_or(0),
+                time_budget_ms: request
+                    .get("timeBudget")
+                    .and_then(Value::as_f64)
+                    .unwrap_or(1_200.0)
+                    .clamp(0.0, 10_000.0),
             };
-            Ok(search_json(ai::search(&b, s, config)))
+            Ok(search_json(ai::search(&b, s, &positions, config)))
         }
         _ => Err(DispatchError::new(format!(
             "unknown doushouqi operation {op:?}"

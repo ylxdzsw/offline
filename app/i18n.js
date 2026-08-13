@@ -175,7 +175,7 @@
             doushouqiChoosePiece: 'Choose a highlighted red piece',
             doushouqiChooseDestination: 'Choose a highlighted destination',
             doushouqiNoPiece: 'That piece has no legal moves',
-            doushouqiDraw: 'Draw — neither player can move',
+            doushouqiDraw: 'Draw by threefold repetition',
             doushouqiAiUnavailable: 'Opponent could not move — undo or start a new game',
             choosePromotion: 'Choose a promotion',
             chessPieceKWhite: 'white king',
@@ -550,7 +550,7 @@
             doushouqiChoosePiece: '请选择亮起的红方棋子',
             doushouqiChooseDestination: '请选择亮起的落点',
             doushouqiNoPiece: '该棋子当前无合法走法',
-            doushouqiDraw: '和棋——双方均无棋可走',
+            doushouqiDraw: '三次重复局面，和棋',
             doushouqiAiUnavailable: '对手无法完成走棋——请悔棋或开始新局',
             choosePromotion: '选择升变棋子',
             chessPieceKWhite: '白王',
@@ -837,7 +837,7 @@
             doushouqi: {
                 intro: 'You play Red and move first; race your eight animals to the opponent\'s den.',
                 rules: [
-                    'Tap a highlighted red piece, then a destination. Higher-ranked animals capture lower-ranked ones — except the Rat (rank 1) captures the Elephant (rank 8) from land.',
+                    'Tap a highlighted red piece, then a destination. Animals capture equal or lower ranks. On land, the Rat captures the Elephant; the Elephant cannot capture an untrapped Rat.',
                     'Only the Rat may enter the rivers. It cannot capture across a river bank. Tigers and Lions jump over a complete river strip unless any piece blocks the path.',
                     'Entering the opponent\'s den wins instantly. An animal in an enemy trap loses its rank and can be captured by anything.',
                 ],
@@ -1060,7 +1060,7 @@
             doushouqi: {
                 intro: '你执红方先行；带领八种动物棋子率先进入对方兽穴即获胜。',
                 rules: [
-                    '点选亮起的红方棋子，再点选目标格。等级高的动物吃低等级的动物，但"鼠"（等级最低）可在陆地上吃"象"（等级最高）。',
+                    '点选亮起的红方棋子，再点选目标格。棋子可吃同级或低级棋子；鼠可在陆地吃象，象不能吃未落入陷阱的鼠。',
                     '只有鼠可以进入河流，且不能隔着河岸吃子。虎和狮可以一次跳过整片河流，除非河中有任意棋子阻挡。',
                     '进入对方兽穴即获胜。陷入敌方陷阱的动物等级归零，任何敌方棋子均可将其吃掉。',
                 ],
@@ -1414,7 +1414,7 @@
                         title: 'Board and pieces',
                         items: [
                             'The board is 7×9. Each side has eight animals ranked 1 (Rat) through 8 (Elephant): Rat, Cat, Dog, Wolf, Leopard, Tiger, Lion, Elephant. Red moves first.',
-                            'Higher-ranked animals capture lower-ranked ones. The one exception: the Rat (rank 1) captures the Elephant (rank 8), but only when the Rat is on land.',
+                            'Animals capture opponents of equal or lower rank. On land, the Rat (rank 1) may capture the Elephant (rank 8); the Elephant cannot capture a Rat unless that Rat is trapped.',
                             'Special squares: two dens (home bases at the center of each back row), six traps (three surrounding each den), and two rivers (three rows of water in the middle).',
                         ],
                     },
@@ -1431,7 +1431,7 @@
                         items: [
                             'When an animal enters an enemy trap square, its rank drops to 0 for as long as it stays there. Any enemy piece, even the lowest-ranked, can capture it.',
                             'Moving your piece into the opponent\'s den wins the game immediately. You may never move into your own den.',
-                            'You also win by capturing all enemy pieces or leaving the opponent with no legal move. Undo removes your move and the opponent\'s reply; progress saves automatically.',
+                            'You also win by capturing all enemy pieces or leaving the opponent with no legal move. Three occurrences of the same position are a draw. Undo removes your move and the opponent\'s reply.',
                         ],
                     },
                 ],
@@ -1955,7 +1955,7 @@
                         title: '棋盘与棋子',
                         items: [
                             '棋盘为 7×9 格。双方各有八种动物，等级从 1（鼠）到 8（象）：鼠、猫、狗、狼、豹、虎、狮、象。红方先行。',
-                            '等级高的棋子吃等级低的棋子，唯一例外：鼠（等级 1）可在陆地上吃象（等级 8）。',
+                            '棋子可吃同级或低级的敌棋。鼠（等级 1）可在陆地吃象（等级 8）；除非鼠落入陷阱，否则象不能吃鼠。',
                             '特殊格：每方有一个兽穴（位于本方底排中央）、三个陷阱（紧靠兽穴）和两片河流（棋盘中部三排水域）。',
                         ],
                     },
@@ -1972,7 +1972,7 @@
                         items: [
                             '棋子进入敌方陷阱格后，等级在该格降为 0，敌方任意棋子（包括最弱的鼠）都可将其吃掉。',
                             '己方棋子进入对方兽穴即立即获胜；不能进入自己的兽穴。',
-                            '吃光敌方所有棋子，或使对方无棋可走，同样获胜。"悔棋"撤销一个完整回合，进度自动保存在本机。',
+                            '吃光敌方所有棋子，或使对方无棋可走，同样获胜；同一局面出现三次则和棋。"悔棋"撤销一个完整回合。',
                         ],
                     },
                 ],

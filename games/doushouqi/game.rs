@@ -248,40 +248,51 @@ pub fn apply_move(board: &[u8], mv: Move) -> Result<Vec<u8>, String> {
     Ok(next)
 }
 
-pub fn status(board: &[u8], turn: u8) -> Status {
+pub(crate) fn terminal(
+    board: &[u8],
+    turn: u8,
+    repetitions: u8,
+    has_moves: bool,
+) -> Option<(Option<u8>, &'static str)> {
     if side_of(board[den(RED)]) == BLACK {
-        return Status {
-            ended: true,
-            winner: Some(BLACK),
-            reason: "den".to_owned(),
-        };
+        return Some((Some(BLACK), "den"));
     }
     if side_of(board[den(BLACK)]) == RED {
-        return Status {
-            ended: true,
-            winner: Some(RED),
-            reason: "den".to_owned(),
-        };
+        return Some((Some(RED), "den"));
     }
     if !board.iter().any(|&p| side_of(p) == RED) {
-        return Status {
-            ended: true,
-            winner: Some(BLACK),
-            reason: "no-pieces".to_owned(),
-        };
+        return Some((Some(BLACK), "no-pieces"));
     }
     if !board.iter().any(|&p| side_of(p) == BLACK) {
+        return Some((Some(RED), "no-pieces"));
+    }
+    if !has_moves {
+        return Some((Some(other(turn)), "no-moves"));
+    }
+    if repetitions >= 3 {
+        return Some((None, "repetition"));
+    }
+    None
+}
+
+pub fn status(board: &[u8], turn: u8, repetitions: u8) -> Status {
+    if let Some((winner, reason)) = terminal(board, turn, 0, true) {
         return Status {
             ended: true,
-            winner: Some(RED),
-            reason: "no-pieces".to_owned(),
+            winner,
+            reason: reason.to_owned(),
         };
     }
-    if legal_moves(board, turn).is_empty() {
+    if let Some((winner, reason)) = terminal(
+        board,
+        turn,
+        repetitions,
+        !legal_moves(board, turn).is_empty(),
+    ) {
         return Status {
             ended: true,
-            winner: Some(other(turn)),
-            reason: "no-moves".to_owned(),
+            winner,
+            reason: reason.to_owned(),
         };
     }
     Status {
@@ -298,16 +309,16 @@ pub fn initial_board() -> Vec<u8> {
     board[at(7, 1)] = piece_for(RED, CAT);
     board[at(7, 5)] = piece_for(RED, DOG);
     board[at(6, 0)] = piece_for(RED, ELEPHANT);
-    board[at(6, 2)] = piece_for(RED, LEOPARD);
-    board[at(6, 4)] = piece_for(RED, WOLF);
+    board[at(6, 2)] = piece_for(RED, WOLF);
+    board[at(6, 4)] = piece_for(RED, LEOPARD);
     board[at(6, 6)] = piece_for(RED, RAT);
     board[at(0, 0)] = piece_for(BLACK, LION);
     board[at(0, 6)] = piece_for(BLACK, TIGER);
     board[at(1, 1)] = piece_for(BLACK, DOG);
     board[at(1, 5)] = piece_for(BLACK, CAT);
     board[at(2, 0)] = piece_for(BLACK, RAT);
-    board[at(2, 2)] = piece_for(BLACK, WOLF);
-    board[at(2, 4)] = piece_for(BLACK, LEOPARD);
+    board[at(2, 2)] = piece_for(BLACK, LEOPARD);
+    board[at(2, 4)] = piece_for(BLACK, WOLF);
     board[at(2, 6)] = piece_for(BLACK, ELEPHANT);
     board
 }
@@ -317,10 +328,33 @@ mod tests {
     use super::*;
 
     #[test]
-    fn initial_board_piece_counts_and_no_overlap_with_special_squares() {
+    fn initial_board_has_the_standard_layout() {
         let board = initial_board();
-        assert_eq!(board.iter().filter(|&&p| side_of(p) == RED).count(), 8);
-        assert_eq!(board.iter().filter(|&&p| side_of(p) == BLACK).count(), 8);
+        let expected = [
+            (at(8, 0), RED, TIGER),
+            (at(8, 6), RED, LION),
+            (at(7, 1), RED, CAT),
+            (at(7, 5), RED, DOG),
+            (at(6, 0), RED, ELEPHANT),
+            (at(6, 2), RED, WOLF),
+            (at(6, 4), RED, LEOPARD),
+            (at(6, 6), RED, RAT),
+            (at(0, 0), BLACK, LION),
+            (at(0, 6), BLACK, TIGER),
+            (at(1, 1), BLACK, DOG),
+            (at(1, 5), BLACK, CAT),
+            (at(2, 0), BLACK, RAT),
+            (at(2, 2), BLACK, LEOPARD),
+            (at(2, 4), BLACK, WOLF),
+            (at(2, 6), BLACK, ELEPHANT),
+        ];
+        for (index, side, rank) in expected {
+            assert_eq!(board[index], piece_for(side, rank));
+        }
+        assert_eq!(
+            board.iter().filter(|&&p| p != EMPTY).count(),
+            expected.len()
+        );
         assert_eq!(board[den(RED)], EMPTY);
         assert_eq!(board[den(BLACK)], EMPTY);
         for &t in &traps(RED) {
@@ -450,9 +484,30 @@ mod tests {
             },
         )
         .unwrap();
-        let s = status(&next, BLACK);
+        let s = status(&next, BLACK, 0);
         assert!(s.ended);
         assert_eq!(s.winner, Some(RED));
         assert_eq!(s.reason, "den");
+    }
+
+    #[test]
+    fn third_position_repetition_is_a_draw() {
+        let board = initial_board();
+        let s = status(&board, RED, 3);
+        assert!(s.ended);
+        assert_eq!(s.winner, None);
+        assert_eq!(s.reason, "repetition");
+    }
+
+    #[test]
+    fn no_moves_wins_before_repetition_is_considered() {
+        let mut board = vec![EMPTY; ROWS * COLS];
+        board[at(0, 0)] = piece_for(BLACK, CAT);
+        board[at(0, 1)] = piece_for(RED, ELEPHANT);
+        board[at(1, 0)] = piece_for(RED, ELEPHANT);
+        let s = status(&board, BLACK, 3);
+        assert!(s.ended);
+        assert_eq!(s.winner, Some(RED));
+        assert_eq!(s.reason, "no-moves");
     }
 }

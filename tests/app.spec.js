@@ -46,6 +46,7 @@ test('gallery grid logos stay centered and contained', async ({page}) => {
     const geometry = await page.locator([
         'article[data-game="sudoku"] .preview > span',
         'article[data-game="go"] .preview > span',
+        'article[data-game="doushouqi"] .preview > span',
         'article[data-game="huarong"] .preview > span',
         'article[data-game="sliding"] .preview > span',
         'article[data-game="nonogram"] .preview > span',
@@ -704,6 +705,40 @@ test('Junqi reports relative battle strength without revealing the surviving ran
     await page.reload()
     await expect(survivor.locator('.piece.hidden')).toHaveText('◆')
     expect(await page.locator('junqi-game').evaluate(game => game.state.revealed)).toEqual([])
+})
+
+test('Dou Shou Qi starts correctly and bounds its hard AI turn', async ({page}) => {
+    await page.goto('/doushouqi.html')
+    const game = page.locator('doushouqi-game')
+    await expect(game.locator('.status')).toHaveText('Your turn')
+    const setup = await game.evaluate(element => {
+        const {engine, state} = element
+        return {
+            red: [engine.rankOf(state.board[engine.at(6, 2)]), engine.rankOf(state.board[engine.at(6, 4)])],
+            black: [engine.rankOf(state.board[engine.at(2, 2)]), engine.rankOf(state.board[engine.at(2, 4)])],
+            keys: state.keys.length,
+            firstKey: state.keys[0] === engine.positionKey(state.board, state.turn),
+        }
+    })
+    expect(setup).toEqual({red: [4, 5], black: [5, 4], keys: 1, firstKey: true})
+
+    await game.locator('.difficulty').selectOption('hard')
+    const move = await game.evaluate(element => element.legal[0])
+    const started = Date.now()
+    await game.locator(`.cell[data-index="${move.from}"]`).click()
+    await game.locator(`.cell[data-index="${move.to}"]`).click()
+    await expect(game.locator('.status')).toHaveText('Your turn', {timeout: 6000})
+    expect(Date.now() - started).toBeLessThan(6000)
+    expect(await game.evaluate(element => ({
+        history: element.state.history.length,
+        keys: element.state.keys.length,
+    }))).toEqual({history: 2, keys: 3})
+
+    await game.locator('.undo').click()
+    expect(await game.evaluate(element => ({
+        history: element.state.history.length,
+        keys: element.state.keys.length,
+    }))).toEqual({history: 0, keys: 1})
 })
 
 test('Chess makes a legal AI reply, persists, reloads, and undoes the turn',async({page})=>{

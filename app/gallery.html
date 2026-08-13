@@ -34,6 +34,7 @@
     .game-gallery article[data-game="sudoku"]  .preview { color: var(--ink); background: var(--board-paper); }
     .game-gallery article[data-game="2048"]    .preview { color: #776e65; background: color-mix(in srgb, #8f7a66 55%, var(--bg-elevated)); }
     .game-gallery article[data-game="junqi"]   .preview { color: var(--piece-red); background: color-mix(in srgb, var(--board-wood) 40%, var(--bg-elevated)); }
+    .game-gallery article[data-game="doushouqi"] .preview { color: var(--board-wood-line); background: color-mix(in srgb, var(--board-wood) 55%, var(--bg-elevated)); }
     .game-gallery article[data-game="chess"]   .preview { color: var(--ink); background: color-mix(in srgb, var(--board-dark) 35%, var(--bg-elevated)); }
     .game-gallery article[data-game="reversi"] .preview { color: var(--stone-white); background: color-mix(in srgb, var(--board-felt) 70%, var(--bg-elevated)); }
     .game-gallery article[data-game="checkers"] .preview { color: var(--piece-white); background: color-mix(in srgb, var(--board-dark) 48%, var(--bg-elevated)); }
@@ -116,6 +117,37 @@
         background: var(--piece-face); color: var(--piece-red);
     }
     .game-gallery .junqi-mark i:nth-child(n+4) { color: var(--piece-black); }
+    .game-gallery .doushouqi-mark {
+        position: relative; width: 50px; height: 64px; overflow: hidden;
+        border: 2px solid var(--board-wood-edge); border-radius: 5px;
+        background-color: var(--board-wood);
+        background-image:
+            linear-gradient(currentColor 1px, transparent 1px),
+            linear-gradient(90deg, currentColor 1px, transparent 1px);
+        background-size: calc(100% / 7) calc(100% / 9);
+        box-shadow: inset 0 0 6px color-mix(in srgb, var(--board-wood-line) 16%, transparent);
+    }
+    .game-gallery .doushouqi-mark::before {
+        position: absolute; top: 21px; left: 8px; width: 12px; height: 22px;
+        background: color-mix(in srgb, #75b4d5 72%, var(--board-wood));
+        box-shadow: 22px 0 color-mix(in srgb, #75b4d5 72%, var(--board-wood));
+        content: "";
+    }
+    .game-gallery .doushouqi-mark i {
+        position: absolute; z-index: 1; display: grid; width: 19px; height: 19px;
+        border: 1px solid currentColor; border-radius: 50%; place-items: center;
+        font-family: var(--font-display); font-size: .58rem; font-style: normal; font-weight: 800;
+        line-height: 1; box-shadow: 0 1px 2px rgba(0,0,0,.3);
+    }
+    .game-gallery .doushouqi-mark i:nth-child(1) {
+        top: 23px; left: 5px; color: #8f2c26; background: var(--piece-face);
+    }
+    .game-gallery .doushouqi-mark i:nth-child(2) {
+        top: 4px; right: 3px; color: var(--piece-black); background: var(--piece-face);
+    }
+    .game-gallery .doushouqi-mark i:nth-child(3) {
+        right: 3px; bottom: 4px; color: var(--piece-red); background: var(--piece-face);
+    }
     .game-gallery .chess-mark {
         position: relative; display: grid; width: 58px; height: 58px;
         grid-template: repeat(2, 1fr) / repeat(2, 1fr);
@@ -362,6 +394,7 @@
             sudoku:  '<span class="sudoku-mark"><i>8</i><i></i><i>2</i><i></i><i>5</i><i></i><i>1</i><i></i><i>9</i></span>',
             '2048':  '<span class="game2048-mark"><i></i><i data-value="2">2</i><i></i><i data-value="4">4</i><i data-value="2">2</i><i></i><i data-value="8">8</i><i></i><i></i><i data-value="4">4</i><i></i><i></i><i data-value="16">16</i><i></i><i></i><i></i></span>',
             junqi:   '<span class="junqi-mark"><i>司</i><i>旗</i><i>工</i><i>弹</i><i>师</i><i>雷</i></span>',
+            doushouqi: '<span class="doushouqi-mark"><i>鼠</i><i>象</i><i>狮</i></span>',
             chess:   '<span class="chess-mark"><i></i><i></i><i></i><i></i></span>',
             reversi: '<span class="reversi-mark">' + '<i></i>'.repeat(16) + '</span>',
             checkers: '<span class="checkers-mark"></span>',

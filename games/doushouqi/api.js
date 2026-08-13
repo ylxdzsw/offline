@@ -39,18 +39,23 @@
         const row = rowOf(index), col = colOf(index)
         return row >= 3 && row <= 5 && (col === 1 || col === 2 || col === 4 || col === 5)
     }
+    const positionKey = (board, side) => `${side}:${board.join(',')}`
 
     const initialBoard = () => call('initialBoard')
     const legalMoves = (board, side) => call('legalMoves', {board, side})
     const movesFor = (board, from) => call('movesFor', {board, from})
     const applyMove = (board, move) => call('applyMove', {board, move})
-    const status = (board, turn) => call('status', {board, turn})
+    const status = (board, turn, keys = []) => {
+        const key = positionKey(board, turn)
+        const repetitions = keys.reduce((count, candidate) => count + Number(candidate === key), 0)
+        return call('status', {board, turn, repetitions})
+    }
 
     return {
         ROWS, COLS, SIZE, EMPTY, RED, BLACK,
         RAT, CAT, DOG, WOLF, LEOPARD, TIGER, LION, ELEPHANT,
         RED_DEN, BLACK_DEN, RED_TRAPS, BLACK_TRAPS,
-        at, rowOf, colOf, inside, other, sideOf, rankOf, pieceFor, den, traps, isRiver,
+        at, rowOf, colOf, inside, other, sideOf, rankOf, pieceFor, den, traps, isRiver, positionKey,
         initialBoard, legalMoves, movesFor, applyMove, status,
     }
 })
