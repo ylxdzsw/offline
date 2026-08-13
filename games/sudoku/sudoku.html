@@ -18,9 +18,18 @@
         .warning { margin: 0 0 9px; color: var(--danger); font-size: .77rem; text-align: center; }
         .warning[hidden] { display: none; }
         .board {
-            display: grid; width: 100%; aspect-ratio: 1; grid-template: repeat(9, 1fr) / repeat(9, 1fr);
+            position: relative; display: grid; width: 100%; aspect-ratio: 1; grid-template: repeat(9, 1fr) / repeat(9, 1fr);
             overflow: hidden; border: 2px solid var(--board-paper-box); border-radius: var(--radius-sm);
             background: var(--board-paper); box-shadow: var(--shadow-soft); user-select: none;
+        }
+        .board[data-win]::before {
+            position: absolute; z-index: 4; top: 50%; left: 50%; width: 42%; padding: 9px 7px;
+            border: 3px double var(--accent); border-radius: 4px; content: attr(data-win);
+            color: var(--accent); background: color-mix(in srgb, var(--board-paper) 90%, transparent);
+            box-shadow: 0 3px 12px color-mix(in srgb, var(--ink) 16%, transparent);
+            font-family: var(--font-display); font-size: clamp(.78rem, 4vw, 1.05rem);
+            font-weight: 800; line-height: 1.2; text-align: center; transform: translate(-50%, -50%) rotate(-2deg);
+            pointer-events: none;
         }
         .cell {
             position: relative; display: grid; min-width: 0; min-height: 0; padding: 0; border: 0;
@@ -226,7 +235,11 @@ customElements.define('sudoku-game', class extends HTMLElement {
         this.changedIndex = null
         const counts = this.engine.DIGITS.map(digit => this.state.board.filter(value => value === digit).length)
         s.querySelector('.pad').innerHTML = this.engine.DIGITS.map((digit, index) => `<button type="button" class="digit${counts[index] >= 9 ? ' complete' : ''}" data-digit="${digit}" aria-label="${digit}; ${this.i18n.t('longPressNote')}" ${counts[index] >= 9 ? 'disabled' : ''}>${digit}</button>`).join('')
-        s.querySelector('.status').textContent = this.i18n.t(this.state.outcome ? 'sudokuSolved' : 'sudokuPrompt')
+        const statusText = this.i18n.t(this.state.outcome ? 'sudokuSolved' : 'sudokuPrompt')
+        s.querySelector('.status').textContent = statusText
+        const board = s.querySelector('.board')
+        if (this.state.outcome?.reason === 'solved') board.dataset.win = statusText
+        else delete board.dataset.win
         s.querySelector('.difficulty').value = this.state.difficulty
         s.querySelector('.undo').disabled = !this.state.history.length
     }

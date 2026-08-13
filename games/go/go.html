@@ -56,6 +56,14 @@
             box-shadow: inset 0 0 24px color-mix(in srgb, var(--board-wood-line) 17%, transparent), var(--shadow-soft);
             touch-action: manipulation; user-select: none;
         }
+        .board[data-win]::after {
+            position: absolute; z-index: 5; right: 4%; bottom: 4%; max-width: 76%; padding: 8px 11px;
+            border: 2px solid var(--stone-black); border-radius: 5px; content: attr(data-win);
+            color: var(--stone-black); background: color-mix(in srgb, var(--piece-face) 92%, transparent);
+            box-shadow: 4px 4px 0 color-mix(in srgb, var(--stone-black) 24%, transparent);
+            font-size: clamp(.65rem, 3vw, .82rem); font-weight: 800; line-height: 1.3;
+            text-align: center; pointer-events: none;
+        }
         .field {
             position: absolute; inset: var(--edge);
             border-right: 1px solid var(--board-wood-line); border-bottom: 1px solid var(--board-wood-line);
@@ -477,6 +485,8 @@ OfflineGames.wasm.defineElement('go', 'go-game', class extends HTMLElement {
         const status = s.querySelector('.status')
         status.textContent = this.statusText()
         status.classList.toggle('thinking', this.thinking)
+        if (this.position.outcome.winner === this.engine.BLACK) board.dataset.win = this.i18n.t('youWin')
+        else delete board.dataset.win
         s.querySelector('.black-captures').textContent = String(this.position.captures.black)
         s.querySelector('.white-captures').textContent = String(this.position.captures.white)
         s.querySelector('.difficulty').value = this.state.difficulty

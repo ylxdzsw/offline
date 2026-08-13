@@ -35,6 +35,14 @@
             box-shadow: inset 0 0 28px color-mix(in srgb, var(--board-wood-line) 14%, transparent), var(--shadow-soft);
             user-select: none;
         }
+        .board[data-win]::after {
+            position: absolute; z-index: 8; top: 48%; left: 50%; width: 58%; padding: 9px 10px;
+            border: 2px solid #78241f; border-radius: 5px; content: attr(data-win); color: #fff8dd;
+            background: color-mix(in srgb, var(--piece-red) 92%, transparent);
+            box-shadow: inset 0 0 0 2px rgba(255,255,255,.14), 0 5px 16px rgba(70,25,15,.3);
+            font-family: var(--font-display); font-size: clamp(.76rem, 3.7vw, 1rem);
+            font-weight: 850; text-align: center; transform: translate(-50%, -50%); pointer-events: none;
+        }
         .square { position: relative; display: grid; min-width: 0; min-height: 0; padding: 3px; border: 0; border-radius: 0; place-items: center; background: transparent; }
         .square::before, .square::after { position: absolute; z-index: 0; content: ""; background: color-mix(in srgb, var(--board-wood-line) 55%, transparent); }
         .square::before { width: 100%; height: 1px; }
@@ -252,7 +260,8 @@ OfflineGames.wasm.defineElement('junqi', 'junqi-game', class extends HTMLElement
             const last=this.state.lastMove&&(index===this.state.lastMove.from||index===this.state.lastMove.to)?`, ${this.i18n.t('lastMove')}`:''
             return `<button type="button" role="gridcell" class="${classes.join(' ')}" data-index="${index}" aria-label="${name}, ${this.i18n.t('row')} ${row+1}, ${this.i18n.t('column')} ${column+1}${last}">${token}</button>`
         }).join('')
-        s.querySelector('.board').innerHTML=squares+'<i class="river"></i>'; const status=s.querySelector('.status'); status.textContent=this.statusText(); status.classList.toggle('thinking',this.thinking)
+        const board=s.querySelector('.board'); board.innerHTML=squares+'<i class="river"></i>'; const status=s.querySelector('.status'); status.textContent=this.statusText(); status.classList.toggle('thinking',this.thinking)
+        if(this.state.outcome?.winner===this.engine.RED)board.dataset.win=this.i18n.t('youWin');else delete board.dataset.win
         const placement=this.state.phase==='placement', undo=s.querySelector('.undo'), next=s.querySelector('.new')
         s.querySelector('.placement-note').hidden=!placement; s.querySelector('.difficulty').value=this.state.difficulty
         undo.textContent=this.i18n.t(placement?'junqiShuffle':'undo'); undo.disabled=!placement&&!this.state.history.length

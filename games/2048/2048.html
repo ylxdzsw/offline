@@ -31,12 +31,21 @@
         .warning { margin: 0 0 9px; color: var(--danger); font-size: .77rem; text-align: center; }
         .warning[hidden] { display: none; }
         .board {
-            display: grid; width: 100%; aspect-ratio: 1; box-sizing: border-box;
+            position: relative; display: grid; width: 100%; aspect-ratio: 1; box-sizing: border-box;
             grid-template-columns: repeat(4, 1fr); gap: clamp(6px, 2.2vw, 10px);
             padding: clamp(7px, 2.4vw, 11px); overflow: hidden;
             border: 2px solid color-mix(in srgb, var(--ink) 18%, var(--border-strong));
             border-radius: var(--radius-lg); background: color-mix(in srgb, #8f7a66 76%, var(--bg-elevated));
             box-shadow: var(--shadow-soft); outline: none; touch-action: none; user-select: none;
+        }
+        .board[data-win]::after {
+            position: absolute; z-index: 4; top: 50%; left: 50%; width: min(70%, 250px); padding: 10px 12px;
+            border: 2px solid #fff3bb; border-radius: var(--radius-sm); content: attr(data-win);
+            color: #fff; background: color-mix(in srgb, #b98908 92%, transparent);
+            box-shadow: 0 0 0 4px color-mix(in srgb, #edc22e 42%, transparent), 0 8px 24px rgba(77,55,0,.28);
+            font-family: var(--font-display); font-size: clamp(.82rem, 4vw, 1.05rem);
+            font-weight: 800; line-height: 1.25; text-align: center; transform: translate(-50%, -50%);
+            pointer-events: none; animation: milestone .3s ease-out;
         }
         .board:focus-visible { box-shadow: 0 0 0 3px var(--focus), var(--shadow-soft); }
         .cell {
@@ -62,13 +71,14 @@
         .cell.merged { animation: merge .22s ease-out; }
         @keyframes spawn { from { opacity: 0; transform: scale(.45); } }
         @keyframes merge { 45% { transform: scale(1.13); } }
+        @keyframes milestone { from { opacity: 0; transform: translate(-50%, -50%) scale(.8); } }
         @media (max-width: 340px) {
             .toolbar { gap: 4px; }
             .score { padding-inline: 5px; }
             button { padding-inline: 8px; font-size: .8rem; }
         }
         @media (prefers-reduced-motion: reduce) {
-            .cell.spawn, .cell.merged { animation: none; }
+            .cell.spawn, .cell.merged, .board[data-win]::after { animation: none; }
         }
     </style>
     <div class="toolbar">
@@ -265,6 +275,8 @@ customElements.define('game-2048', class extends HTMLElement {
             if (this.animation?.merged?.includes(index)) cell.classList.add('merged')
             return cell
         }))
+        if (this.state.reached2048 && !this.state.outcome) board.dataset.win = this.i18n.t('game2048Reached')
+        else delete board.dataset.win
     }
     disconnectedCallback() { clearTimeout(this.animationTimer) }
 })

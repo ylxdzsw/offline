@@ -46,12 +46,20 @@
         .status.lost { color: var(--danger); background: var(--danger-soft); }
         .board {
             --columns: 9;
-            display: grid; width: min(100%, 420px); margin: 0 auto; box-sizing: border-box;
+            position: relative; display: grid; width: min(100%, 420px); margin: 0 auto; box-sizing: border-box;
             grid-template-columns: repeat(var(--columns), minmax(0, 1fr)); gap: 1px;
             padding: 3px; overflow: hidden; border: 1px solid var(--border-strong);
             border-radius: var(--radius-md); background: var(--border-strong);
             box-shadow: var(--shadow-soft); touch-action: manipulation; user-select: none;
             -webkit-touch-callout: none;
+        }
+        .board[data-win]::after {
+            position: absolute; z-index: 6; top: 9px; right: 9px; max-width: 68%; padding: 7px 10px;
+            border: 1px solid color-mix(in srgb, var(--accent) 72%, var(--border-strong));
+            border-radius: 4px; content: attr(data-win); color: var(--accent-ink);
+            background: color-mix(in srgb, var(--accent) 92%, transparent); box-shadow: var(--shadow-soft);
+            font-size: clamp(.66rem, 3vw, .82rem); font-weight: 800; line-height: 1.25; text-align: center;
+            pointer-events: none;
         }
         .cell {
             position: relative; display: grid; min-width: 0; min-height: 0; aspect-ratio: 1;
@@ -542,6 +550,8 @@ customElements.define('minesweeper-game', class extends HTMLElement {
         const status = s.querySelector('.status')
         status.textContent = this.statusText()
         status.classList.toggle('lost', this.state.outcome === 'lost')
+        if (this.state.outcome === 'won') boardElement.dataset.win = status.textContent
+        else delete boardElement.dataset.win
         const selectedFlagged = this.selected != null && board.flagged[this.selected]
         const selectedRevealed = this.selected != null && board.revealed[this.selected]
         const reveal = s.querySelector('.reveal')

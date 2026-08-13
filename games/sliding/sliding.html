@@ -43,7 +43,7 @@
             line-height: 1.35; text-align: center; background: var(--status-bg);
         }
         .board {
-            width: min(100%, 390px); aspect-ratio: 1; box-sizing: border-box;
+            position: relative; width: min(100%, 390px); aspect-ratio: 1; box-sizing: border-box;
             margin: 0 auto; padding: clamp(8px, 2.6vw, 12px);
             overflow: hidden; border: 1px solid var(--border-strong);
             border-radius: var(--radius-md); background: var(--bg-elevated);
@@ -54,6 +54,14 @@
             box-shadow: 0 0 0 3px var(--focus), inset 0 1px 4px color-mix(in srgb, var(--ink) 12%, transparent);
         }
         .board.solved { border-color: color-mix(in srgb, var(--accent) 68%, var(--border-strong)); }
+        .board[data-win]::after {
+            position: absolute; z-index: 4; right: 5%; bottom: 5%; max-width: 70%; padding: 8px 11px;
+            border: 1px solid color-mix(in srgb, var(--accent) 68%, var(--border-strong));
+            border-radius: var(--radius-xs); content: attr(data-win); color: var(--accent-ink);
+            background: color-mix(in srgb, var(--accent) 92%, transparent); box-shadow: var(--shadow);
+            font-size: clamp(.7rem, 3.2vw, .88rem); font-weight: 800; line-height: 1.25; text-align: center;
+            pointer-events: none;
+        }
         .well { position: relative; width: 100%; height: 100%; }
         .slot, .tile {
             position: absolute; box-sizing: border-box; border-radius: clamp(6px, 2vw, 9px);
@@ -472,7 +480,7 @@ customElements.define('sliding-puzzle', class extends HTMLElement {
         s.querySelector('.move-count').textContent = String(this.state.history.length)
         s.querySelector('.undo').disabled = this.state.history.length === 0
         this.renderTimer()
-        s.querySelector('.status').textContent = this.state.outcome
+        const statusText = this.state.outcome
             ? this.format(this.i18n.t(this.state.history.length === 1
                 ? 'slidingSolvedOne'
                 : 'slidingSolved'), {
@@ -480,7 +488,11 @@ customElements.define('sliding-puzzle', class extends HTMLElement {
                 time: this.timeText(),
             })
             : this.i18n.t(this.notice === 'blocked' ? 'slidingBlocked' : 'slidingPrompt')
+        s.querySelector('.status').textContent = statusText
         this.renderBoard()
+        const board = s.querySelector('.board')
+        if (this.state.outcome === 'solved') board.dataset.win = statusText
+        else delete board.dataset.win
     }
 })
 </script>

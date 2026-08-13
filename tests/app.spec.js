@@ -1833,6 +1833,96 @@ for (const viewport of [
     })
 }
 
+test('completed games show a board-level human win treatment only for wins', async ({page}) => {
+    test.setTimeout(60000)
+    const cases = [
+        ['xiangqi', 'xiangqi-game', game => ({winner: game.state.humanSide})],
+        ['wuziqi', 'wuziqi-game', game => ({winner: game.engine.BLACK})],
+        ['go', 'go-game', game => ({winner: game.engine.BLACK})],
+        ['sudoku', 'sudoku-game', () => ({reason: 'solved'})],
+        ['junqi', 'junqi-game', game => ({winner: game.engine.RED})],
+        ['doushouqi', 'doushouqi-game', game => ({winner: game.engine.RED})],
+        ['chess', 'chess-game', game => ({winner: game.engine.WHITE})],
+        ['reversi', 'reversi-game', game => ({winner: game.engine.BLACK})],
+        ['checkers', 'checkers-game', game => ({winner: game.engine.BLACK})],
+    ]
+    for (const [name, selector, outcome] of cases) {
+        await page.goto(`/${name}.html`)
+        const result = await page.locator(selector).evaluate((game, source) => {
+            const value = Function('game', `return (${source})(game)`)(game)
+            if (game.position?.outcome) game.position.outcome = {ended: true, ...value}
+            else game.state.outcome = {ended: true, ...value}
+            game.render()
+            const board = game.shadowRoot.querySelector('.board')
+            const win = board.dataset.win
+            if (game.position?.outcome) game.position.outcome = {ended: true, winner: null}
+            else game.state.outcome = {ended: true, winner: null}
+            game.render()
+            return {win, drawHasWin: board.hasAttribute('data-win')}
+        }, outcome.toString())
+        expect(result.win, name).toBeTruthy()
+        expect(result.drawHasWin, name).toBe(false)
+    }
+
+    for (const [name, selector, won, lost, target] of [
+        ['sliding', 'sliding-puzzle', 'solved', null, '.board'],
+        ['nonogram', 'nonogram-game', 'won', null, '.puzzle'],
+        ['minesweeper', 'minesweeper-game', 'won', 'lost', '.board'],
+    ]) {
+        await page.goto(`/${name}.html`)
+        const result = await page.locator(selector).evaluate((game, values) => {
+            game.state.outcome = values.won
+            if (game.state.board?.outcome !== undefined) game.state.board.outcome = values.won
+            game.render()
+            const surface = game.shadowRoot.querySelector(values.target)
+            const win = surface.dataset.win
+            game.state.outcome = values.lost
+            if (game.state.board?.outcome !== undefined) game.state.board.outcome = values.lost
+            game.render()
+            return {win, lossHasWin: surface.hasAttribute('data-win')}
+        }, {won, lost, target})
+        expect(result.win, name).toBeTruthy()
+        expect(result.lossHasWin, name).toBe(false)
+    }
+
+    await page.goto('/2048.html')
+    const milestone = await page.locator('game-2048').evaluate(game => {
+        game.state.reached2048 = true
+        game.state.outcome = null
+        game.render()
+        const board = game.shadowRoot.querySelector('.board')
+        const win = board.dataset.win
+        game.state.outcome = 'over'
+        game.render()
+        return {win, gameOverHasWin: board.hasAttribute('data-win')}
+    })
+    expect(milestone.win).toBeTruthy()
+    expect(milestone.gameOverHasWin).toBe(false)
+
+    await page.goto('/backgammon.html')
+    const backgammon = await page.locator('backgammon-game').evaluate(game => {
+        const board = game.shadowRoot.querySelector('.board')
+        game.state.roundOutcome = {winner: game.engine.HUMAN, kind: 'regular', multiplier: 1, points: 1, dropped: false, cube: 1}
+        game.state.phase = 'game-over'
+        game.state.outcome = null
+        game.render()
+        const gameWin = {text: board.dataset.win, match: board.classList.contains('match-win')}
+        game.state.phase = 'match-over'
+        game.state.outcome = {winner: game.engine.HUMAN, reason: 'match'}
+        game.render()
+        const matchWin = {text: board.dataset.win, match: board.classList.contains('match-win')}
+        game.state.roundOutcome.winner = game.engine.AI
+        game.state.outcome.winner = game.engine.AI
+        game.render()
+        return {gameWin, matchWin, lossHasWin: board.hasAttribute('data-win')}
+    })
+    expect(backgammon.gameWin.text).toBeTruthy()
+    expect(backgammon.gameWin.match).toBe(false)
+    expect(backgammon.matchWin.text).toBeTruthy()
+    expect(backgammon.matchWin.match).toBe(true)
+    expect(backgammon.lossHasWin).toBe(false)
+})
+
 test('the installed app reloads and navigates completely offline', async ({browser}) => {
     const context = await browser.newContext({locale: 'en-US', viewport: {width: 390, height: 844}, serviceWorkers: 'allow'})
     const page = await context.newPage()
