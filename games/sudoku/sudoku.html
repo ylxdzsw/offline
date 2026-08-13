@@ -176,7 +176,8 @@ customElements.define('sudoku-game', class extends HTMLElement {
         shadow.querySelector('.new').addEventListener('click', () => this.newGame())
         shadow.querySelector('.difficulty').addEventListener('change', event => this.newGame(event.target.value, true))
         this.addEventListener('keydown', event => {
-            if (/^[1-9]$/.test(event.key)) this.enter(Number(event.key), event.shiftKey)
+            const digit = event.code?.match(/^Digit([1-9])$/)?.[1]
+            if (digit) this.enter(Number(digit), event.shiftKey)
             else if (event.key === 'Backspace' || event.key === 'Delete') this.enter(0)
         })
     }
