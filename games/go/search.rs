@@ -165,14 +165,6 @@ pub fn search<F: FnMut() -> bool>(
             nodes: 1,
         };
     }
-    if let Some(index) = safe_capture(&root_board, &root_candidates) {
-        return SearchResult {
-            selected: Some(index),
-            simulations: 0,
-            nodes: 1,
-        };
-    }
-
     let played = position
         .records
         .iter()
@@ -223,21 +215,6 @@ pub fn search<F: FnMut() -> bool>(
         simulations,
         nodes: nodes.len() as u32,
     }
-}
-
-fn safe_capture(board: &FastBoard, candidates: &[Candidate]) -> Option<u16> {
-    candidates
-        .iter()
-        .filter_map(|candidate| {
-            let info = board.probe(candidate.index)?;
-            (info.captured > 0 && info.liberties > 1).then_some((
-                candidate.index,
-                info.captured,
-                info.liberties,
-            ))
-        })
-        .max_by_key(|(index, captured, liberties)| (*captured, *liberties, u16::MAX - *index))
-        .map(|(index, _, _)| index)
 }
 
 fn run_simulation<F: FnMut() -> bool>(
@@ -492,7 +469,24 @@ fn move_prior(board: &FastBoard, index: u16, info: MoveInfo) -> f32 {
         + opponent * 6.0
         + friendly * 2.0
         + edge.min(3.0) * 2.0
+        + opening_shape_prior(board, index, info, edge)
         - if self_atari { 60.0 } else { 0.0 }
+}
+
+fn opening_shape_prior(board: &FastBoard, index: u16, info: MoveInfo, edge: f32) -> f32 {
+    if board.state.moves >= board.size as u16
+        || info.captured > 0
+        || board.saves_atari(index)
+        || board.has_nearby_stone(index, 2)
+    {
+        return 0.0;
+    }
+    match edge as u8 {
+        0 => -120.0,
+        1 => -60.0,
+        2 | 3 => 24.0,
+        _ => 8.0,
+    }
 }
 
 fn playout<F: FnMut() -> bool>(
@@ -700,6 +694,33 @@ impl FastBoard {
 
     fn neighbors(&self, index: u16) -> [Option<u16>; 4] {
         neighbors(self.size, index)
+    }
+
+    fn saves_atari(&self, index: u16) -> bool {
+        self.neighbors(index)
+            .into_iter()
+            .flatten()
+            .any(|neighbor| self.cell(neighbor) == self.turn() && self.group(neighbor).1 == [index])
+    }
+
+    fn has_nearby_stone(&self, index: u16, radius: i16) -> bool {
+        let row = index as i16 / self.size as i16;
+        let column = index as i16 % self.size as i16;
+        for row_delta in -radius..=radius {
+            for column_delta in -radius..=radius {
+                let next_row = row + row_delta;
+                let next_column = column + column_delta;
+                if next_row >= 0
+                    && next_column >= 0
+                    && next_row < self.size as i16
+                    && next_column < self.size as i16
+                    && self.cell(next_row as u16 * self.size as u16 + next_column as u16) != EMPTY
+                {
+                    return true;
+                }
+            }
+        }
+        false
     }
 
     fn is_true_eye(&self, index: u16, side: u8) -> bool {
@@ -1047,7 +1068,7 @@ mod tests {
     }
 
     #[test]
-    fn search_takes_an_immediate_capture() {
+    fn search_prioritizes_an_immediate_capture_without_bypassing_search() {
         let size = 9;
         let records = [
             Record::Play(at(1, 1, size)),
@@ -1059,6 +1080,13 @@ mod tests {
             Record::Play(at(7, 8, size)),
         ];
         let position = Position::from_records(size as u8, &records).unwrap();
+        let board = FastBoard::from_position(&position);
+        let capture = at(2, 1, size);
+        let capture_info = board.probe(capture).unwrap();
+        let quiet = at(3, 5, size);
+        let quiet_info = board.probe(quiet).unwrap();
+        assert!(move_prior(&board, capture, capture_info) > move_prior(&board, quiet, quiet_info));
+
         let result = search(
             &position,
             SearchConfig {
@@ -1069,7 +1097,110 @@ mod tests {
             19,
             || false,
         );
-        assert_eq!(result.selected, Some(at(2, 1, size)));
+        assert!(position.legal_moves().contains(&result.selected.unwrap()));
+        assert!(result.simulations > 0);
+    }
+
+    #[test]
+    fn early_search_avoids_distant_first_and_second_line_moves() {
+        for size in [13, 19] {
+            let records = [
+                Record::Play(at(size / 2, size / 2, size)),
+                Record::Play(at(3, 3, size)),
+                Record::Play(at(size - 4, size - 4, size)),
+            ];
+            let position = Position::from_records(size as u8, &records).unwrap();
+            let result = search(
+                &position,
+                SearchConfig {
+                    budget_ms: 10.0,
+                    simulation_limit: 64,
+                    widening: 1.5,
+                },
+                43,
+                || false,
+            );
+            let index = result.selected.unwrap();
+            let row = index / size;
+            let column = index % size;
+            let edge = row.min(column).min(size - 1 - row).min(size - 1 - column);
+            assert!(edge >= 2, "{size}x{size} selected ({row}, {column})");
+        }
+    }
+
+    #[test]
+    fn opening_shape_bias_preserves_tactical_and_local_edge_moves() {
+        let open = diagram(
+            &[
+                ".........",
+                ".........",
+                "B........",
+                ".........",
+                ".........",
+                ".........",
+                ".........",
+                ".........",
+                ".........",
+            ],
+            BLACK,
+            3,
+        );
+        let distant_edge = at(0, 8, 9);
+        let third_line = at(2, 5, 9);
+        let local_edge = at(0, 0, 9);
+        assert!(
+            opening_shape_prior(&open, distant_edge, open.probe(distant_edge).unwrap(), 0.0) < 0.0
+        );
+        assert!(opening_shape_prior(&open, third_line, open.probe(third_line).unwrap(), 2.0) > 0.0);
+        assert_eq!(
+            opening_shape_prior(&open, local_edge, open.probe(local_edge).unwrap(), 0.0),
+            0.0
+        );
+
+        let capture = diagram(
+            &[
+                "BW.......",
+                ".........",
+                ".........",
+                ".........",
+                ".........",
+                ".........",
+                ".........",
+                ".........",
+                ".........",
+            ],
+            WHITE,
+            3,
+        );
+        let edge_move = at(1, 0, 9);
+        let capture_info = capture.probe(edge_move).unwrap();
+        assert_eq!(capture_info.captured, 1);
+        assert_eq!(
+            opening_shape_prior(&capture, edge_move, capture_info, 0.0),
+            0.0
+        );
+
+        let defense = diagram(
+            &[
+                "BW.......",
+                ".........",
+                ".........",
+                ".........",
+                ".........",
+                ".........",
+                ".........",
+                ".........",
+                ".........",
+            ],
+            BLACK,
+            3,
+        );
+        let defense_info = defense.probe(edge_move).unwrap();
+        assert!(defense.saves_atari(edge_move));
+        assert_eq!(
+            opening_shape_prior(&defense, edge_move, defense_info, 0.0),
+            0.0
+        );
     }
 
     #[test]
