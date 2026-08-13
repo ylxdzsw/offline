@@ -324,6 +324,65 @@ test('Xiangqi plays an AI reply, persists, reloads, and undoes a full turn', asy
     expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:xiangqi')).history.length)).toBe(0)
 })
 
+test('Xiangqi lets the player choose Black and preserves the AI opening on undo', async ({page}) => {
+    await page.goto('/xiangqi.html')
+
+    await expect(page.locator('xiangqi-game .side-label')).toHaveText('Play as')
+    await page.locator('xiangqi-game .side').selectOption('b')
+    await expect(page.locator('xiangqi-game .status')).toHaveText('Your turn', {timeout: 6000})
+
+    expect(await page.evaluate(() => {
+        const game = document.querySelector('xiangqi-game')
+        return {
+            humanSide: game.state.humanSide,
+            turn: game.state.turn,
+            openingSide: game.state.history[0]?.side,
+            flipped: game.shadowRoot.querySelector('.board').classList.contains('flipped'),
+            blackKingTop: game.shadowRoot.querySelector('.spot[data-index="4"]').style.top,
+            undoDisabled: game.shadowRoot.querySelector('.undo').disabled,
+        }
+    })).toEqual({
+        humanSide: 'b',
+        turn: 'b',
+        openingSide: 'r',
+        flipped: true,
+        blackKingTop: '100%',
+        undoDisabled: true,
+    })
+
+    const move = await page.evaluate(() => {
+        const game = document.querySelector('xiangqi-game')
+        const candidate = game.engine.legalMoves(game.state.board, game.engine.BLACK)[0]
+        return {from: candidate.from, to: candidate.to}
+    })
+    await page.locator(`xiangqi-game .spot[data-index="${move.from}"]`).click()
+    await page.locator(`xiangqi-game .spot[data-index="${move.to}"]`).click()
+    await expect.poll(
+        () => page.evaluate(() => document.querySelector('xiangqi-game').state.history.length),
+        {timeout: 6000},
+    ).toBe(3)
+    await expect(page.locator('xiangqi-game .status')).toHaveText('Your turn')
+
+    expect(await page.evaluate(() => {
+        const saved = JSON.parse(localStorage.getItem('offline-games:v1:xiangqi'))
+        return {humanSide: saved.humanSide, historyLength: saved.history.length}
+    })).toEqual({humanSide: 'b', historyLength: 3})
+
+    await page.reload()
+    await expect(page.locator('xiangqi-game .side')).toHaveValue('b')
+    await expect(page.locator('xiangqi-game .board')).toHaveClass(/flipped/)
+    await expect(page.locator('xiangqi-game .status')).toHaveText('Your turn')
+    await page.locator('xiangqi-game .undo').click()
+    expect(await page.evaluate(() => {
+        const game = document.querySelector('xiangqi-game')
+        return {
+            history: game.state.history.map(entry => entry.side),
+            turn: game.state.turn,
+            undoDisabled: game.shadowRoot.querySelector('.undo').disabled,
+        }
+    })).toEqual({history: ['r'], turn: 'b', undoDisabled: true})
+})
+
 test('Xiangqi legal capture hints preserve piece shape', async ({page}) => {
     await page.goto('/xiangqi.html')
     const target = page.locator('xiangqi-game .spot[data-index="1"]')

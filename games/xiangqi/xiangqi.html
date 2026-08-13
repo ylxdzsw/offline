@@ -2,7 +2,7 @@
     <style>
         *, *::before, *::after { box-sizing: border-box; }
         :host { display: block; color: var(--ink); }
-        .toolbar { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: end; margin-bottom: 10px; }
+        .toolbar { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto; gap: 8px; align-items: end; margin-bottom: 10px; }
         label { display: grid; gap: 3px; color: var(--ink-muted); font-size: .7rem; font-weight: 600; letter-spacing: .02em; }
         select, .action {
             min-height: var(--control-h, 42px);
@@ -11,7 +11,7 @@
             color: var(--ink);
             background: var(--bg-surface);
         }
-        select { min-width: 96px; padding: 0 28px 0 10px; }
+        select { width: 100%; min-width: 0; padding: 0 28px 0 10px; }
         .action { padding: 0 12px; font-weight: 650; }
         .action:disabled { opacity: .42; }
         .status {
@@ -48,6 +48,7 @@
             font-family: var(--font-display); font-size: clamp(.7rem, 3vw, 1rem);
             letter-spacing: .18em; transform: translateY(-50%); pointer-events: none;
         }
+        .board.flipped .river { flex-direction: row-reverse; }
         .spot {
             position: absolute; display: grid;
             width: clamp(28px, 9.7vw, 44px); height: clamp(28px, 9.7vw, 44px);
@@ -82,10 +83,9 @@
         @media (prefers-reduced-motion: reduce) {
             .status.thinking::after, .spot.last-to .piece { animation: none; }
         }
-        @media (max-width: 340px) {
-            .toolbar { gap: 4px; }
-            .action { padding-inline: 8px; font-size: .82rem; }
-            select { min-width: 88px; }
+        @media (max-width: 420px) {
+            .toolbar { grid-template-columns: 1fr 1fr; gap: 6px; }
+            .action { width: 100%; }
         }
     </style>
     <div class="toolbar">
@@ -93,6 +93,10 @@
             <option value="easy"></option>
             <option value="medium"></option>
             <option value="hard"></option>
+        </select></label>
+        <label><span class="side-label"></span><select class="side">
+            <option value="r" data-i18n="red"></option>
+            <option value="b" data-i18n="black"></option>
         </select></label>
         <button class="action undo" type="button"></button>
         <button class="action new" type="button"></button>
@@ -134,14 +138,14 @@ OfflineGames.wasm.defineElement('xiangqi', 'xiangqi-game', class extends HTMLEle
         this.bind()
         this.localize()
         this.render()
-        if (this.state.turn === this.engine.BLACK && !this.state.outcome) this.requestAI()
+        if (this.state.turn === this.aiSide() && !this.state.outcome) this.requestAI()
     }
 
     disconnectedCallback() {
         this.cancelAI()
     }
 
-    fresh(difficulty = 'medium') {
+    fresh(difficulty = 'medium', humanSide = this.engine.RED) {
         const board = this.engine.initialBoard()
         return {
             schema: 1,
@@ -150,6 +154,7 @@ OfflineGames.wasm.defineElement('xiangqi', 'xiangqi-game', class extends HTMLEle
             board,
             turn: this.engine.RED,
             difficulty,
+            humanSide,
             history: [],
             keys: [this.engine.positionKey(board, this.engine.RED)],
             outcome: null,
@@ -160,13 +165,19 @@ OfflineGames.wasm.defineElement('xiangqi', 'xiangqi-game', class extends HTMLEle
         return saved && Array.isArray(saved.board) && saved.board.length === 90
             && [this.engine.RED, this.engine.BLACK].includes(saved.turn)
             && ['easy', 'medium', 'hard'].includes(saved.difficulty)
+            && (saved.humanSide == null || [this.engine.RED, this.engine.BLACK].includes(saved.humanSide))
             && Array.isArray(saved.history) && Array.isArray(saved.keys)
     }
 
     load() {
         const saved = this.storage.read('xiangqi')
         this.state = this.valid(saved) ? saved : this.fresh()
+        if (!this.state.humanSide) this.state.humanSide = this.engine.RED
         if (!Number.isInteger(this.state.seed)) this.state.seed = OfflineGames.runtime.randomSeed()
+    }
+
+    aiSide() {
+        return this.engine.other(this.state.humanSide)
     }
 
     bind() {
@@ -181,12 +192,14 @@ OfflineGames.wasm.defineElement('xiangqi', 'xiangqi-game', class extends HTMLEle
             this.state.difficulty = event.target.value
             this.save()
         })
+        shadow.querySelector('.side').addEventListener('change', event => this.changeSide(event.target.value))
     }
 
     localize() {
         const shadow = this.shadowRoot
         shadow.querySelector('.difficulty-label').textContent = this.i18n.t('difficulty')
-        for (const option of shadow.querySelectorAll('.difficulty option')) option.textContent = this.i18n.t(option.value)
+        shadow.querySelector('.side-label').textContent = this.i18n.t('playAs')
+        for (const option of shadow.querySelectorAll('option')) option.textContent = this.i18n.t(option.dataset.i18n || option.value)
         shadow.querySelector('.undo').textContent = this.i18n.t('undo')
         shadow.querySelector('.new').textContent = this.i18n.t('newGame')
         shadow.querySelector('.warning').textContent = this.i18n.t('storageWarning')
@@ -204,13 +217,14 @@ OfflineGames.wasm.defineElement('xiangqi', 'xiangqi-game', class extends HTMLEle
     }
 
     tap(index) {
-        if (this.thinking || this.state.outcome || this.state.turn !== this.engine.RED) return
+        const humanSide = this.state.humanSide
+        if (this.thinking || this.state.outcome || this.state.turn !== humanSide) return
         const piece = this.state.board[index]
         if (this.selected == null) {
-            if (this.engine.sideOf(piece) === this.engine.RED) this.select(index)
+            if (this.engine.sideOf(piece) === humanSide) this.select(index)
             return
         }
-        if (this.engine.sideOf(piece) === this.engine.RED) {
+        if (this.engine.sideOf(piece) === humanSide) {
             this.select(index)
             return
         }
@@ -221,13 +235,13 @@ OfflineGames.wasm.defineElement('xiangqi', 'xiangqi-game', class extends HTMLEle
             this.render()
             return
         }
-        this.commit(move, this.engine.RED)
+        this.commit(move, humanSide)
         if (!this.state.outcome) this.requestAI()
     }
 
     select(index) {
         this.selected = index
-        this.legal = this.engine.legalMoves(this.state.board, this.engine.RED).filter(move => move.from === index)
+        this.legal = this.engine.legalMoves(this.state.board, this.state.humanSide).filter(move => move.from === index)
         this.render()
     }
 
@@ -246,7 +260,8 @@ OfflineGames.wasm.defineElement('xiangqi', 'xiangqi-game', class extends HTMLEle
     }
 
     requestAI() {
-        if (this.state.outcome || this.state.turn !== this.engine.BLACK) return
+        const aiSide = this.aiSide()
+        if (this.state.outcome || this.state.turn !== aiSide) return
         this.cancelAI()
         this.thinking = true
         this.aiStartedAt = performance.now()
@@ -254,7 +269,7 @@ OfflineGames.wasm.defineElement('xiangqi', 'xiangqi-game', class extends HTMLEle
         this.worker = OfflineGames.runtime.createWorker('xiangqi-worker-payload')
         this.worker.onmessage = event => {
             if (event.data.id !== id || !this.thinking) return
-            const legal = this.engine.legalMoves(this.state.board, this.engine.BLACK)
+            const legal = this.engine.legalMoves(this.state.board, aiSide)
             const move = legal.find(candidate => candidate.from === event.data.move?.from && candidate.to === event.data.move?.to)
             if (this.worker) this.worker.terminate()
             this.worker = null
@@ -263,7 +278,7 @@ OfflineGames.wasm.defineElement('xiangqi', 'xiangqi-game', class extends HTMLEle
                 this.aiTimer = null
                 if (id !== this.requestId || !this.thinking) return
                 this.thinking = false
-                if (move) this.commit(move, this.engine.BLACK)
+                if (move) this.commit(move, aiSide)
                 else this.render()
             }, delay)
         }
@@ -272,7 +287,7 @@ OfflineGames.wasm.defineElement('xiangqi', 'xiangqi-game', class extends HTMLEle
             this.cancelAI(false)
             this.render()
         }
-        this.worker.postMessage({id, board: this.state.board, side: this.engine.BLACK, difficulty: this.state.difficulty, seed: OfflineGames.runtime.moveSeed(this.state.seed, this.state.history.length)})
+        this.worker.postMessage({id, board: this.state.board, side: aiSide, difficulty: this.state.difficulty, seed: OfflineGames.runtime.moveSeed(this.state.seed, this.state.history.length)})
         this.render()
     }
 
@@ -286,16 +301,15 @@ OfflineGames.wasm.defineElement('xiangqi', 'xiangqi-game', class extends HTMLEle
     }
 
     undo() {
-        if (!this.state.history.length) return
-        const wasThinking = this.thinking
+        const humanMove = this.state.history.findLastIndex(move => move.side === this.state.humanSide)
+        if (humanMove < 0) return
         this.cancelAI()
-        let count = wasThinking || this.state.history.at(-1).side === this.engine.RED ? 1 : 2
-        while (count-- > 0 && this.state.history.length) {
+        while (this.state.history.length > humanMove) {
             const move = this.state.history.pop()
             this.state.board = this.engine.undoMove(this.state.board, move)
             this.state.keys.pop()
         }
-        this.state.turn = this.engine.RED
+        this.state.turn = this.state.humanSide
         this.state.outcome = null
         this.selected = null
         this.legal = []
@@ -305,22 +319,35 @@ OfflineGames.wasm.defineElement('xiangqi', 'xiangqi-game', class extends HTMLEle
 
     newGame() {
         if (this.state.history.length && !confirm(this.i18n.t('confirmNew'))) return
-        const difficulty = this.state.difficulty
+        this.restart(this.state.humanSide)
+    }
+
+    changeSide(humanSide) {
+        if (![this.engine.RED, this.engine.BLACK].includes(humanSide) || humanSide === this.state.humanSide) return
+        if (this.state.history.length && !confirm(this.i18n.t('confirmNew'))) {
+            this.shadowRoot.querySelector('.side').value = this.state.humanSide
+            return
+        }
+        this.restart(humanSide)
+    }
+
+    restart(humanSide) {
         this.cancelAI()
-        this.state = this.fresh(difficulty)
+        this.state = this.fresh(this.state.difficulty, humanSide)
         this.selected = null
         this.legal = []
         this.save()
         this.render()
+        if (this.state.turn === this.aiSide()) this.requestAI()
     }
 
     statusText() {
         if (this.state.outcome) {
             if (!this.state.outcome.winner) return this.i18n.t('draw')
-            return this.i18n.t(this.state.outcome.winner === this.engine.RED ? 'youWin' : 'aiWins')
+            return this.i18n.t(this.state.outcome.winner === this.state.humanSide ? 'youWin' : 'aiWins')
         }
-        if (this.thinking || this.state.turn === this.engine.BLACK) return this.i18n.t('aiThinking')
-        return this.i18n.t(this.engine.isInCheck(this.state.board, this.engine.RED) ? 'check' : 'yourTurn')
+        if (this.thinking || this.state.turn === this.aiSide()) return this.i18n.t('aiThinking')
+        return this.i18n.t(this.engine.isInCheck(this.state.board, this.state.humanSide) ? 'check' : 'yourTurn')
     }
 
     pieceName(piece) {
@@ -332,11 +359,14 @@ OfflineGames.wasm.defineElement('xiangqi', 'xiangqi-game', class extends HTMLEle
     render() {
         const shadow = this.shadowRoot
         const last = this.state.history.at(-1)
+        const flipped = this.state.humanSide === this.engine.BLACK
         const legalTargets = new Map(this.legal.map(move => [move.to, Boolean(move.captured)]))
         const glyphs = {rK: '帥', rA: '仕', rE: '相', rH: '馬', rR: '車', rC: '炮', rP: '兵', bK: '將', bA: '士', bE: '象', bH: '馬', bR: '車', bC: '砲', bP: '卒'}
         shadow.querySelector('.spots').innerHTML = this.state.board.map((piece, index) => {
             const row = this.engine.rowOf(index)
             const column = this.engine.columnOf(index)
+            const displayRow = flipped ? 9 - row : row
+            const displayColumn = flipped ? 8 - column : column
             const classes = ['spot']
             if (this.selected === index) classes.push('selected')
             if (legalTargets.has(index)) classes.push(legalTargets.get(index) ? 'capture' : 'legal')
@@ -347,14 +377,17 @@ OfflineGames.wasm.defineElement('xiangqi', 'xiangqi-game', class extends HTMLEle
             if (legalTargets.has(index)) labels.push(this.i18n.t('legalMove'))
             if (last && (last.from === index || last.to === index)) labels.push(this.i18n.t('lastMove'))
             const token = piece ? `<span class="piece ${this.engine.sideOf(piece) === this.engine.RED ? 'red' : 'black'}">${glyphs[piece]}</span>` : ''
-            return `<button type="button" role="gridcell" class="${classes.join(' ')}" data-index="${index}" aria-label="${labels.join(', ')}" style="left:${column / 8 * 100}%;top:${row / 9 * 100}%">${token}</button>`
+            return `<button type="button" role="gridcell" class="${classes.join(' ')}" data-index="${index}" aria-label="${labels.join(', ')}" style="left:${displayColumn / 8 * 100}%;top:${displayRow / 9 * 100}%">${token}</button>`
         }).join('')
         const status = shadow.querySelector('.status')
         status.textContent = this.statusText()
         status.classList.toggle('thinking', this.thinking)
-        shadow.querySelector('.board').setAttribute('aria-disabled', String(this.thinking || Boolean(this.state.outcome)))
+        const board = shadow.querySelector('.board')
+        board.classList.toggle('flipped', flipped)
+        board.setAttribute('aria-disabled', String(this.thinking || this.state.turn !== this.state.humanSide || Boolean(this.state.outcome)))
         shadow.querySelector('.difficulty').value = this.state.difficulty
-        shadow.querySelector('.undo').disabled = !this.state.history.length
+        shadow.querySelector('.side').value = this.state.humanSide
+        shadow.querySelector('.undo').disabled = !this.state.history.some(move => move.side === this.state.humanSide)
     }
 })
 </script>

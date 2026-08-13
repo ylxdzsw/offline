@@ -60,6 +60,7 @@
             newGame: 'New game',
             undo: 'Undo',
             difficulty: 'Difficulty',
+            playAs: 'Play as',
             easy: 'Easy',
             medium: 'Medium',
             hard: 'Hard',
@@ -435,6 +436,7 @@
             newGame: '新局',
             undo: '悔棋',
             difficulty: '难度',
+            playAs: '执子',
             easy: '简单',
             medium: '中等',
             hard: '困难',
@@ -757,9 +759,9 @@
     const guides = {
         en: {
             xiangqi: {
-                intro: 'You play Red and move first against the on-device opponent.',
+                intro: 'Choose Red to move first or Black to reply after the on-device opponent opens.',
                 rules: [
-                    'Tap a red piece, then a highlighted destination. Checkmate the opposing general, or leave it with no legal move, to win.',
+                    'Tap one of your pieces, then a highlighted destination. Checkmate the opposing general, or leave it with no legal move, to win.',
                     'The general and advisors stay in the palace. Elephants stay on their side of the river; soldiers can also move sideways after crossing it.',
                     'Chariots move along clear lines. A horse can be blocked at its first step, while a cannon needs exactly one piece between it and a capture.',
                 ],
@@ -980,9 +982,9 @@
         },
         zh: {
             xiangqi: {
-                intro: '你执红先行，与本地电脑对弈。',
+                intro: '可选择执红先行，或执黑等待本地电脑先走。',
                 rules: [
-                    '点选红方棋子，再点可走的位置。将死对方将帅，或使对方无子可走即获胜。',
+                    '点选己方棋子，再点可走的位置。将死对方将帅，或使对方无子可走即获胜。',
                     '将帅和士只能在九宫内活动，象不能过河，兵卒过河后可左右移动。',
                     '车走直线；马腿被挡时不能走；炮吃子时中间必须恰好隔一枚棋子。',
                 ],
@@ -1236,7 +1238,8 @@
                     {
                         title: 'Playing this version',
                         items: [
-                            'Tap one of your red pieces, then a green legal destination. Selecting another red piece changes your choice; blue outlines mark the preceding move.',
+                            'Choose Red to move first or Black to play second. The board turns so your pieces stay nearest you.',
+                            'Tap one of your pieces, then a green legal destination. Selecting another of your pieces changes your choice; blue outlines mark the preceding move.',
                             'Easy, Medium, and Hard change the on-device opponent. Progress is saved on this device and works without a connection.',
                             'Undo normally removes both your move and the opponent’s reply. If the opponent is still thinking, it removes only your unanswered move.',
                         ],
@@ -1777,7 +1780,8 @@
                     {
                         title: '本游戏的操作',
                         items: [
-                            '先点选红方棋子，再点绿色合法位置；改点另一枚红子即可换子。蓝色圈标出上一步。',
+                            '可选择执红先行或执黑后行；棋盘会自动转向，使己方棋子靠近你。',
+                            '先点选己方棋子，再点绿色合法位置；改点另一枚己方棋子即可换子。蓝色圈标出上一步。',
                             '简单、中等、困难会改变本地电脑对手的强度；进度保存在本机，无网络也可继续。',
                             '通常“悔棋”会撤销你的一步和电脑的回应；若电脑仍在思考，则只撤销你尚未得到回应的一步。',
                         ],
