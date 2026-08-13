@@ -166,7 +166,7 @@ fn dispatch(request: Value) -> DispatchResult {
                 .get("seed")
                 .and_then(Value::as_u64)
                 .unwrap_or(0x0047_4f42_414e);
-            let config = search::config(difficulty);
+            let config = search::config(difficulty, position.size);
             let deadline = clock_ms() + config.budget_ms;
             let result = search::search(&position, config, seed, || clock_ms() >= deadline);
             Ok(json!({

@@ -44,6 +44,7 @@ struct BoardState {
     turn: u8,
     ko: Option<u16>,
     passes: u8,
+    moves: u16,
     hash: u64,
     last_move: Option<u16>,
 }
@@ -60,6 +61,11 @@ struct MoveInfo {
     captured: u16,
     liberties: u16,
     stones: u16,
+}
+
+struct EndgameMap {
+    owners: [u8; MAX_AREA],
+    urgent: [bool; MAX_AREA],
 }
 
 #[derive(Clone, Copy)]
@@ -113,22 +119,27 @@ impl Node {
     }
 }
 
-pub const fn config(difficulty: &str) -> SearchConfig {
+pub const fn config(difficulty: &str, size: u8) -> SearchConfig {
+    let size_scale = match size {
+        19 => 2.0,
+        13 => 1.4,
+        _ => 1.0,
+    };
     match difficulty.as_bytes() {
         b"easy" => SearchConfig {
-            budget_ms: 70.0,
+            budget_ms: 70.0 * size_scale,
             simulation_limit: 1_000,
             widening: 1.25,
         },
         b"hard" => SearchConfig {
-            budget_ms: 720.0,
+            budget_ms: 760.0 * size_scale,
             simulation_limit: 20_000,
-            widening: 2.0,
+            widening: 1.75,
         },
         _ => SearchConfig {
-            budget_ms: 260.0,
+            budget_ms: 260.0 * size_scale,
             simulation_limit: 6_000,
-            widening: 1.6,
+            widening: 1.5,
         },
     }
 }
@@ -236,6 +247,9 @@ fn run_simulation<F: FnMut() -> bool>(
     let mut played_moves = Vec::with_capacity(board.area());
 
     loop {
+        if board.state.passes >= 2 {
+            break;
+        }
         let node_index = *path.last().unwrap();
         if !nodes[node_index].initialized {
             nodes[node_index].unexpanded = candidates(&board, rng);
@@ -278,14 +292,15 @@ fn run_simulation<F: FnMut() -> bool>(
     let tree_moves = played_moves.len();
     playout(&mut board, rng, stopped, &mut played_moves);
     let (black, white) = board.area_score();
-    let winner = if black > white {
-        BLACK
-    } else if white > black {
-        WHITE
-    } else {
-        EMPTY
-    };
-    backpropagate(nodes, &path, &played_moves, tree_moves, winner);
+    backpropagate(
+        nodes,
+        &path,
+        &played_moves,
+        tree_moves,
+        black,
+        white,
+        board.area(),
+    );
 }
 
 fn select_child(parent_index: usize, nodes: &[Node]) -> Option<usize> {
@@ -324,7 +339,9 @@ fn backpropagate(
     path: &[usize],
     played: &[(u8, u16)],
     tree_moves: usize,
-    winner: u8,
+    black_score: f32,
+    white_score: f32,
+    area: usize,
 ) {
     let mut black_moves = [false; MAX_AREA];
     let mut white_moves = [false; MAX_AREA];
@@ -341,7 +358,7 @@ fn backpropagate(
     for depth in (0..path.len()).rev() {
         let node_index = path[depth];
         let side = nodes[node_index].side;
-        let value = result_for(winner, side);
+        let value = result_for(black_score, white_score, side, area);
         nodes[node_index].visits += 1;
         nodes[node_index].value_sum += value;
         let amaf = if side == BLACK {
@@ -372,18 +389,24 @@ fn backpropagate(
     }
 }
 
-fn result_for(winner: u8, side: u8) -> f32 {
-    if winner == EMPTY {
-        0.5
-    } else if winner == side {
-        1.0
+fn result_for(black_score: f32, white_score: f32, side: u8, area: usize) -> f32 {
+    let difference = if side == BLACK {
+        black_score - white_score
     } else {
-        0.0
+        white_score - black_score
+    };
+    if difference == 0.0 {
+        0.5
+    } else if difference > 0.0 {
+        0.95 + 0.05 * (difference / area as f32).min(1.0)
+    } else {
+        0.05 - 0.05 * (-difference / area as f32).min(1.0)
     }
 }
 
 fn candidates(board: &FastBoard, rng: &mut SplitMix64) -> Vec<Candidate> {
     let mut moves = Vec::with_capacity(board.area());
+    let settled = board.settled_territory();
     for index in 0..board.area() as u16 {
         if board.cell(index) != EMPTY {
             continue;
@@ -394,15 +417,18 @@ fn candidates(board: &FastBoard, rng: &mut SplitMix64) -> Vec<Candidate> {
         if board.is_true_eye(index, board.turn()) && info.captured == 0 {
             continue;
         }
+        if !board.is_meaningful_endgame_move(index, info, settled.as_ref()) {
+            continue;
+        }
         moves.push(Candidate {
             index,
             prior: move_prior(board, index, info) + rng.unit() * 0.001,
         });
     }
-    if board.should_offer_pass() || moves.is_empty() {
+    if moves.is_empty() {
         moves.push(Candidate {
             index: PASS,
-            prior: if moves.is_empty() { 1_000.0 } else { -8.0 },
+            prior: 1_000.0,
         });
     }
     moves.sort_by(|left, right| {
@@ -483,6 +509,7 @@ fn playout<F: FnMut() -> bool>(
 }
 
 fn playout_move(board: &FastBoard, rng: &mut SplitMix64) -> Option<u16> {
+    let settled = board.settled_territory();
     let mut tactical = tactical_moves(board);
     tactical.sort_by(|left, right| {
         left.1
@@ -493,7 +520,7 @@ fn playout_move(board: &FastBoard, rng: &mut SplitMix64) -> Option<u16> {
         let window = tactical.len().min(3);
         let selected = tactical.len() - 1 - rng.index(window);
         let (index, _) = tactical.swap_remove(selected);
-        if sensible_probe(board, index).is_some() {
+        if sensible_probe(board, index, settled.as_ref()).is_some() {
             return Some(index);
         }
     }
@@ -520,7 +547,7 @@ fn playout_move(board: &FastBoard, rng: &mut SplitMix64) -> Option<u16> {
         }
         while !local.is_empty() {
             let index = local.swap_remove(rng.index(local.len()));
-            if sensible_probe(board, index).is_some() && rng.unit() < 0.72 {
+            if sensible_probe(board, index, settled.as_ref()).is_some() && rng.unit() < 0.72 {
                 return Some(index);
             }
         }
@@ -529,21 +556,21 @@ fn playout_move(board: &FastBoard, rng: &mut SplitMix64) -> Option<u16> {
     let area = board.area();
     for _ in 0..area.min(32) {
         let index = rng.index(area) as u16;
-        if sensible_probe(board, index).is_some() {
+        if sensible_probe(board, index, settled.as_ref()).is_some() {
             return Some(index);
         }
     }
     let start = rng.index(area);
     for offset in 0..area {
         let index = ((start + offset) % area) as u16;
-        if sensible_probe(board, index).is_some() {
+        if sensible_probe(board, index, settled.as_ref()).is_some() {
             return Some(index);
         }
     }
     None
 }
 
-fn sensible_probe(board: &FastBoard, index: u16) -> Option<MoveInfo> {
+fn sensible_probe(board: &FastBoard, index: u16, settled: Option<&EndgameMap>) -> Option<MoveInfo> {
     if board.cell(index) != EMPTY {
         return None;
     }
@@ -552,6 +579,9 @@ fn sensible_probe(board: &FastBoard, index: u16) -> Option<MoveInfo> {
         return None;
     }
     if info.liberties == 1 && info.captured == 0 && info.stones <= 2 {
+        return None;
+    }
+    if !board.is_meaningful_endgame_move(index, info, settled) {
         return None;
     }
     Some(info)
@@ -596,6 +626,7 @@ impl FastBoard {
                 turn: BLACK,
                 ko: None,
                 passes: 0,
+                moves: 0,
                 hash: 0,
                 last_move: None,
             },
@@ -643,6 +674,7 @@ impl FastBoard {
         self.state.turn = other(self.state.turn);
         self.state.ko = None;
         self.state.passes = self.state.passes.saturating_add(1);
+        self.state.moves = self.state.moves.saturating_add(1);
         self.state.last_move = None;
     }
 
@@ -698,12 +730,83 @@ impl FastBoard {
         friendly_corners + off_board >= if off_board > 0 { 4 } else { 3 }
     }
 
-    fn should_offer_pass(&self) -> bool {
-        let occupied = self.state.cells[..self.area()]
-            .iter()
-            .filter(|cell| **cell != EMPTY)
-            .count();
-        self.state.passes > 0 || occupied * 5 >= self.area() * 4
+    fn settled_territory(&self) -> Option<EndgameMap> {
+        let played = self.state.moves as usize;
+        if played * 2 < self.area() && (self.state.passes == 0 || played * 3 < self.area()) {
+            return None;
+        }
+
+        let mut map = EndgameMap {
+            owners: [EMPTY; MAX_AREA],
+            urgent: [false; MAX_AREA],
+        };
+        let mut visited = [false; MAX_AREA];
+        for index in 0..self.area() as u16 {
+            if self.cell(index) != EMPTY || visited[index as usize] {
+                continue;
+            }
+            let mut region = vec![index];
+            let mut cursor = 0;
+            let mut border = 0_u8;
+            visited[index as usize] = true;
+            while cursor < region.len() {
+                let point = region[cursor];
+                cursor += 1;
+                for neighbor in self.neighbors(point).into_iter().flatten() {
+                    match self.cell(neighbor) {
+                        EMPTY if !visited[neighbor as usize] => {
+                            visited[neighbor as usize] = true;
+                            region.push(neighbor);
+                        }
+                        BLACK => border |= BLACK,
+                        WHITE => border |= WHITE,
+                        _ => {}
+                    }
+                }
+            }
+            if border == BLACK || border == WHITE {
+                for point in region {
+                    map.owners[point as usize] = border;
+                }
+            }
+        }
+
+        visited.fill(false);
+        for index in 0..self.area() as u16 {
+            if self.cell(index) == EMPTY || visited[index as usize] {
+                continue;
+            }
+            let (stones, liberties) = self.group(index);
+            for stone in stones {
+                visited[stone as usize] = true;
+            }
+            if liberties.len() <= 2 {
+                for liberty in liberties {
+                    map.urgent[liberty as usize] = true;
+                }
+            }
+        }
+        Some(map)
+    }
+
+    fn is_meaningful_endgame_move(
+        &self,
+        index: u16,
+        info: MoveInfo,
+        settled: Option<&EndgameMap>,
+    ) -> bool {
+        let Some(owners) = settled else {
+            return true;
+        };
+        if info.captured > 0 {
+            return true;
+        }
+        if info.liberties == 1
+            || owners.owners[index as usize] != EMPTY && !owners.urgent[index as usize]
+        {
+            return false;
+        }
+        true
     }
 
     fn area_score(&self) -> (f32, f32) {
@@ -789,6 +892,7 @@ fn apply_move(size: u8, state: &mut BoardState, history: &[u64], index: u16) -> 
     };
     state.turn = opponent;
     state.passes = 0;
+    state.moves = state.moves.saturating_add(1);
     state.last_move = Some(index);
     Some(MoveInfo {
         captured: captured.len() as u16,
@@ -859,6 +963,39 @@ mod tests {
         row * size + column
     }
 
+    fn diagram(rows: &[&str], turn: u8, moves: u16) -> FastBoard {
+        let size = rows.len() as u8;
+        let mut state = BoardState {
+            cells: [EMPTY; MAX_AREA],
+            turn,
+            ko: None,
+            passes: 0,
+            moves,
+            hash: 0,
+            last_move: None,
+        };
+        for (row, cells) in rows.iter().enumerate() {
+            for (column, cell) in cells.bytes().enumerate() {
+                let color = match cell {
+                    b'B' => BLACK,
+                    b'W' => WHITE,
+                    b'.' => EMPTY,
+                    _ => panic!("invalid board diagram"),
+                };
+                let index = row as u16 * size as u16 + column as u16;
+                state.cells[index as usize] = color;
+                if color != EMPTY {
+                    state.hash ^= stone_hash(index, color);
+                }
+            }
+        }
+        FastBoard {
+            state,
+            history: vec![state.hash],
+            size,
+        }
+    }
+
     #[test]
     fn fast_board_matches_rules_for_capture_and_suicide() {
         let records = [
@@ -879,7 +1016,7 @@ mod tests {
     #[test]
     fn opening_search_uses_a_standard_point() {
         let position = Position::from_records(13, &[]).unwrap();
-        let result = search(&position, config("medium"), 7, || false);
+        let result = search(&position, config("medium", 13), 7, || false);
         let standard = [42, 48, 84, 120, 126];
         assert!(standard.contains(&result.selected.unwrap()));
     }
@@ -928,6 +1065,59 @@ mod tests {
             || false,
         );
         assert_eq!(result.selected, Some(at(2, 1, size)));
+    }
+
+    #[test]
+    fn settled_enclosures_offer_only_pass() {
+        let board = diagram(
+            &[
+                "BBBBBBBBB",
+                "B...BBBBB",
+                "B...BBBBB",
+                "B...BBBBB",
+                "BBBBBBBBB",
+                "WWWWWWWWW",
+                "W...WWWWW",
+                "W...WWWWW",
+                "WWWWWWWWW",
+            ],
+            WHITE,
+            50,
+        );
+        let moves = candidates(&board, &mut SplitMix64(5));
+
+        assert_eq!(moves.len(), 1);
+        assert_eq!(moves[0].index, PASS);
+    }
+
+    #[test]
+    fn neutral_dame_is_filled_before_pass() {
+        let board = diagram(
+            &[
+                "BBBBBBBBB",
+                "B...BBBBB",
+                "B...BBBBB",
+                "BBBBBBBBB",
+                "BBBB.BBBB",
+                "WWWWWWWWW",
+                "W...WWWWW",
+                "W...WWWWW",
+                "WWWWWWWWW",
+            ],
+            BLACK,
+            50,
+        );
+        let moves = candidates(&board, &mut SplitMix64(7));
+
+        assert!(moves.iter().any(|candidate| candidate.index == at(4, 4, 9)));
+        assert!(moves.iter().all(|candidate| candidate.index != PASS));
+    }
+
+    #[test]
+    fn large_boards_receive_more_search_time() {
+        assert_eq!(config("hard", 9).budget_ms, 760.0);
+        assert_eq!(config("hard", 13).budget_ms, 1064.0);
+        assert_eq!(config("hard", 19).budget_ms, 1520.0);
     }
 
     #[test]
