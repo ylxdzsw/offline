@@ -5,7 +5,7 @@
     const limits = {
         easy: {time: 100, depth: 2, nodes: 1200, rootBand: 100},
         medium: {time: 500, depth: 4, nodes: 4500, rootBand: 40},
-        hard: {time: 1500, depth: 6, nodes: 13000, rootBand: 14},
+        hard: {time: 1500, depth: 6, nodes: 13000, rootBand: 0},
     }
     const now = () => typeof performance !== 'undefined' ? performance.now() : Date.now()
     const hash = (board, side) => {
