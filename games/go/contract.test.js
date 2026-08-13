@@ -8,6 +8,15 @@ const ai = globalThis.OfflineGames.GoAI
 const play = (moves, index) => [...moves, {kind: 'play', index}]
 const pass = moves => [...moves, {kind: 'pass'}]
 
+test('publishes the search budgets', () => {
+    assert.deepEqual(ai.limits, {
+        easy: {time: 280, simulations: 2000},
+        medium: {time: 1040, simulations: 12000},
+        hard: {time: 3040, simulations: 40000},
+        'very-hard': {time: 15200, simulations: 200000},
+    })
+})
+
 test('defaults to a 13x13 Chinese-rules game', () => {
     assert.equal(engine.DEFAULT_SIZE, 13)
     assert.deepEqual(engine.SIZES, [9, 13, 19])

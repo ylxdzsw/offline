@@ -127,18 +127,23 @@ pub const fn config(difficulty: &str, size: u8) -> SearchConfig {
     };
     match difficulty.as_bytes() {
         b"easy" => SearchConfig {
-            budget_ms: 70.0 * size_scale,
-            simulation_limit: 1_000,
+            budget_ms: 140.0 * size_scale,
+            simulation_limit: 2_000,
             widening: 1.25,
         },
         b"hard" => SearchConfig {
-            budget_ms: 760.0 * size_scale,
-            simulation_limit: 20_000,
+            budget_ms: 1_520.0 * size_scale,
+            simulation_limit: 40_000,
+            widening: 1.75,
+        },
+        b"very-hard" => SearchConfig {
+            budget_ms: 7_600.0 * size_scale,
+            simulation_limit: 200_000,
             widening: 1.75,
         },
         _ => SearchConfig {
-            budget_ms: 260.0 * size_scale,
-            simulation_limit: 6_000,
+            budget_ms: 520.0 * size_scale,
+            simulation_limit: 12_000,
             widening: 1.5,
         },
     }
@@ -1114,27 +1119,38 @@ mod tests {
     }
 
     #[test]
-    fn large_boards_receive_more_search_time() {
-        assert_eq!(config("hard", 9).budget_ms, 760.0);
-        assert_eq!(config("hard", 13).budget_ms, 1064.0);
-        assert_eq!(config("hard", 19).budget_ms, 1520.0);
+    fn search_budgets_scale_with_difficulty_and_board_size() {
+        assert_eq!(config("easy", 9).budget_ms, 140.0);
+        assert_eq!(config("medium", 13).budget_ms, 728.0);
+        assert_eq!(config("hard", 19).budget_ms, 3040.0);
+        assert_eq!(config("very-hard", 19).budget_ms, 15200.0);
+        assert_eq!(config("easy", 9).simulation_limit, 2_000);
+        assert_eq!(config("medium", 13).simulation_limit, 12_000);
+        assert_eq!(config("hard", 19).simulation_limit, 40_000);
+        assert_eq!(config("very-hard", 19).simulation_limit, 200_000);
     }
 
     #[test]
-    fn fast_board_replays_a_seeded_game_like_the_rules_engine() {
-        let mut rng = SplitMix64(0x7265_706c_6179);
-        let mut records = Vec::new();
-        for _ in 0..120 {
-            let position = Position::from_records(9, &records).unwrap();
-            let fast = FastBoard::from_position(&position);
-            assert_eq!(fast.state.cells[..fast.area()], position.board());
-            assert_eq!(fast.turn(), position.turn());
-            assert_eq!(fast.area_score(), position.score());
-            let legal = position.legal_moves();
-            if legal.is_empty() {
-                break;
+    fn fast_board_matches_the_rules_engine_across_seeded_games() {
+        for seed in [1, 7, 29, 101, 503, 4093, 0x7265_706c_6179] {
+            let mut rng = SplitMix64(seed);
+            let mut records = Vec::new();
+            for _ in 0..120 {
+                let position = Position::from_records(9, &records).unwrap();
+                let fast = FastBoard::from_position(&position);
+                assert_eq!(fast.state.cells[..fast.area()], position.board());
+                assert_eq!(fast.turn(), position.turn());
+                assert_eq!(fast.area_score(), position.score());
+                let legal = position.legal_moves();
+                let fast_legal: Vec<_> = (0..fast.area() as u16)
+                    .filter(|index| fast.probe(*index).is_some())
+                    .collect();
+                assert_eq!(fast_legal, legal);
+                if legal.is_empty() {
+                    break;
+                }
+                records.push(Record::Play(legal[rng.index(legal.len())]));
             }
-            records.push(Record::Play(legal[rng.index(legal.len())]));
         }
     }
 }

@@ -124,6 +124,7 @@
             <option value="easy"></option>
             <option value="medium"></option>
             <option value="hard"></option>
+            <option value="very-hard"></option>
         </select></label>
         <button class="new" type="button"></button>
     </div>
@@ -191,7 +192,7 @@ OfflineGames.wasm.defineElement('go', 'go-game', class extends HTMLElement {
 
     valid(saved) {
         return saved && this.engine.SIZES.includes(saved.size)
-            && ['easy', 'medium', 'hard'].includes(saved.difficulty)
+            && ['easy', 'medium', 'hard', 'very-hard'].includes(saved.difficulty)
             && Number.isInteger(saved.seed) && saved.seed >= 0 && saved.seed <= 0xffffffff
             && typeof saved.progress === 'boolean'
             && Array.isArray(saved.history)
