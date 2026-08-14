@@ -14,6 +14,7 @@ A mobile-first bilingual collection of classic board and puzzle games that remai
 - Five-point Backgammon with the doubling cube, Crawford rule, and expectiminimax AI
 - Huarong Dao with three layouts and optimal on-device path hints
 - Sliding Puzzle with solvable 3×3, classic 4×4, and 5×5 boards
+- A smooth, fully interactive 3D 3×3×3 Rubik's Cube
 - Minesweeper with confirmation-first mobile controls and irreversible reveals
 - Klondike Solitaire with draw-one and draw-three play
 - Spider Solitaire with one-, two-, and four-suit modes
@@ -95,3 +96,7 @@ copyright and license text are preserved in
 The Go rules engine includes the MIT-licensed `goban` crate. Its copyright and
 license text are preserved in
 [`games/go/THIRD_PARTY_LICENSE`](games/go/THIRD_PARTY_LICENSE).
+
+The Rubik's Cube renderer bundles the MIT-licensed Three.js library. Its
+copyright and license text are preserved in
+[`games/rubiks/THIRD_PARTY_LICENSE`](games/rubiks/THIRD_PARTY_LICENSE).

@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" role="img" aria-labelledby="title desc">
+  <title id="title">Rubik's Cube touch controls</title>
+  <desc id="desc">A three-dimensional three by three cube with arrows showing a layer turn, background drag to rotate the view, and pinch zoom.</desc>
+  <defs>
+    <filter id="shadow"><feDropShadow dx="0" dy="12" stdDeviation="12" flood-opacity=".2"/></filter>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0l10 5-10 5z" fill="#2d6357"/></marker>
+  </defs>
+  <rect width="960" height="540" rx="28" fill="#f5f4f2"/>
+  <g filter="url(#shadow)" stroke="#090a0c" stroke-width="6">
+    <g transform="matrix(1 .5 1 -.5 300 120)" fill="#f4f5f7">
+      <rect x="5" y="5" width="50" height="50" rx="7"/><rect x="65" y="5" width="50" height="50" rx="7"/><rect x="125" y="5" width="50" height="50" rx="7"/>
+      <rect x="5" y="65" width="50" height="50" rx="7"/><rect x="65" y="65" width="50" height="50" rx="7"/><rect x="125" y="65" width="50" height="50" rx="7"/>
+      <rect x="5" y="125" width="50" height="50" rx="7"/><rect x="65" y="125" width="50" height="50" rx="7"/><rect x="125" y="125" width="50" height="50" rx="7"/>
+    </g>
+    <g transform="matrix(1 .5 0 1 300 120)" fill="#00a651">
+      <rect x="5" y="5" width="50" height="60" rx="7"/><rect x="65" y="5" width="50" height="60" rx="7"/><rect x="125" y="5" width="50" height="60" rx="7"/>
+      <rect x="5" y="75" width="50" height="60" rx="7"/><rect x="65" y="75" width="50" height="60" rx="7"/><rect x="125" y="75" width="50" height="60" rx="7"/>
+      <rect x="5" y="145" width="50" height="60" rx="7"/><rect x="65" y="145" width="50" height="60" rx="7"/><rect x="125" y="145" width="50" height="60" rx="7"/>
+    </g>
+    <g transform="matrix(-1 .5 0 1 660 120)" fill="#c41e3a">
+      <rect x="5" y="5" width="50" height="60" rx="7"/><rect x="65" y="5" width="50" height="60" rx="7"/><rect x="125" y="5" width="50" height="60" rx="7"/>
+      <rect x="5" y="75" width="50" height="60" rx="7"/><rect x="65" y="75" width="50" height="60" rx="7"/><rect x="125" y="75" width="50" height="60" rx="7"/>
+      <rect x="5" y="145" width="50" height="60" rx="7"/><rect x="65" y="145" width="50" height="60" rx="7"/><rect x="125" y="145" width="50" height="60" rx="7"/>
+    </g>
+  </g>
+  <g fill="none" stroke="#2d6357" stroke-width="10" stroke-linecap="round" marker-end="url(#arrow)">
+    <path d="M345 257c35-38 84-42 127-16"/>
+    <path d="M720 360c58-47 66-127 22-183"/>
+  </g>
+  <g font-family="system-ui,sans-serif" fill="#19191a" font-weight="700">
+    <text x="104" y="205" font-size="30">DRAG A STICKER</text>
+    <text x="104" y="240" fill="#6b6968" font-size="22" font-weight="500">Turn one layer</text>
+    <text x="690" y="420" font-size="30" text-anchor="middle">DRAG OUTSIDE</text>
+    <text x="690" y="455" fill="#6b6968" font-size="22" font-weight="500" text-anchor="middle">Rotate the view</text>
+    <text x="480" y="500" fill="#6b6968" font-size="22" font-weight="500" text-anchor="middle">Pinch or use the wheel to zoom</text>
+  </g>
+  <circle cx="337" cy="267" r="17" fill="#ffffff" stroke="#2d6357" stroke-width="6"/>
+</svg>

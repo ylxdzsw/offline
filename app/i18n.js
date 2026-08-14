@@ -34,6 +34,7 @@
             backgammon: 'Backgammon',
             huarong: 'Huarong Dao',
             sliding: 'Sliding Puzzle',
+            rubiks: 'Rubik\'s Cube',
             nonogram: 'Nonogram',
             minesweeper: 'Minesweeper',
             solitaire: 'Solitaire',
@@ -51,6 +52,7 @@
             backgammonDesc: 'Race, hit, double, and bear off through a complete five-point match.',
             huarongDesc: 'Slide Cao Cao through the gate in the classic Three Kingdoms puzzle.',
             slidingDesc: 'Order numbered tiles across 3×3, classic 4×4, or 5×5 boards.',
+            rubiksDesc: 'Turn, scramble, and solve a smooth interactive 3D 3×3×3 cube.',
             nonogramDesc: 'Use number clues to uncover a hidden picture on a compact logic grid.',
             minesweeperDesc: 'Clear a hidden minefield with careful reveals, flags, and deduction.',
             solitaireDesc: 'Deal the classic Klondike patience game with draw-one or draw-three rules.',
@@ -300,6 +302,16 @@
             slidingTileLabel: 'tile {tile}, row {row}, column {column}',
             slidingMovableTileLabel: 'tile {tile}, row {row}, column {column}, can move',
             slidingEmptyLabel: 'empty space, row {row}, column {column}',
+            rubiksScramble: 'Scramble',
+            rubiksReset: 'Reset',
+            rubiksMoves: 'Moves',
+            rubiksCube: 'Interactive 3D Rubik\'s Cube',
+            rubiksPrompt: 'Drag a sticker to turn a layer',
+            rubiksScrambling: 'Scrambling the cube…',
+            rubiksSolved: 'Cube solved in {moves} moves · {time}',
+            rubiksConfirmReset: 'Reset the cube to its solved state and discard this game?',
+            rubiksResetDone: 'Cube reset to the solved state',
+            rubiksWebglError: '3D graphics are unavailable in this browser.',
             nonogramMode: 'Mark',
             nonogramFill: 'Fill',
             nonogramCross: 'Cross',
@@ -411,6 +423,7 @@
             backgammon: '西洋双陆棋',
             huarong: '华容道',
             sliding: '数字华容道',
+            rubiks: '三阶魔方',
             nonogram: '数织',
             minesweeper: '扫雷',
             solitaire: '纸牌',
@@ -428,6 +441,7 @@
             backgammonDesc: '掷骰、击子、加倍并收棋，完成一场五分制比赛。',
             huarongDesc: '移动三国人物方块，帮助曹操从底部出口脱困。',
             slidingDesc: '在 3×3、经典 4×4 或 5×5 棋盘上依次排好数字方块。',
+            rubiksDesc: '在流畅的 3D 三阶魔方上转层、打乱并完成六面还原。',
             nonogramDesc: '根据行列数字线索，在方格中推理出隐藏图案。',
             minesweeperDesc: '谨慎揭开格子、标记地雷，在隐藏雷区中推理出安全路线。',
             solitaireDesc: '经典七列接龙纸牌，可选择翻一张或翻三张。',
@@ -677,6 +691,16 @@
             slidingTileLabel: '数字 {tile}，第 {row} 行，第 {column} 列',
             slidingMovableTileLabel: '数字 {tile}，第 {row} 行，第 {column} 列，可以移动',
             slidingEmptyLabel: '空格，第 {row} 行，第 {column} 列',
+            rubiksScramble: '打乱',
+            rubiksReset: '复原',
+            rubiksMoves: '步数',
+            rubiksCube: '可操作的 3D 三阶魔方',
+            rubiksPrompt: '拖动贴纸，转动对应层',
+            rubiksScrambling: '正在打乱魔方…',
+            rubiksSolved: '用 {moves} 步完成 · {time}',
+            rubiksConfirmReset: '将魔方恢复为完成状态并放弃本局进度？',
+            rubiksResetDone: '魔方已恢复为完成状态',
+            rubiksWebglError: '此浏览器无法使用 3D 图形。',
             nonogramMode: '标记',
             nonogramFill: '涂黑',
             nonogramCross: '排除',
@@ -929,6 +953,19 @@
                     'Undo restores one slide. Board, move count, and elapsed time save automatically.',
                 ],
             },
+            rubiks: {
+                intro: 'Turn the layers of a standard 3×3×3 cube until every face has one color.',
+                rules: [
+                    'Drag across a sticker to turn its row or column. The layer follows your pointer and snaps to a quarter turn.',
+                    'Drag empty space around the cube to rotate the view; pinch or use the wheel to zoom.',
+                    'A fresh game starts scrambled. The cube is solved when all nine stickers on each face match.',
+                ],
+                tips: [
+                    'Build one face together with its first layer before solving the middle layer.',
+                    'Keep completed pieces in view and rotate the camera instead of reorienting the whole puzzle.',
+                    'Undo reverses one turn. Scramble starts a fresh timed cube and progress saves automatically.',
+                ],
+            },
             nonogram: {
                 intro: 'Use the clues beside the grid to reveal a small hidden picture.',
                 rules: [
@@ -1150,6 +1187,19 @@
                     '4×4 是经典的十五数码；3×3 有八枚数字方块，5×5 则有二十四枚。',
                     '先完成最上方一行，再逐步处理剩余区域的左侧，同时保护已经排好的部分。',
                     '“悔棋”撤销一步；棋盘、步数和用时会自动保存在本机。',
+                ],
+            },
+            rubiks: {
+                intro: '转动标准 3×3×3 魔方的各层，让每一面都恢复为同一种颜色。',
+                rules: [
+                    '在贴纸上拖动可转动对应行或列；该层会跟随手势，并吸附到四分之一圈。',
+                    '在魔方外的空白处拖动可旋转视角；双指捏合或滚轮可缩放。',
+                    '新局会自动打乱；当六个面各自九枚贴纸颜色一致时即完成。',
+                ],
+                tips: [
+                    '先完成一面及其相邻的第一层，再处理中央层。',
+                    '尽量让已完成的块保持不动，需要观察背面时旋转视角即可。',
+                    '“悔棋”反转一步；“打乱”开始新的计时魔方，进度会自动保存。',
                 ],
             },
             nonogram: {
@@ -1624,6 +1674,35 @@
                             'Choose 3×3 for a shorter puzzle, 4×4 for the namesake classic, or 5×5 for a longer planning challenge. Changing size begins a fresh board.',
                             'Tap an adjacent tile, swipe that tile into the empty space, or focus the board and use arrow or WASD keys to move the empty space.',
                             'Undo reverses one slide. Current board, selected size, move count, and elapsed time save locally and remain available offline.',
+                        ],
+                    },
+                ],
+            },
+            rubiks: {
+                visual: 'Drag a sticker to turn its layer. Drag the surrounding stage to orbit the camera, then pinch or use the wheel to zoom.',
+                sections: [
+                    {
+                        title: 'Cube and goal',
+                        items: [
+                            'This is a standard 3×3×3 cube with six fixed center colors, twelve edge pieces, and eight corner pieces.',
+                            'A layer turn rotates one outer face or middle slice by a quarter or half turn. Pieces never detach or swap stickers.',
+                            'The puzzle is solved when each of the six faces shows one uniform color.',
+                        ],
+                    },
+                    {
+                        title: 'Touch, mouse, and keyboard',
+                        items: [
+                            'Press a visible sticker and drag along the direction that layer should travel. Release to snap to the nearest quarter turn.',
+                            'Begin a drag outside the cube to rotate the camera. Pinch or use the mouse wheel to zoom; camera movement does not count as a turn.',
+                            'With the cube focused, U, D, L, R, F, and B turn the corresponding outer face. Hold Shift for the inverse direction.',
+                        ],
+                    },
+                    {
+                        title: 'Game controls',
+                        items: [
+                            'Scramble generates a deterministic 25-move outer-face sequence and starts a fresh cube. There is no difficulty setting.',
+                            'The timer begins with your first turn. Undo reverses one completed turn without changing the scramble.',
+                            'Reset returns directly to the solved state. Cube state, move history, and elapsed time save locally for offline play.',
                         ],
                     },
                 ],
@@ -2166,6 +2245,35 @@
                             '3×3 适合短局，4×4 是同名经典，5×5 需要更长的规划。切换大小会开始一块新棋盘。',
                             '可点击相邻方块、把它滑向空格，也可聚焦棋盘后使用方向键或 WASD 移动空格。',
                             '“悔棋”撤销一步；当前棋盘、大小、步数和用时都会保存在本机，可离线继续。',
+                        ],
+                    },
+                ],
+            },
+            rubiks: {
+                visual: '在贴纸上拖动可转动对应层；在周围空白处拖动可旋转视角，双指捏合或滚轮可缩放。',
+                sections: [
+                    {
+                        title: '魔方与目标',
+                        items: [
+                            '这是标准 3×3×3 魔方，包含六个固定颜色中心块、十二个棱块和八个角块。',
+                            '每次转层会让一个外层或中间层转动四分之一圈或半圈；块不会脱落，贴纸也不会交换。',
+                            '当六个面各自都只显示一种颜色时，魔方即完成。',
+                        ],
+                    },
+                    {
+                        title: '触控、鼠标与键盘',
+                        items: [
+                            '按住可见贴纸，沿该层应移动的方向拖动；松手后会吸附到最近的四分之一圈。',
+                            '从魔方外的空白处开始拖动可旋转视角；双指捏合或滚轮可缩放。调整视角不计步。',
+                            '聚焦魔方后，可用 U、D、L、R、F、B 转动对应外层；按住 Shift 可反向转动。',
+                        ],
+                    },
+                    {
+                        title: '游戏控制',
+                        items: [
+                            '“打乱”会生成固定种子的二十五步外层转法并开始新局；本游戏没有难度设置。',
+                            '第一次转层后开始计时；“悔棋”反转最近完成的一步，不会改变初始打乱。',
+                            '“复原”会直接回到完成状态；魔方、历史步数和用时都会保存在本机，可离线继续。',
                         ],
                     },
                 ],

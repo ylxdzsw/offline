@@ -1,6 +1,7 @@
 NODE ?= node
 CARGO ?= cargo
 NATTOPPET := node_modules/.bin/nattoppet
+ESBUILD := node_modules/.bin/esbuild
 DIST := dist
 GAMES := \
 	xiangqi \
@@ -16,15 +17,17 @@ GAMES := \
 	backgammon \
 	huarong \
 	sliding \
+	rubiks \
 	nonogram \
 	minesweeper \
 	solitaire \
 	spider
-JS_GAMES := sudoku 2048 sliding nonogram minesweeper solitaire spider
+JS_GAMES := sudoku 2048 sliding rubiks nonogram minesweeper solitaire spider
 WASM_GAMES := $(filter-out $(JS_GAMES),$(GAMES))
 PAGES := index $(GAMES)
 APP_SOURCES := $(shell find app -type f -not -name '*.test.js' -not -path 'app/icons/*')
-GAME_WEB_SOURCES := $(shell find games -maxdepth 2 -type f \( -name '*.js' -o -name '*.html' -o -name '*.ymd' \) -not -name '*.test.js')
+GAME_WEB_SOURCES := $(shell find games -maxdepth 2 -type f \( -name '*.js' -o -name '*.html' -o -name '*.ymd' \) -not -name '*.test.js' -not -path 'games/target/*')
+RUBIKS_BUNDLE := games/target/rubiks.bundle.js
 APP_PUBLIC := manifest.webmanifest CNAME .nojekyll
 APP_PUBLIC_OUTPUTS := $(APP_PUBLIC:%=$(DIST)/%)
 ICON_SOURCES := $(shell find app/icons -type f)
@@ -62,6 +65,12 @@ define GAME_WASM_PAGE_DEPENDENCY
 $(DIST)/$(1).html: $(WASM_DIR)/offline_$(1).wasm
 endef
 $(foreach game,$(WASM_GAMES),$(eval $(call GAME_WASM_PAGE_DEPENDENCY,$(game))))
+
+$(RUBIKS_BUNDLE): games/rubiks/renderer.js package-lock.json
+	mkdir -p $(dir $@)
+	$(ESBUILD) $< --bundle --format=iife --platform=browser --target=es2022 --minify --legal-comments=eof --outfile=$@
+
+$(DIST)/rubiks.html: $(RUBIKS_BUNDLE)
 
 build: wasm $(PAGES:%=$(DIST)/%.html) $(STATIC_OUTPUTS)
 	$(NODE) scripts/build-sw.mjs $(DIST)
@@ -118,4 +127,4 @@ test: test-rust test-unit test-contract test-e2e
 
 clean:
 	CARGO_TARGET_DIR='$(CARGO_TARGET_DIR)' $(CARGO) clean --manifest-path games/$(firstword $(WASM_GAMES))/Cargo.toml
-	rm -rf $(DIST) test-results playwright-report
+	rm -rf $(DIST) test-results playwright-report $(RUBIKS_BUNDLE)

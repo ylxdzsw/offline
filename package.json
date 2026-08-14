@@ -6,6 +6,8 @@
   "license": "MIT",
   "devDependencies": {
     "@playwright/test": "1.61.1",
-    "nattoppet": "4.1.1"
+    "esbuild": "0.28.2",
+    "nattoppet": "4.1.1",
+    "three": "0.160.0"
   }
 }

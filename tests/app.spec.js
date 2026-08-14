@@ -49,6 +49,7 @@ test('gallery grid logos stay centered and contained', async ({page}) => {
         'article[data-game="doushouqi"] .preview > span',
         'article[data-game="huarong"] .preview > span',
         'article[data-game="sliding"] .preview > span',
+        'article[data-game="rubiks"] .preview > span',
         'article[data-game="nonogram"] .preview > span',
         'article[data-game="minesweeper"] .preview > span',
     ].join(',')).evaluateAll(marks => marks.map(mark => {
@@ -1260,6 +1261,91 @@ test('Huarong Dao hints and animates an optimal slide, persists, reloads, and un
     })
     await page.locator('huarong-game .piece[data-piece="8"]').click()
     await expect(page.locator('huarong-game .target[data-to="16"]')).toHaveCount(0)
+})
+
+test('Rubik cube renders in 3D, separates orbit from layer turns, persists, and undoes', async ({page}) => {
+    test.setTimeout(45_000)
+    await page.setViewportSize({width: 390, height: 844})
+    await page.goto('/rubiks.html')
+    await expect(page.locator('offline-shell h1')).toHaveText("Rubik's Cube")
+    await expect(page.locator('rubiks-game canvas')).toBeVisible()
+    await expect(page.locator('rubiks-game .move-count')).toHaveText('0')
+
+    const geometry = await page.locator('rubiks-game').evaluate(game => {
+        const canvas = game.stage.canvas()
+        const board = game.shadowRoot.querySelector('.board')
+        game.stage.renderer.render(game.stage.scene, game.stage.camera)
+        const gl = game.stage.renderer.getContext()
+        const pixels = new Uint8Array(80 * 80 * 4)
+        gl.readPixels(
+            Math.floor((canvas.width - 80) / 2),
+            Math.floor((canvas.height - 80) / 2),
+            80,
+            80,
+            gl.RGBA,
+            gl.UNSIGNED_BYTE,
+            pixels,
+        )
+        let colored = 0
+        for (let index = 0; index < pixels.length; index += 4) {
+            if (pixels[index] + pixels[index + 1] + pixels[index + 2] > 80) colored++
+        }
+        const rect = board.getBoundingClientRect()
+        return {
+            colored,
+            fit: Number(board.dataset.fitScale),
+            rect: {left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom},
+        }
+    })
+    expect(geometry.colored).toBeGreaterThan(500)
+    expect(geometry.fit).toBe(1)
+    expect(geometry.rect.left).toBeGreaterThanOrEqual(0)
+    expect(geometry.rect.right).toBeLessThanOrEqual(390)
+    expect(geometry.rect.bottom).toBeLessThanOrEqual(844)
+
+    const canvas = await page.locator('rubiks-game canvas').boundingBox()
+    const cameraBefore = await page.locator('rubiks-game').evaluate(game => game.stage.camera.position.toArray())
+    await page.mouse.move(canvas.x + 24, canvas.y + 24)
+    await page.mouse.down()
+    await page.mouse.move(canvas.x + 84, canvas.y + 64, {steps: 5})
+    await page.mouse.up()
+    await expect(page.locator('rubiks-game .move-count')).toHaveText('0')
+    const cameraAfter = await page.locator('rubiks-game').evaluate(game => game.stage.camera.position.toArray())
+    expect(cameraAfter).not.toEqual(cameraBefore)
+
+    await page.goto('/rubiks.html', {waitUntil: 'domcontentloaded'})
+    await page.waitForFunction(() => document.querySelector('rubiks-game')?.stage?.canvas()?.clientWidth > 0)
+    const freshCanvas = await page.evaluate(() => {
+        const canvas = document.querySelector('rubiks-game').stage.canvas()
+        const rect = canvas.getBoundingClientRect()
+        return {x: rect.x, y: rect.y, width: rect.width, height: rect.height}
+    })
+    await page.mouse.move(freshCanvas.x + freshCanvas.width * .47, freshCanvas.y + freshCanvas.height * .48)
+    await page.mouse.down()
+    await page.mouse.move(freshCanvas.x + freshCanvas.width * .9, freshCanvas.y + freshCanvas.height * .48)
+    await page.mouse.up()
+    await expect(page.locator('rubiks-game .move-count')).toHaveText('1', {timeout: 2500})
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:rubiks')).history.length)).toBe(1)
+
+    await page.goto('/rubiks.html', {waitUntil: 'domcontentloaded'})
+    await expect(page.locator('rubiks-game .move-count')).toHaveText('1')
+    await page.evaluate(() => { document.querySelector('rubiks-game').shadowRoot.querySelector('.undo').click() })
+    await expect.poll(
+        () => page.evaluate(() => document.querySelector('rubiks-game').state.history.length),
+        {timeout: 5000},
+    ).toBe(0)
+    await expect(page.locator('rubiks-game .move-count')).toHaveText('0')
+    expect(await page.evaluate(() => JSON.parse(localStorage.getItem('offline-games:v1:rubiks')).history.length)).toBe(0)
+
+    await page.evaluate(() => {
+        const canvas = document.querySelector('rubiks-game').stage.canvas()
+        canvas.focus()
+        canvas.dispatchEvent(new KeyboardEvent('keydown', {key: 'r', bubbles: true}))
+    })
+    await expect.poll(
+        () => page.evaluate(() => document.querySelector('rubiks-game').state.history.length),
+        {timeout: 5000},
+    ).toBe(1)
 })
 
 test('Sliding Puzzle changes size, slides with touch and keyboard, persists, and undoes', async ({page}) => {

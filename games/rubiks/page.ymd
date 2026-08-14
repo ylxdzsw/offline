@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+[offline-pwa-head]
+<meta name="author" content="ylxdzsw">
+<meta name="license" content="MIT">
+<meta name="github" content="https://github.com/ylxdzsw/offline">
+<title>Rubik's Cube / 三阶魔方</title>
+[require](../../app/tokens.css)
+[require](../../app/theme.js)
+[require](../../app/i18n.js)
+[require](../../app/storage.js)
+[require](../../app/runtime.js)
+[require](./api.js)
+[require](../target/rubiks.bundle.js)
+</head>
+<body>
+[require](../../app/segmented-control.html)
+[require](../../app/guide-dialog.html)
+[require](../../app/side-drawer.html)
+[require](../../app/app-shell.html)
+[require](./rubiks.html)
+<offline-shell page="rubiks" guide="./guides/rubiks.svg"><rubiks-game></rubiks-game></offline-shell>
+</body>
+</html>
+
+[mixin] ../../app/macros.ymd
+[mixin] common.ymd
