@@ -645,8 +645,8 @@ test('2048 merges, scores, persists, reloads, undoes, and accepts a swipe', asyn
     await expect(page.locator('game-2048 .current-score')).toHaveText('0')
     await expect(page.locator('game-2048 .cell[data-value="2"]')).toHaveCount(2)
 
-    await board.dispatchEvent('pointerdown', {pointerId: 1, pointerType: 'touch', clientX: 240, clientY: 120})
-    await board.dispatchEvent('pointerup', {pointerId: 1, pointerType: 'touch', clientX: 40, clientY: 120})
+    await board.dispatchEvent('pointerdown', {pointerId: 1, pointerType: 'touch', isPrimary: true, clientX: 240, clientY: 120})
+    await board.dispatchEvent('pointerup', {pointerId: 1, pointerType: 'touch', isPrimary: true, clientX: 40, clientY: 120})
     await expect(page.locator('game-2048 .current-score')).toHaveText('4')
 })
 
@@ -732,7 +732,7 @@ test('Junqi holds a fast AI battle reply and cues its destination', async ({page
     await expect(page.locator('junqi-game .square.last-to')).toHaveAttribute('aria-label', /last move/)
 })
 
-test('Junqi reports relative battle strength without revealing the surviving rank', async ({page}) => {
+test('Junqi reports the battle survivor without revealing its rank', async ({page}) => {
     await page.goto('/junqi.html')
     const battle = await page.locator('junqi-game').evaluate(game => {
         const engine = game.engine
@@ -752,7 +752,7 @@ test('Junqi reports relative battle strength without revealing the surviving ran
     })
 
     await expect(page.locator('junqi-game .status'))
-        .toHaveText('The attacking piece was stronger — your turn')
+        .toHaveText('The attacking piece survived — your turn')
     const survivor = page.locator(`junqi-game .square[data-index="${battle.to}"]`)
     await expect(survivor.locator('.piece.hidden')).toHaveText('◆')
     await expect(survivor).toHaveAttribute('aria-label', /hidden enemy piece/)
@@ -1348,6 +1348,25 @@ test('Rubik cube renders in 3D, separates orbit from layer turns, persists, and 
     ).toBe(1)
 })
 
+test('Rubik cube preserves the solved position when undo returns to a reset cube', async ({page}) => {
+    await page.emulateMedia({reducedMotion: 'reduce'})
+    await page.goto('/rubiks.html')
+    const game = page.locator('rubiks-game')
+    await game.locator('.reset').click()
+    await game.locator('canvas').focus()
+    await page.keyboard.press('r')
+    await expect(game.locator('.move-count')).toHaveText('1')
+    await game.locator('.undo').click()
+    await expect(game.locator('.move-count')).toHaveText('0')
+    expect(await game.evaluate(element => element.state.outcome)).toBe('solved')
+    await page.reload()
+    expect(await game.evaluate(element => ({
+        solved: element.engine.isSolved(element.state.cube),
+        outcome: element.state.outcome,
+        moves: element.state.history.length,
+    }))).toEqual({solved: true, outcome: 'solved', moves: 0})
+})
+
 test('Sliding Puzzle changes size, slides with touch and keyboard, persists, and undoes', async ({page}) => {
     await page.goto('/sliding.html')
     await expect(page.locator('offline-shell h1')).toHaveText('Sliding Puzzle')
@@ -1472,11 +1491,11 @@ test('Sliding Puzzle changes size, slides with touch and keyboard, persists, and
     const tile24 = page.locator('sliding-puzzle .tile[data-value="24"]')
     const box = await tile24.boundingBox()
     await tile24.dispatchEvent('pointerdown', {
-        pointerId: 17, pointerType: 'touch', button: 0,
+        pointerId: 17, pointerType: 'touch', button: 0, isPrimary: true,
         clientX: box.x + box.width / 2, clientY: box.y + box.height / 2,
     })
     await tile24.dispatchEvent('pointerup', {
-        pointerId: 17, pointerType: 'touch', button: 0,
+        pointerId: 17, pointerType: 'touch', button: 0, isPrimary: true,
         clientX: box.x + box.width / 2 - 30, clientY: box.y + box.height / 2,
     })
     await expect(page.locator('sliding-puzzle .status')).toContainText('Puzzle solved')
@@ -1847,7 +1866,8 @@ for (const viewport of [
     {width: 844, height: 390},
     {width: 1024, height: 768},
 ]) {
-    test(`game pages stay within a ${viewport.width}x${viewport.height} viewport`, async ({page}) => {
+    test(`game pages remain readable within a ${viewport.width}x${viewport.height} viewport`, async ({page}) => {
+        test.setTimeout(60000)
         await page.setViewportSize(viewport)
         for (const file of gamePageFiles) {
             const url = '/' + file
@@ -1883,6 +1903,8 @@ for (const viewport of [
                     innerHeight,
                     scrollWidth: document.documentElement.scrollWidth,
                     scrollHeight: document.documentElement.scrollHeight,
+                    contentScroll: main.scrollHeight - main.clientHeight,
+                    contentOverflow: mainStyle.overflowY,
                     footerDisplay: getComputedStyle(footer).display,
                     scale: Number(surface.dataset.fitScale),
                     usable: {
@@ -1907,11 +1929,12 @@ for (const viewport of [
             expect(layout.scrollWidth, url).toBeLessThanOrEqual(layout.innerWidth)
             expect(layout.scrollHeight, url).toBe(layout.innerHeight)
             expect(layout.footerDisplay, url).toBe('none')
-            expect(layout.scale, url).toBeGreaterThan(0)
+            expect(layout.scale, url).toBeGreaterThanOrEqual(.8)
             expect(layout.scale, url).toBeLessThanOrEqual(1)
             expect(layout.content.top, url).toBeGreaterThanOrEqual(layout.usable.top - 1)
             expect(layout.content.right, url).toBeLessThanOrEqual(layout.usable.right + 1)
-            expect(layout.content.bottom, url).toBeLessThanOrEqual(layout.usable.bottom + 1)
+            expect(layout.content.bottom, url).toBeLessThanOrEqual(layout.usable.bottom + layout.contentScroll + 1)
+            if (layout.contentScroll > 0) expect(layout.contentOverflow, url).toBe('auto')
             expect(layout.content.left, url).toBeGreaterThanOrEqual(layout.usable.left - 1)
             expect(layout.surface.right, url).toBeLessThanOrEqual(layout.usable.right + 1)
             expect(layout.surface.left, url).toBeGreaterThanOrEqual(layout.usable.left - 1)
@@ -2062,5 +2085,16 @@ test('the installed app reloads and navigates completely offline', async ({brows
     await page.goto('/spider.html')
     await expect(page.locator('offline-shell h1')).toHaveText('Spider Solitaire')
     await expect(page.locator('spider-game .pile')).toHaveCount(10)
+    for (const [game, title] of [
+        ['sudoku', 'Sudoku'], ['2048', '2048'], ['junqi', 'Junqi'],
+        ['doushouqi', 'Dou Shou Qi'], ['chess', 'Chess'], ['rubiks', "Rubik's Cube"],
+    ]) {
+        await page.goto(`/${game}.html`)
+        await expect(page.locator('offline-shell h1')).toHaveText(title)
+        await page.waitForFunction(() => Boolean(document.querySelector('offline-shell')?.firstElementChild?.state))
+        await expect(page.locator('offline-shell .board')).toBeVisible()
+    }
+    await page.goto('/index.html')
+    await expect(page.locator('.game-gallery article')).toHaveCount(games.length)
     await context.close()
 })

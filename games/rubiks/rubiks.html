@@ -229,9 +229,10 @@ customElements.define('rubiks-game', class extends HTMLElement {
         await this.stage.animateTurn(inverse, duration, false)
         this.state.history.pop()
         this.state.cube = this.engine.turn(this.state.cube, inverse)
-        this.state.outcome = null
+        this.state.outcome = this.engine.isSolved(this.state.cube) ? 'solved' : null
         this.notice = null
-        this.resumeTimer()
+        if (this.state.outcome) this.pauseTimer(false)
+        else this.resumeTimer()
         this.save()
         this.render()
         this.stage.canvas()?.focus()

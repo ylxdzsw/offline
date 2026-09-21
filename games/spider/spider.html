@@ -76,6 +76,7 @@
         }
         .card, .slot, .run-slot {
             position: relative; display: block; width: 100%; min-width: 0; aspect-ratio: 5 / 7;
+            flex-shrink: 0;
             box-sizing: border-box; padding: 0; overflow: hidden;
             border: 1px solid rgba(20,28,25,.58); border-radius: clamp(2px, .75vw, 5px);
             touch-action: manipulation;
@@ -124,8 +125,8 @@
         }
         .card .corner {
             position: absolute; top: clamp(1px, .5vw, 3px); left: clamp(1px, .5vw, 3px);
-            display: grid; justify-items: center; font-family: Georgia, serif; font-weight: 800;
-            font-size: clamp(.48rem, 2vw, .72rem); line-height: .82;
+            display: flex; align-items: baseline; gap: 1px; font-family: Georgia, serif; font-weight: 800;
+            font-size: clamp(.6rem, 2.5vw, .75rem); line-height: 1;
         }
         .card .corner .suit { font-size: 1.04em; }
         .card .pip {
@@ -157,10 +158,10 @@
             z-index: 40; outline: 2px solid #fff; outline-offset: 1px;
         }
         .pile > .card + .card {
-            margin-top: clamp(-49px, -10vw, -27px);
+            margin-top: calc(clamp(8px, 2vw, 10px) - 140%);
         }
         .pile > .card.face + .card {
-            margin-top: clamp(-43px, -8.5vw, -23px);
+            margin-top: calc(clamp(15px, 4vw, 18px) - 140%);
         }
         .celebration {
             position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 50;
@@ -191,9 +192,11 @@
             }
             .table {
                 display: flex; min-height: 0; flex: 1; flex-direction: column;
+                overflow-y: auto; overscroll-behavior: contain;
             }
-            .tableau { min-height: 0; flex: 1; }
-            .pile { height: 100%; min-height: 0; }
+            .board-top { flex-shrink: 0; }
+            .tableau { min-height: 0; flex: 1 0 auto; }
+            .pile { min-height: 0; }
         }
         @media (max-width: 300px) {
             .dashboard { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -299,6 +302,7 @@ customElements.define('spider-game', class extends HTMLElement {
         const s = this.shadowRoot
         const table = s.querySelector('.table')
         table.addEventListener('click', event => this.clicked(event))
+        table.addEventListener('keydown', event => this.keydown(event))
         table.addEventListener('dragstart', event => this.dragStarted(event))
         table.addEventListener('dragend', () => this.clearDropTargets())
         table.addEventListener('dragover', event => this.draggedOver(event))
@@ -334,6 +338,39 @@ customElements.define('spider-game', class extends HTMLElement {
 
     sameSource(left, right) {
         return left && right && left.column === right.column && left.card === right.card
+    }
+
+    keydown(event) {
+        const target = event.target.closest('button')
+        if (!target || event.ctrlKey || event.metaKey || event.altKey) return
+        if (event.key === 'Escape') {
+            event.preventDefault()
+            this.selected = null
+            this.notice = null
+            this.render()
+            return
+        }
+        const pile = target.closest('.pile')
+        if (!pile) {
+            if (event.key === 'ArrowDown') {
+                event.preventDefault()
+                this.shadowRoot.querySelector('.pile button')?.focus()
+            }
+            return
+        }
+        const buttons = [...pile.querySelectorAll('button')], index = buttons.indexOf(target)
+        let next
+        if (['ArrowLeft', 'ArrowRight'].includes(event.key)) {
+            const column = Number(pile.dataset.column) + (event.key === 'ArrowLeft' ? -1 : 1)
+            const neighbours = this.shadowRoot.querySelector(`.pile[data-column="${column}"]`)?.querySelectorAll('button')
+            if (neighbours?.length) next = neighbours[Math.min(index, neighbours.length - 1)]
+        } else if (event.key === 'ArrowUp') next = buttons[index - 1] || this.shadowRoot.querySelector('.stock')
+        else if (event.key === 'ArrowDown') next = buttons[index + 1]
+        else if (event.key === 'Home') next = buttons[0]
+        else if (event.key === 'End') next = buttons.at(-1)
+        else return
+        event.preventDefault()
+        next?.focus()
     }
 
     isMovable(source) {
@@ -374,6 +411,10 @@ customElements.define('spider-game', class extends HTMLElement {
                 return
             }
             if (pile) {
+                if (source && source.column === this.selected.column) {
+                    this.select(source)
+                    return
+                }
                 this.move(this.selected, {column: Number(pile.dataset.column)})
                 return
             }
@@ -453,7 +494,7 @@ customElements.define('spider-game', class extends HTMLElement {
         this.selected = null
         this.notice = null
         this.motion = null
-        this.storage.clear('spider')
+        this.save()
         this.render()
         if (!changedMode) this.shadowRoot.querySelector('.suit-count').value = String(suitCount)
         return true
@@ -516,7 +557,7 @@ customElements.define('spider-game', class extends HTMLElement {
         const style = motion === 'dealt' ? ` style="--motion-delay:${column * 12}ms"` : ''
         return `<button class="card face ${this.engine.color(card, this.state.suitCount)}${selected ? ' selected' : ''}${motion ? ` ${motion}` : ''}"
             type="button" data-column="${column}" data-card="${index}" data-value="${card}"
-            draggable="true" aria-label="${this.cardName(card)}"${style}>
+            draggable="true" aria-pressed="${selected}" aria-label="${this.cardName(card)}"${style}>
             <span class="corner"><span>${rank}</span><span class="suit">${mark}</span></span>
             <span class="pip">${mark}</span>
         </button>`
@@ -569,6 +610,9 @@ customElements.define('spider-game', class extends HTMLElement {
 
     render() {
         const s = this.shadowRoot
+        const focused = s.activeElement
+        const focusValue = focused?.dataset.value
+        const focusColumn = focused?.closest('.pile')?.dataset.column
         s.querySelector('.suit-count').value = String(this.state.suitCount)
         s.querySelector('.undo').disabled = this.state.history.length === 0
         s.querySelector('.moves').textContent = String(this.state.moves)
@@ -585,6 +629,9 @@ customElements.define('spider-game', class extends HTMLElement {
         this.renderTop()
         this.renderTableau()
         this.renderCelebration()
+        const focusTarget = focusValue != null ? s.querySelector(`[data-value="${focusValue}"]`) : null
+        const fallback = focusColumn != null ? s.querySelector(`.pile[data-column="${focusColumn}"] button:last-child`) : null
+        ;(focusTarget || fallback)?.focus({preventScroll: true})
         this.motion = null
     }
 

@@ -209,7 +209,7 @@ class RubiksStage {
     }
 
     canvas() { return this.renderer?.domElement || null }
-    isBusy() { return this.busy }
+    isBusy() { return this.busy || this.drag !== null }
     setInputEnabled(enabled) { this.inputEnabled = Boolean(enabled) }
 
     setNdc(event) {
@@ -245,6 +245,7 @@ class RubiksStage {
             layer: null,
         }
         this.controls.enabled = false
+        this.renderer.domElement.focus({preventScroll: true})
         try { this.renderer.domElement.setPointerCapture(event.pointerId) } catch {}
         event.preventDefault()
         event.stopImmediatePropagation()
@@ -300,7 +301,8 @@ class RubiksStage {
         this.controls.enabled = true
         try { this.renderer.domElement.releasePointerCapture(event.pointerId) } catch {}
         if (!drag.axis) return
-        const turns = THREE.MathUtils.clamp(Math.round(this.pivot.rotation[drag.axis] / HALF_PI), -2, 2)
+        const turns = event.type === 'pointercancel' ? 0
+            : THREE.MathUtils.clamp(Math.round(this.pivot.rotation[drag.axis] / HALF_PI), -2, 2)
         this.finishLayer({axis: drag.axis, layer: drag.layer, turns}, 190)
     }
 
@@ -314,6 +316,7 @@ class RubiksStage {
 
     tweenRotation(axis, target, duration) {
         const start = this.pivot.rotation[axis]
+        if (matchMedia('(prefers-reduced-motion: reduce)').matches) duration = 0
         if (duration <= 0) {
             this.pivot.rotation[axis] = target
             this.draw()
@@ -351,7 +354,7 @@ class RubiksStage {
     }
 
     async animateTurn(move, duration = 120, commit = true) {
-        if (this.busy || !this.renderer) return false
+        if (this.isBusy() || !this.renderer) return false
         this.mountLayer(move.axis, move.layer)
         await this.finishLayer(move, duration, commit)
         return true

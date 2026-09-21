@@ -9,6 +9,7 @@
     }
     .game-gallery .games { display: grid; gap: 10px; }
     .game-gallery article {
+        position: relative;
         display: grid;
         grid-template-columns: 90px 1fr;
         overflow: hidden;
@@ -19,6 +20,10 @@
         transition: box-shadow .15s ease, transform .12s ease;
     }
     .game-gallery article:active { transform: scale(.99); }
+    .game-gallery article:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
+    @media (hover: hover) {
+        .game-gallery article:hover { box-shadow: var(--shadow), 0 0 0 1px var(--accent); }
+    }
     .game-gallery .preview {
         position: relative;
         display: grid;
@@ -379,7 +384,7 @@
         align-items: center;
         justify-content: center;
         width: fit-content;
-        min-height: 34px;
+        min-height: 44px;
         padding: 0 16px;
         border-radius: var(--radius-xl);
         background: var(--accent);
@@ -388,9 +393,11 @@
         font-weight: 600;
         letter-spacing: -.01em;
         text-decoration: none;
-        transition: filter .12s ease;
+        cursor: pointer;
+        transition: background-color .12s ease;
     }
-    .game-gallery a:active { filter: brightness(.92); }
+    .game-gallery article:active a { background: color-mix(in srgb, var(--accent) 92%, black); }
+    .game-gallery a::after { position: absolute; inset: 0; content: ""; }
     @media (max-width: 340px) {
         .game-gallery article { grid-template-columns: 76px 1fr; }
         .game-gallery .preview { min-height: 96px; }
@@ -400,6 +407,15 @@
 
 <script>
 (() => {
+    const refreshProgress = () => {
+        const {i18n, storage} = OfflineGames
+        for (const card of document.querySelectorAll('.game-gallery article')) {
+            const link = card.querySelector('a')
+            const action = i18n.t(storage.hasProgress(card.dataset.game) ? 'continue' : 'play')
+            link.textContent = action
+            link.setAttribute('aria-label', `${action} · ${i18n.t(card.dataset.game)}`)
+        }
+    }
     const render = () => {
         const root = document.querySelector('.game-gallery')
         if (!root) return
@@ -442,7 +458,7 @@
         }
         root.querySelector('.games').innerHTML = OfflineGames.games.map(game => `
             <article data-game="${game}">
-                <div class="preview">${marks[game] || ''}</div>
+                <div class="preview" aria-hidden="true">${marks[game] || ''}</div>
                 <div class="content">
                     <h2>${i18n.t(game)}</h2>
                     <p>${i18n.t(game + 'Desc')}</p>
@@ -450,7 +466,13 @@
                 </div>
             </article>
         `).join('')
+        refreshProgress()
     }
+    window.addEventListener('pageshow', refreshProgress)
+    window.addEventListener('storage', refreshProgress)
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden) refreshProgress()
+    })
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', render, {once: true})
     else render()
 })()

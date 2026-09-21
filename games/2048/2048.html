@@ -28,6 +28,7 @@
             color: var(--status-ink); font-size: .88rem; font-weight: 700;
             text-align: center; background: var(--status-bg);
         }
+        .controls { margin: 9px 0 0; color: var(--ink-muted); font-size: .75rem; line-height: 1.4; text-align: center; }
         .warning { margin: 0 0 9px; color: var(--danger); font-size: .77rem; text-align: center; }
         .warning[hidden] { display: none; }
         .board {
@@ -61,11 +62,11 @@
         .cell[data-value="16"] { color: #f9f6f2; background: #f59563; }
         .cell[data-value="32"] { color: #f9f6f2; background: #f67c5f; }
         .cell[data-value="64"] { color: #f9f6f2; background: #f65e3b; }
-        .cell[data-value="128"] { color: #f9f6f2; background: #edcf72; font-size: clamp(1.4rem, 7.8vw, 2.25rem); }
-        .cell[data-value="256"] { color: #f9f6f2; background: #edcc61; font-size: clamp(1.4rem, 7.8vw, 2.25rem); }
-        .cell[data-value="512"] { color: #f9f6f2; background: #edc850; font-size: clamp(1.4rem, 7.8vw, 2.25rem); }
-        .cell[data-value="1024"] { color: #f9f6f2; background: #edc53f; font-size: clamp(1.15rem, 6.3vw, 1.9rem); }
-        .cell[data-value="2048"] { color: #f9f6f2; background: #edc22e; font-size: clamp(1.15rem, 6.3vw, 1.9rem); box-shadow: 0 0 16px rgba(237, 194, 46, .5); }
+        .cell[data-value="128"] { color: #57420f; background: #edcf72; font-size: clamp(1.4rem, 7.8vw, 2.25rem); }
+        .cell[data-value="256"] { color: #57420f; background: #edcc61; font-size: clamp(1.4rem, 7.8vw, 2.25rem); }
+        .cell[data-value="512"] { color: #57420f; background: #edc850; font-size: clamp(1.4rem, 7.8vw, 2.25rem); }
+        .cell[data-value="1024"] { color: #57420f; background: #edc53f; font-size: clamp(1.15rem, 6.3vw, 1.9rem); }
+        .cell[data-value="2048"] { color: #57420f; background: #edc22e; font-size: clamp(1.15rem, 6.3vw, 1.9rem); box-shadow: 0 0 16px rgba(237, 194, 46, .5); }
         .cell.beyond { color: #f9f6f2; background: #3c3a32; font-size: clamp(.92rem, 5.2vw, 1.55rem); }
         .cell.spawn { animation: spawn .18s ease-out; }
         .cell.merged { animation: merge .22s ease-out; }
@@ -89,7 +90,8 @@
     </div>
     <p class="warning" hidden></p>
     <div class="status" role="status" aria-live="polite"></div>
-    <div class="board" role="grid" tabindex="0"></div>
+    <div class="board" role="grid" tabindex="0" aria-describedby="controls"></div>
+    <p class="controls" id="controls"></p>
 </template>
 
 <script>
@@ -98,6 +100,7 @@ customElements.define('game-2048', class extends HTMLElement {
         super()
         this.attachShadow({mode: 'open'}).append(document.getElementById('game-2048-template').content.cloneNode(true))
         this.announcement = null
+        this.milestoneVisible = true
         this.animation = null
         this.animationTimer = null
         this.pointer = null
@@ -140,6 +143,7 @@ customElements.define('game-2048', class extends HTMLElement {
     load() {
         const saved = this.storage.read('2048')
         this.state = this.valid(saved) ? saved : this.fresh()
+        this.milestoneVisible = !this.state.reached2048
     }
     bind() {
         const s = this.shadowRoot
@@ -156,6 +160,8 @@ customElements.define('game-2048', class extends HTMLElement {
             this.move(direction)
         })
         board.addEventListener('pointerdown', event => {
+            if (event.button !== 0 || event.isPrimary === false) return
+            board.focus({preventScroll: true})
             this.pointer = {id: event.pointerId, x: event.clientX, y: event.clientY}
             try { board.setPointerCapture(event.pointerId) } catch {}
         })
@@ -172,6 +178,7 @@ customElements.define('game-2048', class extends HTMLElement {
     }
     localize() {
         const s = this.shadowRoot, t = key => this.i18n.t(key)
+        s.querySelector('.controls').textContent = t('game2048Controls')
         s.querySelector('.score-label').textContent = t('game2048Score')
         s.querySelector('.best-label').textContent = t('game2048Best')
         s.querySelector('.undo').textContent = t('undo')
@@ -184,6 +191,7 @@ customElements.define('game-2048', class extends HTMLElement {
     }
     move(direction) {
         if (this.state.outcome) return
+        if (this.state.reached2048) this.milestoneVisible = false
         const seed = OfflineGames.runtime.moveSeed(this.state.seed, this.state.spawnCount)
         const result = this.engine.move(this.state.board, direction, seed)
         if (!result.moved) {
@@ -208,6 +216,7 @@ customElements.define('game-2048', class extends HTMLElement {
             outcome: this.state.outcome,
         })
         const firstWin = !this.state.reached2048 && result.reached2048
+        if (firstWin) this.milestoneVisible = true
         this.state.board = result.board
         this.state.score += result.scoreGain
         this.state.best = Math.max(this.state.best, this.state.score)
@@ -244,6 +253,7 @@ customElements.define('game-2048', class extends HTMLElement {
         clearTimeout(this.animationTimer)
         this.animationTimer = null
         this.state = this.fresh(Math.max(this.state.best, this.state.score))
+        this.milestoneVisible = true
         this.announcement = null
         this.animation = null
         this.save()
@@ -275,7 +285,7 @@ customElements.define('game-2048', class extends HTMLElement {
             if (this.animation?.merged?.includes(index)) cell.classList.add('merged')
             return cell
         }))
-        if (this.state.reached2048 && !this.state.outcome) board.dataset.win = this.i18n.t('game2048Reached')
+        if (this.state.reached2048 && !this.state.outcome && this.milestoneVisible) board.dataset.win = this.i18n.t('game2048Reached')
         else delete board.dataset.win
     }
     disconnectedCallback() { clearTimeout(this.animationTimer) }

@@ -91,3 +91,14 @@ test('malformed positions and dice fail at the ABI boundary', () => {
     assert.throws(() => engine.legalTurns(position, engine.HUMAN, [0, 7]), /between 1 and 6/)
     assert.throws(() => engine.legalTurns(position, 9, [1, 2]), /not a valid side/)
 })
+
+test('hard play builds the strong opening points instead of scattering checkers', () => {
+    const position = engine.initialPosition()
+    for (const [dice, point] of [[[3, 1], 4], [[4, 2], 3], [[6, 1], 6]]) {
+        for (const seed of [1, 7, 29]) {
+            const result = ai.search(position, engine.HUMAN, dice, 'hard', {seed})
+            assert(result.turn.position.board[point] >= 2)
+            assert.equal(result.depth, 2)
+        }
+    }
+})

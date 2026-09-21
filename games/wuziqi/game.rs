@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 pub const SIZE: usize = 15;
 pub const CELLS: usize = SIZE * SIZE;
 pub const EMPTY: u8 = 0;
@@ -118,7 +116,7 @@ impl Position {
         if self.board.iter().all(|cell| *cell == EMPTY) {
             return vec![at(7, 7)];
         }
-        let mut found = HashSet::new();
+        let mut found = [false; CELLS];
         for (index, _) in self
             .board
             .iter()
@@ -134,15 +132,17 @@ impl Position {
                     if inside(next_row, next_column) {
                         let target = at(next_row as usize, next_column as usize);
                         if self.board[target as usize] == EMPTY {
-                            found.insert(target);
+                            found[target as usize] = true;
                         }
                     }
                 }
             }
         }
-        let mut result: Vec<_> = found.into_iter().collect();
-        result.sort_unstable();
-        result
+        found
+            .iter()
+            .enumerate()
+            .filter_map(|(index, present)| present.then_some(index as u16))
+            .collect()
     }
 }
 

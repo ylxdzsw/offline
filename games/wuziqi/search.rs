@@ -48,13 +48,28 @@ impl SplitMix64 {
 }
 
 impl Position {
+    fn would_win(&self, index: u16, side: u8) -> bool {
+        DIRECTIONS.iter().any(|&(dr, dc)| {
+            let mut length = 1;
+            for sign in [-1, 1] {
+                let mut row = row_of(index) as i8 + dr * sign;
+                let mut column = column_of(index) as i8 + dc * sign;
+                while inside(row, column)
+                    && self.board[at(row as usize, column as usize) as usize] == side
+                {
+                    length += 1;
+                    row += dr * sign;
+                    column += dc * sign;
+                }
+            }
+            length >= 5
+        })
+    }
+
     pub(crate) fn winning_moves(&self, side: u8) -> Vec<u16> {
         self.candidates()
             .into_iter()
-            .filter(|index| {
-                self.apply(*index, side)
-                    .is_some_and(|next| next.is_win(*index, side))
-            })
+            .filter(|index| self.would_win(*index, side))
             .collect()
     }
 
@@ -122,29 +137,67 @@ fn score_side(position: &Position, side: u8) -> i32 {
     score
 }
 
-fn move_threat_score(position: &Position, index: u16, side: u8) -> i32 {
-    let next = position.apply(index, side).expect("candidate is empty");
-    if next.is_win(index, side) {
-        return WIN;
+// Only windows crossing the new stone change. Count distinct winning replies so
+// open fours and crossing threats outrank cosmetic gains elsewhere on the board.
+fn local_threat(position: &Position, index: u16, side: u8) -> i32 {
+    let row = row_of(index) as i8;
+    let column = column_of(index) as i8;
+    let mut score = 0;
+    let mut winning = [false; crate::game::CELLS];
+    for (dr, dc) in DIRECTIONS {
+        for offset in -4..=0 {
+            let mut own = 0;
+            let mut empties = 0;
+            let mut last_empty = 0;
+            let mut blocked = false;
+            for step in offset..offset + 5 {
+                let r = row + dr * step;
+                let c = column + dc * step;
+                if !inside(r, c) {
+                    blocked = true;
+                    break;
+                }
+                let point = at(r as usize, c as usize);
+                let value = if point == index {
+                    side
+                } else {
+                    position.board[point as usize]
+                };
+                if value == side {
+                    own += 1;
+                } else if value == EMPTY {
+                    empties += 1;
+                    last_empty = point;
+                } else {
+                    blocked = true;
+                    break;
+                }
+            }
+            if blocked {
+                continue;
+            }
+            if own == 5 {
+                return WIN;
+            }
+            if own == 4 {
+                winning[last_empty as usize] = true;
+            }
+            score += window_score(own, empties) - window_score(own - 1, empties + 1);
+        }
     }
-    let wins = next.winning_moves(side).len() as i32;
-    let opponent_wins = next.winning_moves(other(side)).len() as i32;
-    let row = row_of(index) as i32;
-    let column = column_of(index) as i32;
-    let center = 14 - ((row - 7).abs() + (column - 7).abs());
-    let fork = if wins >= 2 {
-        8_000_000
-    } else {
-        wins * 1_200_000
-    };
-    fork + score_side(&next, side)
-        - score_side(&next, other(side)) * 11 / 10
-        - opponent_wins * 1_500_000
-        + center
+    let replies = winning.iter().filter(|present| **present).count();
+    score + if replies >= 2 { 12_000_000 } else { 0 }
+}
+
+fn move_threat_score(position: &Position, index: u16, side: u8) -> i32 {
+    let attack = local_threat(position, index, side);
+    let defense = local_threat(position, index, other(side));
+    let center = 14 - ((row_of(index) as i32 - 7).abs() + (column_of(index) as i32 - 7).abs());
+    attack + defense * 9 / 10 + center
 }
 
 pub(crate) fn evaluate(position: &Position, side: u8) -> i32 {
-    score_side(position, side) - score_side(position, other(side)) * 11 / 10
+    score_side(position, side) - score_side(position, other(side))
 }
 
 fn forced_candidates(position: &Position, side: u8) -> Option<Vec<u16>> {
@@ -195,19 +248,38 @@ impl<F: FnMut(u32) -> bool> Searcher<F> {
     ) -> Result<i32, ()> {
         let (mut alpha, mut beta) = alpha_beta;
         self.nodes = self.nodes.saturating_add(1);
-        if self.nodes > self.config.node_limit
-            || (self.nodes & 127 == 0 && (self.stopped)(self.nodes))
-        {
+        if self.nodes > self.config.node_limit || (self.stopped)(self.nodes) {
             return Err(());
         }
         if let Some(last) = last_move.filter(|index| position.is_win(*index, other(side))) {
             let _ = last;
             return Ok(-WIN + ply as i32);
         }
-        if depth == 0 || position.board.iter().all(|cell| *cell != EMPTY) {
+        if position.board.iter().all(|cell| *cell != EMPTY) {
+            return Ok(0);
+        }
+        if depth == 0 {
+            if !position.winning_moves(side).is_empty() {
+                return Ok(WIN - ply as i32 - 1);
+            }
+            let threats = position.winning_moves(other(side));
+            if threats.len() > 1 {
+                return Ok(-WIN + ply as i32 + 2);
+            }
+            if let Some(index) = threats.first().filter(|_| ply < self.config.max_depth + 6) {
+                let child = position.apply(*index, side).expect("forced block is legal");
+                return Ok(-self.negamax(
+                    &child,
+                    other(side),
+                    0,
+                    (-beta, -alpha),
+                    Some(*index),
+                    ply + 1,
+                )?);
+            }
             return Ok(evaluate(position, side));
         }
-        let key = position.hash(side) ^ ((depth as u64) << 56);
+        let key = position.hash(side);
         let original_alpha = alpha;
         let original_beta = beta;
         let cached = self.table.get(&key).copied();
@@ -296,7 +368,7 @@ pub(crate) fn search<F: FnMut(u32) -> bool>(
             nodes: 1,
         };
     }
-    let initial =
+    let mut initial =
         forced.unwrap_or_else(|| ordered_candidates(position, side, config.candidate_limit, None));
     if initial.is_empty() {
         return SearchResult {
@@ -316,17 +388,54 @@ pub(crate) fn search<F: FnMut(u32) -> bool>(
     for depth in 1..=config.max_depth {
         let mut scores = Vec::with_capacity(initial.len());
         let mut interrupted = false;
-        for index in &initial {
+        let mut best_score = i32::MIN / 2;
+        for (ordinal, index) in initial.iter().enumerate() {
             let child = position.apply(*index, side).expect("candidate is legal");
-            match searcher.negamax(
-                &child,
-                other(side),
-                depth - 1,
-                (i32::MIN / 2, i32::MAX / 2),
-                Some(*index),
-                1,
-            ) {
-                Ok(score) => scores.push((*index, -score)),
+            let result = if ordinal == 0 {
+                searcher
+                    .negamax(
+                        &child,
+                        other(side),
+                        depth - 1,
+                        (i32::MIN / 2, i32::MAX / 2),
+                        Some(*index),
+                        1,
+                    )
+                    .map(|score| -score)
+            } else {
+                let threshold = best_score - config.root_band;
+                searcher
+                    .negamax(
+                        &child,
+                        other(side),
+                        depth - 1,
+                        (-threshold, -threshold + 1),
+                        Some(*index),
+                        1,
+                    )
+                    .map(|score| -score)
+                    .and_then(|score| {
+                        if score >= threshold {
+                            searcher
+                                .negamax(
+                                    &child,
+                                    other(side),
+                                    depth - 1,
+                                    (i32::MIN / 2, i32::MAX / 2),
+                                    Some(*index),
+                                    1,
+                                )
+                                .map(|score| -score)
+                        } else {
+                            Ok(score)
+                        }
+                    })
+            };
+            match result {
+                Ok(score) => {
+                    best_score = best_score.max(score);
+                    scores.push((*index, score));
+                }
                 Err(()) => {
                     interrupted = true;
                     break;
@@ -336,7 +445,18 @@ pub(crate) fn search<F: FnMut(u32) -> bool>(
         if interrupted || scores.len() != initial.len() {
             break;
         }
-        selected = select_root(&scores, config.root_band, seed ^ depth as u64);
+        selected = select_root(
+            &scores,
+            if best_score.abs() >= WIN / 2 {
+                0
+            } else {
+                config.root_band
+            },
+            seed ^ depth as u64,
+        );
+        initial.sort_by_key(|index| {
+            std::cmp::Reverse(scores.iter().find(|(point, _)| point == index).unwrap().1)
+        });
         completed_depth = depth;
         if scores.iter().any(|entry| entry.1 >= WIN - 20) {
             break;
@@ -352,22 +472,22 @@ pub(crate) fn search<F: FnMut(u32) -> bool>(
 pub(crate) fn config(difficulty: &str) -> SearchConfig {
     match difficulty {
         "easy" => SearchConfig {
-            max_depth: 1,
+            max_depth: 2,
             node_limit: 30_000,
-            candidate_limit: 8,
-            root_band: 60_000,
+            candidate_limit: 10,
+            root_band: 2_000,
         },
         "hard" => SearchConfig {
-            max_depth: 5,
+            max_depth: 8,
             node_limit: 1_500_000,
-            candidate_limit: 16,
-            root_band: 800,
+            candidate_limit: 20,
+            root_band: 120,
         },
         _ => SearchConfig {
-            max_depth: 3,
+            max_depth: 5,
             node_limit: 300_000,
-            candidate_limit: 12,
-            root_band: 8_000,
+            candidate_limit: 16,
+            root_band: 600,
         },
     }
 }
@@ -385,6 +505,30 @@ mod tests {
             board[at(*row, *column) as usize] = *side;
         }
         Position::from_board(&board).unwrap()
+    }
+
+    #[test]
+    fn leaf_search_resolves_forcing_threats() {
+        let position = placed(&[(7, 4, BLACK), (7, 5, BLACK), (7, 6, BLACK), (7, 7, BLACK)]);
+        let mut searcher = Searcher {
+            config: config("easy"),
+            nodes: 0,
+            stopped: |_| false,
+            table: HashMap::new(),
+        };
+        let bounds = (i32::MIN / 2, i32::MAX / 2);
+        assert!(
+            searcher
+                .negamax(&position, BLACK, 0, bounds, None, 1)
+                .unwrap()
+                > WIN - 10
+        );
+        assert!(
+            searcher
+                .negamax(&position, WHITE, 0, bounds, None, 1)
+                .unwrap()
+                < -WIN + 10
+        );
     }
 
     #[test]

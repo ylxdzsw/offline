@@ -155,9 +155,62 @@ pub fn search<F: FnMut() -> bool>(
     seed: u64,
     mut stopped: F,
 ) -> SearchResult {
+    let (black, white) = position.score();
+    if position.pass_count() == 1
+        && ((position.turn() == BLACK && black > white)
+            || (position.turn() == WHITE && white > black))
+    {
+        return SearchResult {
+            selected: None,
+            simulations: 0,
+            nodes: 1,
+        };
+    }
     let root_board = FastBoard::from_position(position);
     let mut rng = SplitMix64(seed);
     let mut root_candidates = candidates(&root_board, &mut rng);
+    let tactical = root_tactics(&root_board);
+    if let Some(forced) = tactical.forced {
+        root_candidates = forced
+            .into_iter()
+            .map(|index| Candidate {
+                index,
+                prior: 1_000.0 + rng.unit() * 0.001,
+            })
+            .collect();
+        if root_candidates.len() == 1 {
+            return SearchResult {
+                selected: Some(root_candidates[0].index),
+                simulations: 0,
+                nodes: 1,
+            };
+        }
+    } else {
+        // A forcing attack is useful, but a chain that can already be killed
+        // need not be removed immediately. Let wider search judge the timing.
+        for (index, bonus) in tactical.priors {
+            if let Some(candidate) = root_candidates
+                .iter_mut()
+                .find(|candidate| candidate.index == index)
+            {
+                candidate.prior += bonus;
+            } else if bonus > 0.0 {
+                // A proven throw-in can be self-atari. Restore that move while
+                // keeping unproven sacrifices out of the general move policy.
+                root_candidates.push(Candidate {
+                    index,
+                    prior: bonus,
+                });
+            }
+        }
+        if root_candidates
+            .iter()
+            .any(|candidate| candidate.index != PASS)
+        {
+            root_candidates.retain(|candidate| candidate.index != PASS);
+        }
+        root_candidates.sort_by(|left, right| left.prior.total_cmp(&right.prior));
+    }
     if root_candidates.is_empty() {
         return SearchResult {
             selected: None,
@@ -187,7 +240,9 @@ pub fn search<F: FnMut() -> bool>(
     let mut simulations = 0;
 
     while simulations < config.simulation_limit && !stopped() {
-        run_simulation(&root_board, &mut nodes, config, &mut rng, &mut stopped);
+        if !run_simulation(&root_board, &mut nodes, config, &mut rng, &mut stopped) {
+            break;
+        }
         simulations += 1;
     }
 
@@ -223,7 +278,7 @@ fn run_simulation<F: FnMut() -> bool>(
     config: SearchConfig,
     rng: &mut SplitMix64,
     stopped: &mut F,
-) {
+) -> bool {
     let mut board = root_board.clone();
     let mut path = vec![0_usize];
     let mut played_moves = Vec::with_capacity(board.area());
@@ -272,7 +327,9 @@ fn run_simulation<F: FnMut() -> bool>(
     }
 
     let tree_moves = played_moves.len();
-    playout(&mut board, rng, stopped, &mut played_moves);
+    if !playout(&mut board, rng, stopped, &mut played_moves) {
+        return false;
+    }
     let (black, white) = board.area_score();
     backpropagate(
         nodes,
@@ -283,6 +340,7 @@ fn run_simulation<F: FnMut() -> bool>(
         white,
         board.area(),
     );
+    true
 }
 
 fn select_child(parent_index: usize, nodes: &[Node]) -> Option<usize> {
@@ -386,6 +444,341 @@ fn result_for(black_score: f32, white_score: f32, side: u8, area: usize) -> f32 
     }
 }
 
+// Read forcing exchanges before allowing short playouts to choose a quiet
+// move. Proven tactics outrank uncertain attempts to save an atari chain.
+struct RootTactics {
+    forced: Option<Vec<u16>>,
+    priors: Vec<(u16, f32)>,
+}
+
+fn root_tactics(board: &FastBoard) -> RootTactics {
+    let side = board.turn();
+    let mut seen = [false; MAX_AREA];
+    let mut urgent = [false; MAX_AREA];
+    let mut targets = Vec::new();
+    for index in 0..board.area() as u16 {
+        let color = board.cell(index);
+        if color == EMPTY || seen[index as usize] {
+            continue;
+        }
+        let (stones, liberties) = board.group(index);
+        for &stone in &stones {
+            seen[stone as usize] = true;
+        }
+        if liberties.len() > 6 || board.has_two_safe_regions(&stones, &liberties) {
+            continue;
+        }
+        let eye_space = small_eye_space(board, &liberties, color);
+        let reading_limit = eye_space.unwrap_or(3).max(3);
+        if liberties.len() <= 2 || eye_space.is_some() {
+            for &liberty in &liberties {
+                urgent[liberty as usize] = true;
+            }
+            let endangered_eye = if color == side && eye_space.is_some() && liberties.len() >= 2 {
+                let mut attacked = board.clone();
+                attacked.pass();
+                capture_read(
+                    &attacked,
+                    index,
+                    other(side),
+                    if reading_limit >= 5 { 24 } else { 14 },
+                    &mut 0,
+                    reading_limit,
+                ) == CaptureStatus::Captured
+            } else {
+                false
+            };
+            targets.push((
+                index,
+                stones.len() as i32,
+                color,
+                liberties.len(),
+                endangered_eye,
+                reading_limit,
+            ));
+        }
+    }
+    let mut choices = Vec::new();
+    let mut priors = Vec::new();
+    for (index, &is_urgent) in urgent[..board.area()].iter().enumerate() {
+        if !is_urgent {
+            continue;
+        }
+        let mut next = board.clone();
+        let Some(info) = next.play(index as u16) else {
+            continue;
+        };
+        let mut score = i32::from(info.captured) * 100;
+        let mut attack = 0;
+        let mut dead_extension = 0;
+        for &(target, size, color, old_liberties, endangered_eye, reading_limit) in &targets {
+            if next.cell(target) != color {
+                continue;
+            }
+            let liberties = next.group(target).1;
+            let mut nodes = 0;
+            if color == side {
+                let local = board.group(target).1.contains(&(index as u16)) || info.captured > 0;
+                let safety =
+                    if local && (old_liberties <= 2 || endangered_eye) && liberties.len() >= 2 {
+                        capture_read(
+                            &next,
+                            target,
+                            other(side),
+                            if reading_limit >= 5 { 24 } else { 12 },
+                            &mut nodes,
+                            reading_limit,
+                        )
+                    } else {
+                        CaptureStatus::Unknown
+                    };
+                if info.captured == 0 && safety == CaptureStatus::Captured {
+                    dead_extension += size;
+                }
+                if (old_liberties == 1 || endangered_eye)
+                    && liberties.len() >= 2
+                    && safety == CaptureStatus::Escaped
+                {
+                    score += size * 120;
+                } else if old_liberties == 1
+                    && liberties.len() >= 2
+                    && safety == CaptureStatus::Unknown
+                {
+                    // Unfinished reading is not a proof of safety, but giving
+                    // up an atari chain loses it immediately. Prefer its best
+                    // unrefuted defense below a proved escape or equal capture.
+                    score += size * 80;
+                }
+            } else if board.group(target).1.contains(&(index as u16))
+                && capture_read(
+                    &next,
+                    target,
+                    side,
+                    if reading_limit >= 5 { 24 } else { 14 },
+                    &mut nodes,
+                    reading_limit,
+                ) == CaptureStatus::Captured
+            {
+                if old_liberties >= 3 {
+                    // Occupying the vital point denies the opponent two eyes.
+                    score += size * 90;
+                } else {
+                    attack += size;
+                }
+            }
+        }
+        let mut sacrificed = 0;
+        if info.liberties == 1 {
+            let liberty = next.group(index as u16).1[0];
+            if next.probe(liberty).is_some() {
+                sacrificed = i32::from(info.stones);
+                score -= sacrificed * 120;
+            }
+        }
+        if score > 0 {
+            choices.push((index as u16, score));
+        }
+        let bonus = if attack > 0 && attack + i32::from(info.captured) > sacrificed {
+            18.0 + attack.min(8) as f32 * 5.0
+        } else {
+            0.0
+        };
+        // Extending to three liberties need not escape an edge net. Penalize
+        // only a proved losing extension, accounting for profitable sacrifices.
+        let penalty = if info.captured == 0 {
+            (dead_extension.max(sacrificed) - attack).clamp(0, 8) as f32 * 24.0
+        } else {
+            0.0
+        };
+        if bonus != 0.0 || penalty != 0.0 {
+            priors.push((index as u16, bonus - penalty));
+        }
+    }
+    let forced = choices.iter().map(|(_, score)| *score).max().map(|best| {
+        choices
+            .into_iter()
+            .filter_map(|(index, score)| (score == best).then_some(index))
+            .collect()
+    });
+    RootTactics { forced, priors }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CaptureStatus {
+    Captured,
+    Escaped,
+    Unknown,
+}
+
+// Include invading stones inside a tiny eye space so its life-and-death
+// context survives across actual turns, as well as within one local reading.
+fn small_eye_space(board: &FastBoard, liberties: &[u16], side: u8) -> Option<usize> {
+    if liberties.len() > 6 {
+        return None;
+    }
+    let mut region = liberties.to_vec();
+    let mut cursor = 0;
+    while cursor < region.len() {
+        let point = region[cursor];
+        cursor += 1;
+        for neighbor in board.neighbors(point).into_iter().flatten() {
+            if board.cell(neighbor) != side && !region.contains(&neighbor) {
+                region.push(neighbor);
+                if region.len() > 6 {
+                    return None;
+                }
+            }
+        }
+    }
+    Some(region.len())
+}
+
+fn enclosed_liberties(board: &FastBoard, liberties: &[u16], side: u8) -> bool {
+    liberties.iter().all(|&liberty| {
+        board
+            .neighbors(liberty)
+            .into_iter()
+            .flatten()
+            .all(|neighbor| board.cell(neighbor) == side || liberties.contains(&neighbor))
+    })
+}
+
+#[cfg(test)]
+fn capture_status(
+    board: &FastBoard,
+    target: u16,
+    attacker: u8,
+    depth: u8,
+    nodes: &mut u16,
+) -> CaptureStatus {
+    let liberties = board.group(target).1;
+    let limit = if liberties.len() <= 6 && enclosed_liberties(board, &liberties, other(attacker)) {
+        liberties.len().max(3)
+    } else {
+        3
+    };
+    capture_read(board, target, attacker, depth, nodes, limit)
+}
+
+fn capture_read(
+    board: &FastBoard,
+    target: u16,
+    attacker: u8,
+    depth: u8,
+    nodes: &mut u16,
+    liberty_limit: usize,
+) -> CaptureStatus {
+    // A two-liberty ladder proof is conservative: reaching three liberties
+    // counts as a defense. Prove cheap ladders first before widening the net.
+    if liberty_limit == 3
+        && board.cell(target) == other(attacker)
+        && board.group(target).1.len() <= 2
+    {
+        let result = capture_tree(board, target, attacker, depth, nodes, 2);
+        if result == CaptureStatus::Captured {
+            return result;
+        }
+    }
+    if liberty_limit == 3 && depth > 4 {
+        // Look for short escape proofs before one long defensive branch uses
+        // the shared node budget. Unknown remains unknown at the shallow cap.
+        let result = capture_tree(board, target, attacker, 4, nodes, liberty_limit);
+        if result != CaptureStatus::Unknown {
+            return result;
+        }
+    }
+    capture_tree(board, target, attacker, depth, nodes, liberty_limit)
+}
+
+fn capture_tree(
+    board: &FastBoard,
+    target: u16,
+    attacker: u8,
+    depth: u8,
+    nodes: &mut u16,
+    liberty_limit: usize,
+) -> CaptureStatus {
+    if board.cell(target) != other(attacker) {
+        return CaptureStatus::Captured;
+    }
+    let (stones, liberties) = board.group(target);
+    if liberties.len() > liberty_limit || board.has_two_safe_regions(&stones, &liberties) {
+        return CaptureStatus::Escaped;
+    }
+    if depth == 0 || *nodes >= 768 {
+        return CaptureStatus::Unknown;
+    }
+    *nodes += 1;
+    let attacking = board.turn() == attacker;
+    let mut moves = liberties;
+    if !attacking {
+        for stone in stones {
+            for neighbor in board.neighbors(stone).into_iter().flatten() {
+                if board.cell(neighbor) == attacker {
+                    let (_, enemy_liberties) = board.group(neighbor);
+                    if enemy_liberties.len() == 1 {
+                        moves.push(enemy_liberties[0]);
+                    }
+                }
+            }
+        }
+        moves.sort_unstable();
+        moves.dedup();
+    }
+    // Try expanding/countercapturing defenses before tenuki so an obvious
+    // escape does not consume the entire proof budget on pass variations.
+    if !attacking {
+        moves.sort_unstable_by_key(|&index| {
+            board.probe(index).map_or(0, |info| {
+                -(i32::from(info.liberties) * 16 + i32::from(info.captured))
+            })
+        });
+    }
+    if attacking && liberty_limit >= 4 {
+        // The center of a small eye space is usually its vital point.
+        moves.sort_unstable_by_key(|&index| {
+            -(board
+                .neighbors(index)
+                .into_iter()
+                .flatten()
+                .filter(|&neighbor| board.cell(neighbor) == EMPTY)
+                .count() as i32)
+        });
+    }
+    let mut unknown = false;
+    for index in moves {
+        let mut next = board.clone();
+        if next.play(index).is_none() {
+            continue;
+        }
+        let result = capture_tree(&next, target, attacker, depth - 1, nodes, liberty_limit);
+        if attacking && result == CaptureStatus::Captured
+            || !attacking && result == CaptureStatus::Escaped
+        {
+            return result;
+        }
+        unknown |= result == CaptureStatus::Unknown;
+    }
+    if !attacking {
+        // A defender may tenuki. In seki, every local move loses but passing
+        // is safe; omitting this branch incorrectly proves mutual-life kills.
+        let mut next = board.clone();
+        next.pass();
+        let result = capture_tree(&next, target, attacker, depth - 1, nodes, liberty_limit);
+        if result == CaptureStatus::Escaped {
+            return result;
+        }
+        unknown |= result == CaptureStatus::Unknown;
+    }
+    if unknown {
+        CaptureStatus::Unknown
+    } else if attacking {
+        CaptureStatus::Escaped
+    } else {
+        CaptureStatus::Captured
+    }
+}
+
 fn candidates(board: &FastBoard, rng: &mut SplitMix64) -> Vec<Candidate> {
     let mut moves = Vec::with_capacity(board.area());
     let settled = board.settled_territory();
@@ -396,7 +789,7 @@ fn candidates(board: &FastBoard, rng: &mut SplitMix64) -> Vec<Candidate> {
         let Some(info) = board.probe(index) else {
             continue;
         };
-        if board.is_true_eye(index, board.turn()) && info.captured == 0 {
+        if (board.is_true_eye(index, board.turn()) || info.liberties == 1) && info.captured == 0 {
             continue;
         }
         if !board.is_meaningful_endgame_move(index, info, settled.as_ref()) {
@@ -439,6 +832,7 @@ fn opening_move(size: u8, candidates: &[Candidate], rng: &mut SplitMix64) -> Opt
     ];
     let available: Vec<_> = points
         .into_iter()
+        .filter(|&(row, column)| size == 9 || row != middle || column != middle)
         .map(|(row, column)| row as u16 * size as u16 + column as u16)
         .filter(|index| candidates.iter().any(|candidate| candidate.index == *index))
         .collect();
@@ -447,13 +841,34 @@ fn opening_move(size: u8, candidates: &[Candidate], rng: &mut SplitMix64) -> Opt
 
 fn move_prior(board: &FastBoard, index: u16, info: MoveInfo) -> f32 {
     let side = board.turn();
-    let mut friendly = 0.0;
-    let mut opponent = 0.0;
+    let mut friendly = 0;
+    let mut opponent = 0;
+    let mut groups = Vec::new();
+    let mut prior_liberties = 0;
+    let mut tactics = 0.0;
     for neighbor in board.neighbors(index).into_iter().flatten() {
-        match board.cell(neighbor) {
-            color if color == side => friendly += 1.0,
-            EMPTY => {}
-            _ => opponent += 1.0,
+        let color = board.cell(neighbor);
+        if color == EMPTY {
+            continue;
+        }
+        if color == side {
+            friendly += 1;
+        } else {
+            opponent += 1;
+        }
+        let (stones, liberties) = board.group(neighbor);
+        let identity = *stones.iter().min().unwrap();
+        if groups.contains(&identity) {
+            continue;
+        }
+        groups.push(identity);
+        if color == side {
+            prior_liberties += liberties.len() as i32;
+            if liberties.len() <= 2 && info.liberties >= 3 {
+                tactics += stones.len().min(6) as f32 * 16.0;
+            }
+        } else if liberties.len() == 2 && info.liberties >= 2 {
+            tactics += stones.len().min(6) as f32 * 13.0;
         }
     }
     let row = index / board.size as u16;
@@ -462,15 +877,60 @@ fn move_prior(board: &FastBoard, index: u16, info: MoveInfo) -> f32 {
         .min(column)
         .min(board.size as u16 - 1 - row)
         .min(board.size as u16 - 1 - column) as f32;
-    let self_atari = info.liberties == 1 && info.captured == 0;
+    let gain = (i32::from(info.liberties) - prior_liberties).clamp(-3, 4) as f32;
+    let mut nearest_friend = board.size as i32;
+    let mut nearest_enemy = board.size as i32;
+    for point in 0..board.area() {
+        let color = board.cell(point as u16);
+        if color == EMPTY {
+            continue;
+        }
+        let distance = (point as i32 / board.size as i32 - i32::from(row))
+            .abs()
+            .max((point as i32 % board.size as i32 - i32::from(column)).abs());
+        if color == side {
+            nearest_friend = nearest_friend.min(distance);
+        } else {
+            nearest_enemy = nearest_enemy.min(distance);
+        }
+    }
+    let development = if board.state.moves < board.area() as u16 / 2 {
+        let spacing = if nearest_friend == 1 && nearest_enemy > 2 {
+            -20.0
+        } else if (2..=3).contains(&nearest_friend) {
+            12.0
+        } else {
+            0.0
+        };
+        let line = if edge == 0.0 {
+            -30.0
+        } else if edge == 1.0 {
+            -10.0
+        } else if edge <= 3.0 {
+            12.0
+        } else {
+            3.0
+        };
+        spacing + line
+    } else {
+        0.0
+    };
     info.captured as f32 * 80.0
-        + info.liberties.min(8) as f32 * 3.0
-        + info.stones.min(8) as f32
-        + opponent * 6.0
-        + friendly * 2.0
-        + edge.min(3.0) * 2.0
+        + tactics
+        + gain * 3.0
+        + development
         + opening_shape_prior(board, index, info, edge)
-        - if self_atari { 60.0 } else { 0.0 }
+        - if opponent > 0 && nearest_friend > 1 {
+            14.0
+        } else {
+            0.0
+        }
+        - if friendly >= 3 { 30.0 } else { 0.0 }
+        - if info.liberties == 1 && info.stones > info.captured {
+            (info.stones - info.captured) as f32 * 100.0
+        } else {
+            0.0
+        }
 }
 
 fn opening_shape_prior(board: &FastBoard, index: u16, info: MoveInfo, edge: f32) -> f32 {
@@ -494,17 +954,21 @@ fn playout<F: FnMut() -> bool>(
     rng: &mut SplitMix64,
     stopped: &mut F,
     played: &mut Vec<(u8, u16)>,
-) {
+) -> bool {
     let limit = board.area() + board.area() / 2;
     for ply in 0..limit {
-        if board.state.passes >= 2 || ply % 16 == 0 && stopped() {
-            break;
+        if board.state.passes >= 2 {
+            return true;
+        }
+        if ply % 16 == 0 && stopped() {
+            return false;
         }
         let side = board.turn();
         let index = playout_move(board, rng).unwrap_or(PASS);
         board.play_candidate(index);
         played.push((side, index));
     }
+    true
 }
 
 fn playout_move(board: &FastBoard, rng: &mut SplitMix64) -> Option<u16> {
@@ -516,7 +980,12 @@ fn playout_move(board: &FastBoard, rng: &mut SplitMix64) -> Option<u16> {
             .then_with(|| right.0.cmp(&left.0))
     });
     while !tactical.is_empty() {
-        let window = tactical.len().min(3);
+        let best = tactical.last().unwrap().1;
+        let window = tactical
+            .iter()
+            .rev()
+            .take_while(|(_, weight)| *weight >= best * 0.9)
+            .count();
         let selected = tactical.len() - 1 - rng.index(window);
         let (index, _) = tactical.swap_remove(selected);
         if sensible_probe(board, index, settled.as_ref()).is_some() {
@@ -577,7 +1046,7 @@ fn sensible_probe(board: &FastBoard, index: u16, settled: Option<&EndgameMap>) -
     if board.is_true_eye(index, board.turn()) && info.captured == 0 {
         return None;
     }
-    if info.liberties == 1 && info.captured == 0 && info.stones <= 2 {
+    if info.liberties == 1 && info.captured == 0 {
         return None;
     }
     if !board.is_meaningful_endgame_move(index, info, settled) {
@@ -608,9 +1077,9 @@ fn tactical_moves(board: &FastBoard) -> Vec<(u16, f32)> {
         }
         seen_moves[liberty as usize] = true;
         let weight = if color == board.turn() {
-            700.0 + stones.len() as f32 * 28.0
+            60.0 + stones.len() as f32 * 150.0
         } else {
-            900.0 + stones.len() as f32 * 42.0
+            40.0 + stones.len() as f32 * 150.0
         };
         result.push((liberty, weight));
     }
@@ -723,6 +1192,56 @@ impl FastBoard {
         false
     }
 
+    // A sufficient pass-alive proof for one connected group. Each accepted region
+    // consists entirely of this group's liberties and has no other stone boundary.
+    // Filling either region would require suicide while the other stays empty.
+    fn has_two_safe_regions(&self, stones: &[u16], liberties: &[u16]) -> bool {
+        let mut own = [false; MAX_AREA];
+        let mut liberty = [false; MAX_AREA];
+        let mut visited = [false; MAX_AREA];
+        for &point in stones {
+            own[point as usize] = true;
+        }
+        for &point in liberties {
+            liberty[point as usize] = true;
+        }
+        let mut regions = 0;
+        for &start in liberties {
+            if visited[start as usize] {
+                continue;
+            }
+            let mut points = vec![start];
+            let mut cursor = 0;
+            let mut sealed = true;
+            visited[start as usize] = true;
+            while cursor < points.len() {
+                let point = points[cursor];
+                cursor += 1;
+                for neighbor in self.neighbors(point).into_iter().flatten() {
+                    if self.cell(neighbor) == EMPTY {
+                        if !liberty[neighbor as usize] {
+                            // The empty component extends beyond this group's liberties.
+                            sealed = false;
+                        } else if !visited[neighbor as usize] {
+                            visited[neighbor as usize] = true;
+                            points.push(neighbor);
+                        }
+                    } else if !own[neighbor as usize] {
+                        // Even a friendly but separate boundary group could still die.
+                        sealed = false;
+                    }
+                }
+            }
+            if sealed {
+                regions += 1;
+                if regions == 2 {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
     fn is_true_eye(&self, index: u16, side: u8) -> bool {
         if self.cell(index) != EMPTY {
             return false;
@@ -803,10 +1322,15 @@ impl FastBoard {
                 continue;
             }
             let (stones, liberties) = self.group(index);
-            for stone in stones {
+            for &stone in &stones {
                 visited[stone as usize] = true;
             }
-            if liberties.len() <= 2 {
+            // An enclosed three/four-point eye space can still be killed.
+            // Territory borders alone do not establish two-eye life.
+            if (liberties.len() <= 2
+                || liberties.len() <= 4 && enclosed_liberties(self, &liberties, self.cell(index)))
+                && !self.has_two_safe_regions(&stones, &liberties)
+            {
                 for liberty in liberties {
                     map.urgent[liberty as usize] = true;
                 }
@@ -1040,6 +1564,16 @@ mod tests {
     }
 
     #[test]
+    fn accepts_a_winning_second_pass() {
+        let position = Position::from_records(9, &[Record::Pass]).unwrap();
+        let result = search(&position, config("easy", 9), 7, || false);
+        assert_eq!(result.selected, None);
+        let mut finished = position;
+        finished.pass().unwrap();
+        assert_eq!(finished.outcome().winner, Some(WHITE));
+    }
+
+    #[test]
     fn opening_search_uses_a_standard_point() {
         let position = Position::from_records(13, &[]).unwrap();
         let result = search(&position, config("medium", 13), 7, || false);
@@ -1068,7 +1602,7 @@ mod tests {
     }
 
     #[test]
-    fn search_prioritizes_an_immediate_capture_without_bypassing_search() {
+    fn search_takes_an_immediate_safe_capture() {
         let size = 9;
         let records = [
             Record::Play(at(1, 1, size)),
@@ -1098,7 +1632,297 @@ mod tests {
             || false,
         );
         assert!(position.legal_moves().contains(&result.selected.unwrap()));
-        assert!(result.simulations > 0);
+        assert_eq!(result.selected, Some(capture));
+    }
+
+    #[test]
+    fn contract_atari_histories_have_forced_captures_and_defenses() {
+        let fixtures = [
+            (vec![(4, 4), (3, 4), (0, 0), (4, 3), (0, 2), (4, 5)], (5, 4)),
+            (vec![(3, 4), (4, 4), (4, 3), (0, 0), (4, 5), (0, 2)], (5, 4)),
+            (
+                vec![
+                    (3, 4),
+                    (4, 4),
+                    (3, 5),
+                    (4, 5),
+                    (4, 3),
+                    (0, 0),
+                    (4, 6),
+                    (0, 2),
+                    (5, 4),
+                    (0, 4),
+                ],
+                (5, 5),
+            ),
+            (vec![(1, 0), (1, 1), (0, 1), (3, 1), (1, 2)], (2, 1)),
+            (
+                vec![
+                    (3, 4),
+                    (4, 4),
+                    (4, 3),
+                    (3, 3),
+                    (4, 5),
+                    (4, 2),
+                    (5, 5),
+                    (0, 8),
+                    (6, 4),
+                ],
+                (5, 3),
+            ),
+        ];
+        for size in [9_u16, 13, 19] {
+            for (points, (row, column)) in &fixtures {
+                let records: Vec<_> = points
+                    .iter()
+                    .map(|&(r, c)| Record::Play(at(r, c, size)))
+                    .collect();
+                let position = Position::from_records(size as u8, &records).unwrap();
+                let board = FastBoard::from_position(&position);
+                assert_eq!(
+                    root_tactics(&board).forced,
+                    Some(vec![at(*row, *column, size)])
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn atari_saves_extend_connect_and_countercapture_for_every_seed() {
+        for (indices, expected) in [
+            (vec![9, 10, 1, 60, 11], 19),
+            (vec![9, 10, 1, 28, 11], 19),
+            (vec![31, 40, 39, 30, 41, 38, 50, 8, 58], 48),
+        ] {
+            let records: Vec<_> = indices.into_iter().map(Record::Play).collect();
+            let position = Position::from_records(9, &records).unwrap();
+            for seed in 0..16 {
+                assert_eq!(
+                    search(&position, config("easy", 9), seed, || false).selected,
+                    Some(expected)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn local_reading_preserves_life_kills_and_proven_throw_ins() {
+        let rows = [
+            "BBBBBWWWW",
+            "B...BWWWW",
+            "BBBBBWWWW",
+            "WWWWWWWWW",
+            "W.W.WWWWW",
+            "WWWWWWWWW",
+            "WWWWWWWWW",
+            "WWWWWWWWW",
+            "WWWWWWWWW",
+        ];
+        for side in [BLACK, WHITE] {
+            let board = diagram(&rows, side, 76);
+            assert_eq!(root_tactics(&board).forced, Some(vec![11]));
+            assert!(
+                candidates(&board, &mut SplitMix64(1))
+                    .iter()
+                    .any(|candidate| candidate.index == 11)
+            );
+        }
+        let board = diagram(
+            &[
+                "BWWWWB...",
+                "BW..WB...",
+                "BWWWWB...",
+                "BBBBBB...",
+                ".........",
+                ".........",
+                ".........",
+                ".........",
+                ".........",
+            ],
+            BLACK,
+            25,
+        );
+        for point in [11, 12] {
+            let info = board.probe(point).unwrap();
+            assert_eq!(info.liberties, 1);
+            assert_eq!(info.captured, 0);
+        }
+        let tactical = root_tactics(&board);
+        assert!(tactical.forced.is_none());
+        assert_eq!(
+            tactical
+                .priors
+                .iter()
+                .map(|(index, _)| *index)
+                .collect::<Vec<_>>(),
+            vec![11, 12]
+        );
+    }
+
+    #[test]
+    fn reads_the_vital_point_of_a_five_point_eye_without_filling_safe_territory() {
+        let rows = [
+            "BBBBBBWWW",
+            "B..BBBWWW",
+            "B...BBWWW",
+            "BBBBBBWWW",
+            "WWWWWWWWW",
+            "W.W.WWWWW",
+            "WWWWWWWWW",
+            "WWWWWWWWW",
+            "WWWWWWWWW",
+        ];
+        for side in [BLACK, WHITE] {
+            let board = diagram(&rows, side, 74);
+            assert_eq!(
+                root_tactics(&board).forced,
+                Some(if side == BLACK {
+                    vec![11, 19, 20]
+                } else {
+                    vec![20]
+                })
+            );
+        }
+        let mut board = diagram(&rows, BLACK, 74);
+        board.play(11).unwrap();
+        board.play(20).unwrap();
+        assert_eq!(root_tactics(&board).forced, Some(vec![19]));
+    }
+
+    #[test]
+    fn two_separate_eye_spaces_do_not_force_an_unnecessary_repair() {
+        let board = diagram(
+            &[
+                "BBBBBBBWW",
+                "B.B..BBWW",
+                "BBBBBBBWW",
+                "WWWWWWWWW",
+                "W.W.WWWWW",
+                "WWWWWWWWW",
+                "WWWWWWWWW",
+                "WWWWWWWWW",
+                "WWWWWWWWW",
+            ],
+            BLACK,
+            76,
+        );
+        assert!(root_tactics(&board).forced.is_none());
+        let moves = candidates(&board, &mut SplitMix64(1));
+        assert_eq!(
+            moves
+                .iter()
+                .map(|candidate| candidate.index)
+                .collect::<Vec<_>>(),
+            vec![PASS]
+        );
+    }
+
+    #[test]
+    fn defender_can_pass_to_preserve_mutual_life() {
+        let rows = [
+            "BBBBWWWWW",
+            "BBBBWWWWW",
+            "BBBBWWWWW",
+            "BBBB.WWWW",
+            "BBBB.WWWW",
+            "BBBBWWWWW",
+            "BBBBWWWWW",
+            "BBBBWWWWW",
+            "BBBBWWWWW",
+        ];
+        for turn in [BLACK, WHITE] {
+            let board = diagram(&rows, turn, 79);
+            assert_eq!(
+                capture_status(&board, 4, BLACK, 12, &mut 0),
+                CaptureStatus::Escaped
+            );
+            assert!(root_tactics(&board).forced.is_none());
+        }
+    }
+
+    #[test]
+    fn three_liberties_do_not_escape_a_proven_edge_net() {
+        let board = diagram(
+            &[
+                ".BWWW........",
+                ".BWBWWW...W..",
+                ".BBBWBWW.....",
+                ".BBBWBW.WW.W.",
+                ".BWBBBBW.W...",
+                "WBWBBBBBW.W.W",
+                "..WWB..BBW.W.",
+                "..WBBWWBW.WW.",
+                "BBBBBBBWWW..W",
+                "BWWBBWWWW.W..",
+                "BBWWWBBBBWWW.",
+                "WWWBBBBBBBBW.",
+                "W.W..B..B..B.",
+            ],
+            WHITE,
+            115,
+        );
+        let mut next = board.clone();
+        assert_eq!(next.play(78).unwrap().liberties, 3);
+        assert_eq!(
+            capture_status(&next, 65, next.turn(), 12, &mut 0),
+            CaptureStatus::Captured
+        );
+        assert!(
+            root_tactics(&board)
+                .priors
+                .iter()
+                .any(|&(index, prior)| index == 78 && prior < 0.0)
+        );
+        let board = diagram(
+            &[
+                ".WW..B.B.....",
+                ".BWWWBW.WWWB.",
+                ".BBBWBWWWBB..",
+                ".WBBWBBWWB..B",
+                "WWBWWWWWWWBB.",
+                ".WBBBW.WWBW.B",
+                ".WWBBWWBWBW..",
+                ".WWBWWBBWB.B.",
+                "WWWW.WWBWBB.B",
+                "W.BBWWWBB.B..",
+                "WWB.BWBB.BB..",
+                ".B..BB..B..B.",
+                "..B....B.B...",
+            ],
+            BLACK,
+            114,
+        );
+        let mut next = board.clone();
+        assert_eq!(next.play(6).unwrap().liberties, 3);
+        assert_eq!(
+            capture_status(&next, 5, next.turn(), 12, &mut 0),
+            CaptureStatus::Captured
+        );
+        assert!(
+            root_tactics(&board)
+                .priors
+                .iter()
+                .any(|&(index, prior)| index == 6 && prior < 0.0)
+        );
+    }
+    #[test]
+    fn incomplete_ladder_reading_is_unknown_not_an_escape() {
+        let records: Vec<_> = [21, 30, 29, 0, 31, 2, 48]
+            .into_iter()
+            .map(Record::Play)
+            .collect();
+        let position = Position::from_records(9, &records).unwrap();
+        let mut board = FastBoard::from_position(&position);
+        assert!(root_tactics(&board).forced.is_none());
+        board.play(39).unwrap();
+        assert_eq!(
+            capture_status(&board, 30, BLACK, 8, &mut 0),
+            CaptureStatus::Unknown
+        );
+        assert_eq!(
+            capture_status(&board, 30, BLACK, 20, &mut 0),
+            CaptureStatus::Captured
+        );
     }
 
     #[test]

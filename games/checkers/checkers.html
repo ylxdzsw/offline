@@ -1,5 +1,6 @@
 <template id="checkers-game-template">
     <style>
+        *, *::before, *::after { box-sizing: border-box; }
         :host { display: block; color: var(--ink); }
         .toolbar {
             display: grid; grid-template-columns: 1fr auto auto; gap: 8px;
@@ -132,6 +133,8 @@
             .mini-piece { width: 23px; }
             .score-label { font-size: .7rem; }
         }
+        .retry { width: 100%; margin: 0 0 9px; }
+        .retry[hidden] { display: none; }
     </style>
     <div class="toolbar">
         <label><span class="difficulty-label"></span><select class="difficulty"><option value="easy"></option><option value="medium"></option><option value="hard"></option></select></label>
@@ -152,7 +155,7 @@
             <span class="mini-piece red" aria-hidden="true"></span>
         </div>
     </div>
-    <div class="status" role="status" aria-live="polite"></div>
+    <div class="status" role="status" aria-live="polite"></div><button class="action retry" type="button" hidden></button>
     <div class="board" role="grid"></div>
 </template>
 
@@ -247,7 +250,36 @@ OfflineGames.wasm.defineElement('checkers', 'checkers-game', class extends HTMLE
         }))
     }
 
+    bindBoardKeys() {
+        const board = this.shadowRoot.querySelector('.board')
+        for (const button of board.querySelectorAll('.square')) button.tabIndex = button.matches('[data-index="40"]') ? 0 : -1
+        board.addEventListener('focusin', event => {
+            const cell = event.target.closest('.square')
+            if (cell) for (const button of board.querySelectorAll('.square')) button.tabIndex = button === cell ? 0 : -1
+        })
+        board.addEventListener('keydown', event => {
+            const cell = event.target.closest('.square')
+            if (!cell) return
+            if (event.key === 'Escape') { event.preventDefault(); this.clearSelection();this.notice=null; this.render(); return }
+            const direction = {ArrowUp: [0,-1], ArrowDown: [0,1], ArrowLeft: [-1,0], ArrowRight: [1,0]}[event.key]
+            if (!direction) return
+            event.preventDefault()
+            const origin = cell.getBoundingClientRect(), x = origin.x + origin.width / 2, y = origin.y + origin.height / 2
+            const candidates = [...board.querySelectorAll('.square')].filter(button => !button.disabled && button !== cell).map(button => {
+                const rect = button.getBoundingClientRect(), dx = rect.x + rect.width / 2 - x, dy = rect.y + rect.height / 2 - y
+                return {button, forward: dx * direction[0] + dy * direction[1], cross: Math.abs(dx * direction[1] - dy * direction[0])}
+            }).filter(candidate => candidate.forward > 1).sort((a,b) => a.forward - b.forward || a.cross - b.cross)
+            const aligned = direction[0] ? candidates.filter(candidate => candidate.cross < 1) : []
+            ;(aligned[0] || candidates[0])?.button.focus()
+        })
+        this.shadowRoot.querySelector('.retry').addEventListener('click', () => this.requestAI())
+    }
+    failAI(error) {
+        if (error) console.error(error)
+        this.cancelAI(); this.aiFailed = true; this.render()
+    }
     bind() {
+        this.bindBoardKeys()
         const shadow = this.shadowRoot
         shadow.querySelector('.board').addEventListener('click', event => {
             const square = event.target.closest('.square')
@@ -374,7 +406,7 @@ OfflineGames.wasm.defineElement('checkers', 'checkers-game', class extends HTMLE
         this.aiFailed = false
         this.aiStartedAt = performance.now()
         const id = ++this.requestId
-        this.worker = OfflineGames.runtime.createWorker('checkers-worker-payload')
+        try { this.worker = OfflineGames.runtime.createWorker('checkers-worker-payload') } catch (error) { this.failAI(error); return }
         this.worker.onmessage = event => {
             if (event.data.id !== id || !this.thinking) return
             const move = this.legalMoveMatching(event.data.move)
@@ -389,18 +421,18 @@ OfflineGames.wasm.defineElement('checkers', 'checkers-game', class extends HTMLE
                 else { this.aiFailed = true; this.render() }
             }, delay)
         }
-        this.worker.onerror = error => {
-            console.error(error)
-            this.cancelAI(false)
-            this.aiFailed = true
-            this.render()
-        }
+        this.worker.onerror = error => this.failAI(error)
         this.worker.postMessage({
             id,
             board: this.state.board,
             side: this.engine.RED,
             difficulty: this.state.difficulty,
             seed: OfflineGames.runtime.moveSeed(this.state.seed, this.state.history.length),
+            options: {
+                halfmove: this.state.halfmove,
+                positions: [...this.state.history.map(state => ({board: state.board, side: state.turn})),
+                    {board: this.state.board, side: this.state.turn}],
+            },
         })
         this.render()
     }
@@ -463,7 +495,7 @@ OfflineGames.wasm.defineElement('checkers', 'checkers-game', class extends HTMLE
             return this.i18n.t(this.state.outcome.reason === 'repetition'
                 ? 'checkersDrawRepetition' : 'checkersDrawFortyMove')
         }
-        if (this.aiFailed) return this.i18n.t('checkersAiUnavailable')
+        if (this.aiFailed) return this.i18n.t('aiUnavailable')
         if (this.thinking || this.state.turn === this.engine.RED) return this.i18n.t('aiThinking')
         if (this.notice) return this.i18n.t(this.notice)
         if (this.movePath.length) return this.i18n.t('checkersContinueJump')
@@ -482,6 +514,8 @@ OfflineGames.wasm.defineElement('checkers', 'checkers-game', class extends HTMLE
     }
 
     render() {
+        const retry = this.shadowRoot.querySelector('.retry')
+        retry.hidden = !this.aiFailed; retry.textContent = this.i18n.t('retry')
         this.legal = this.state.outcome ? [] : this.engine.legalMoves(this.state.board, this.state.turn)
         const previewMove = this.selectedFrom != null && this.candidates.length ? this.candidates[0] : null
         const displayBoard = previewMove

@@ -16,7 +16,7 @@
         .action:disabled { opacity: .42; }
         .status {
             display: flex; min-height: 38px; align-items: center; justify-content: center;
-            margin: 0 0 9px; border-radius: var(--radius-sm);
+            margin: 0 0 9px; padding: 4px 10px; text-align: center; border-radius: var(--radius-sm);
             color: var(--status-ink); font-size: .92rem; font-weight: 700;
             background: var(--status-bg);
         }
@@ -63,6 +63,8 @@
             padding: 0; border: 0; border-radius: 50%; place-items: center;
             color: transparent; background: transparent; transform: translate(-50%, -50%);
         }
+        .spot:focus-visible { outline: 3px solid var(--selected); outline-offset: 2px; z-index: 4; }
+        .spot.check .piece { box-shadow: 0 0 0 3px var(--check); }
         .spot.legal::after {
             position: absolute; z-index: 2; width: 9px; height: 9px; border-radius: 50%; content: "";
             background: var(--legal); box-shadow: 0 0 0 4px var(--legal-soft);
@@ -95,6 +97,8 @@
             .toolbar { grid-template-columns: 1fr 1fr; gap: 6px; }
             .action { width: 100%; }
         }
+        .retry { width: 100%; min-height: var(--control-h,42px); margin: 0 0 9px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); color: var(--ink); background: var(--bg-surface); font-weight: 650; }
+        .retry[hidden] { display: none; }
     </style>
     <div class="toolbar">
         <label><span class="difficulty-label"></span><select class="difficulty">
@@ -110,7 +114,7 @@
         <button class="action new" type="button"></button>
     </div>
     <p class="warning" hidden></p>
-    <div class="status" role="status" aria-live="polite"></div>
+    <div class="status" role="status" aria-live="polite"></div><button class="retry" type="button" hidden></button>
     <div class="board" role="grid">
         <div class="field">
             <svg viewBox="0 0 8 9" preserveAspectRatio="none" aria-hidden="true">
@@ -189,6 +193,7 @@ OfflineGames.wasm.defineElement('xiangqi', 'xiangqi-game', class extends HTMLEle
     }
 
     bind() {
+        this.bindBoardKeys()
         const shadow = this.shadowRoot
         shadow.querySelector('.spots').addEventListener('click', event => {
             const button = event.target.closest('.spot')
@@ -233,7 +238,8 @@ OfflineGames.wasm.defineElement('xiangqi', 'xiangqi-game', class extends HTMLEle
             return
         }
         if (this.engine.sideOf(piece) === humanSide) {
-            this.select(index)
+            if (this.selected === index) { this.selected = null; this.legal = []; this.render() }
+            else this.select(index)
             return
         }
         const move = this.legal.find(candidate => candidate.to === index)
@@ -274,7 +280,7 @@ OfflineGames.wasm.defineElement('xiangqi', 'xiangqi-game', class extends HTMLEle
         this.thinking = true
         this.aiStartedAt = performance.now()
         const id = ++this.requestId
-        this.worker = OfflineGames.runtime.createWorker('xiangqi-worker-payload')
+        try { this.worker = OfflineGames.runtime.createWorker('xiangqi-worker-payload') } catch (error) { this.failAI(error); return }
         this.worker.onmessage = event => {
             if (event.data.id !== id || !this.thinking) return
             const legal = this.engine.legalMoves(this.state.board, aiSide)
@@ -287,19 +293,22 @@ OfflineGames.wasm.defineElement('xiangqi', 'xiangqi-game', class extends HTMLEle
                 if (id !== this.requestId || !this.thinking) return
                 this.thinking = false
                 if (move) this.commit(move, aiSide)
-                else this.render()
+                else this.failAI()
             }, delay)
         }
-        this.worker.onerror = error => {
-            console.error(error)
-            this.cancelAI(false)
-            this.render()
+        this.worker.onerror = error => this.failAI(error)
+        const positions = [{board: this.state.board, side: this.state.turn}]
+        let prior = this.state.board
+        for (const move of this.state.history.toReversed()) {
+            prior = this.engine.undoMove(prior, move)
+            positions.push({board: prior, side: move.side})
         }
-        this.worker.postMessage({id, board: this.state.board, side: aiSide, difficulty: this.state.difficulty, seed: OfflineGames.runtime.moveSeed(this.state.seed, this.state.history.length)})
+        this.worker.postMessage({id, board: this.state.board, side: aiSide, positions, difficulty: this.state.difficulty, seed: OfflineGames.runtime.moveSeed(this.state.seed, this.state.history.length)})
         this.render()
     }
 
     cancelAI(invalidate = true) {
+        this.aiFailed = false
         if (invalidate) this.requestId++
         if (this.worker) this.worker.terminate()
         if (this.aiTimer) clearTimeout(this.aiTimer)
@@ -350,6 +359,7 @@ OfflineGames.wasm.defineElement('xiangqi', 'xiangqi-game', class extends HTMLEle
     }
 
     statusText() {
+        if (this.aiFailed) return this.i18n.t('aiUnavailable')
         if (this.state.outcome) {
             if (!this.state.outcome.winner) return this.i18n.t('draw')
             return this.i18n.t(this.state.outcome.winner === this.state.humanSide ? 'youWin' : 'aiWins')
@@ -364,10 +374,44 @@ OfflineGames.wasm.defineElement('xiangqi', 'xiangqi-game', class extends HTMLEle
         return this.i18n.t('xiangqiPiece' + this.engine.typeOf(piece) + color)
     }
 
+    failAI(error) {
+        if (error) console.error(error)
+        this.cancelAI(); this.aiFailed = true; this.render()
+    }
+    bindBoardKeys() {
+        this.shadowRoot.querySelector('.retry').addEventListener('click', () => this.requestAI())
+        const board = this.shadowRoot.querySelector('.board')
+        board.addEventListener('focusin', event => {
+            const cell = event.target.closest('.spot')
+            if (!cell) return
+            this.focusIndex = Number(cell.dataset.index)
+            for (const button of board.querySelectorAll('.spot')) button.tabIndex = button === cell ? 0 : -1
+        })
+        board.addEventListener('keydown', event => {
+            const cell = event.target.closest('.spot')
+            if (!cell) return
+            const index = Number(cell.dataset.index), row = Math.floor(index / 9), column = index % 9, direction = this.state.humanSide===this.engine.BLACK?-1:1
+            const step = {ArrowUp: [-direction, 0], ArrowDown: [direction, 0], ArrowLeft: [0, -direction], ArrowRight: [0, direction]}[event.key]
+            if (event.key === 'Escape') { event.preventDefault(); this.selected=null;this.legal=[]; this.render(); return }
+            if (!step) return
+            event.preventDefault()
+            const nextRow = Math.max(0, Math.min(9, row + step[0])), nextColumn = Math.max(0, Math.min(8, column + step[1]))
+            board.querySelector(`[data-index="${nextRow * 9 + nextColumn}"]`).focus()
+        })
+    }
+    restoreBoardFocus(focused) {
+        const retry = this.shadowRoot.querySelector('.retry')
+        retry.hidden = !this.aiFailed; retry.textContent = this.i18n.t('retry')
+        this.focusIndex ??= 58
+        for (const button of this.shadowRoot.querySelectorAll('.spot')) button.tabIndex = Number(button.dataset.index) === this.focusIndex ? 0 : -1
+        if (focused != null) this.shadowRoot.querySelector(`.spot[data-index="${focused}"]`)?.focus({preventScroll: true})
+    }
     render() {
+        const focused = this.shadowRoot.activeElement?.dataset.index
         const shadow = this.shadowRoot
         const last = this.state.history.at(-1)
         const flipped = this.state.humanSide === this.engine.BLACK
+        const checked = new Set([this.engine.RED, this.engine.BLACK].filter(side => this.engine.isInCheck(this.state.board, side)).map(side => side + 'K'))
         const legalTargets = new Map(this.legal.map(move => [move.to, Boolean(move.captured)]))
         const glyphs = {rK: '帥', rA: '仕', rE: '相', rH: '馬', rR: '車', rC: '炮', rP: '兵', bK: '將', bA: '士', bE: '象', bH: '馬', bR: '車', bC: '砲', bP: '卒'}
         shadow.querySelector('.spots').innerHTML = this.state.board.map((piece, index) => {
@@ -377,6 +421,7 @@ OfflineGames.wasm.defineElement('xiangqi', 'xiangqi-game', class extends HTMLEle
             const displayColumn = flipped ? 8 - column : column
             const classes = ['spot']
             if (this.selected === index) classes.push('selected')
+            if (checked.has(piece)) classes.push('check')
             if (legalTargets.has(index)) classes.push(legalTargets.get(index) ? 'capture' : 'legal')
             if (last && (last.from === index || last.to === index)) classes.push('last')
             if (last?.to === index) classes.push('last-to')
@@ -398,6 +443,7 @@ OfflineGames.wasm.defineElement('xiangqi', 'xiangqi-game', class extends HTMLEle
         shadow.querySelector('.difficulty').value = this.state.difficulty
         shadow.querySelector('.side').value = this.state.humanSide
         shadow.querySelector('.undo').disabled = !this.state.history.some(move => move.side === this.state.humanSide)
+        this.restoreBoardFocus(focused)
     }
 })
 </script>

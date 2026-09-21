@@ -157,6 +157,14 @@ fn dispatch(request: Value) -> DispatchResult {
         "search" => {
             let position = position(&request)?;
             let side = side(&request, "side")?;
+            let positions = request.get("positions").map_or(Ok(Vec::new()), |values| {
+                values
+                    .as_array()
+                    .ok_or_else(|| DispatchError::new("positions must be an array"))?
+                    .iter()
+                    .map(|value| Ok((self::position(value)?, self::side(value, "side")?)))
+                    .collect::<Result<Vec<_>, DispatchError>>()
+            })?;
             let config = SearchConfig {
                 node_budget: request
                     .get("nodeBudget")
@@ -174,8 +182,18 @@ fn dispatch(request: Value) -> DispatchResult {
                     .unwrap_or(24)
                     .clamp(0, i32::MAX as i64) as i32,
                 seed: request.get("seed").and_then(Value::as_u64).unwrap_or(0),
+                time_budget_ms: request
+                    .get("timeBudget")
+                    .and_then(Value::as_f64)
+                    .unwrap_or(1_200.0)
+                    .clamp(0.0, 10_000.0),
+                halfmove: request
+                    .get("halfmove")
+                    .and_then(Value::as_u64)
+                    .unwrap_or(0)
+                    .min(u16::MAX as u64) as u16,
             };
-            Ok(search_json(ai::search(position, side, config)))
+            Ok(search_json(ai::search(position, side, &positions, config)))
         }
         _ => Err(DispatchError::new(format!(
             "unknown checkers operation {operation:?}"

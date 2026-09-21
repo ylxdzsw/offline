@@ -35,7 +35,9 @@
         }
         @keyframes pulse { to { opacity: .2; transform: scale(.7); } }
         .warning { margin: 0 0 9px; color: var(--danger); font-size: .77rem; text-align: center; }
-        .warning[hidden] { display: none; }
+        .warning[hidden], .retry[hidden] { display: none; }
+        .retry { display: block; margin: 0 auto 9px; min-height: 40px; padding: 0 14px; }
+        .spot:focus-visible { z-index: 4; outline: 3px solid var(--focus); outline-offset: -3px; }
         .board {
             position: relative; display: grid; box-sizing: border-box; width: 100%; aspect-ratio: 1;
             grid-template-columns: repeat(8, minmax(0, 1fr)); grid-template-rows: repeat(8, minmax(0, 1fr));
@@ -97,6 +99,7 @@
         <div class="score"><strong class="white-score">2</strong><span class="opponent-label"></span><span class="disc-mini white"></span></div>
     </div>
     <div class="status" role="status" aria-live="polite"></div>
+    <button class="action retry" type="button" hidden></button>
     <div class="board" role="grid"><div class="cells"></div></div>
 </template>
 
@@ -112,6 +115,8 @@ OfflineGames.wasm.defineElement('reversi', 'reversi-game', class extends HTMLEle
         this.aiTimer = null
         this.aiStartedAt = 0
         this.requestId = 0
+        this.aiError = false
+        this.focusIndex = 19
     }
 
     connectedCallback() {
@@ -133,10 +138,21 @@ OfflineGames.wasm.defineElement('reversi', 'reversi-game', class extends HTMLEle
             && saved.board.every(value => [this.engine.EMPTY, this.engine.BLACK, this.engine.WHITE].includes(value))
             && [this.engine.BLACK, this.engine.WHITE].includes(saved.turn)
             && ['easy', 'medium', 'hard'].includes(saved.difficulty) && Array.isArray(saved.history)
+            && saved.history.every(move => move && Number.isInteger(move.index) && move.index >= 0 && move.index < 64
+                && [this.engine.BLACK, this.engine.WHITE].includes(move.side) && Array.isArray(move.flips)
+                && move.flips.every(index => Number.isInteger(index) && index >= 0 && index < 64))
     }
     load() { const saved = this.storage.read('reversi'); this.state = this.valid(saved) ? saved : this.fresh(); if (!Number.isInteger(this.state.seed)) this.state.seed = OfflineGames.runtime.randomSeed() }
     bind() {
         const shadow = this.shadowRoot
+        shadow.querySelector('.retry').addEventListener('click', () => this.requestAI())
+        shadow.querySelector('.board').addEventListener('keydown', event => this.boardKey(event))
+        shadow.querySelector('.board').addEventListener('focusin', event => {
+            const cell = event.target.closest('.cell')
+            if (!cell) return
+            this.focusIndex = Number(cell.dataset.index)
+            for (const spot of shadow.querySelectorAll('.cell')) spot.tabIndex = spot === cell ? 0 : -1
+        })
         shadow.querySelector('.cells').addEventListener('click', event => {
             const button = event.target.closest('.cell')
             if (button) this.tap(Number(button.dataset.index))
@@ -147,6 +163,7 @@ OfflineGames.wasm.defineElement('reversi', 'reversi-game', class extends HTMLEle
     }
     localize() {
         const shadow = this.shadowRoot
+        shadow.querySelector('.retry').textContent = this.i18n.t('retry')
         shadow.querySelector('.difficulty-label').textContent = this.i18n.t('difficulty')
         for (const option of shadow.querySelectorAll('.difficulty option')) option.textContent = this.i18n.t(option.value)
         shadow.querySelector('.undo').textContent = this.i18n.t('undo')
@@ -178,17 +195,42 @@ OfflineGames.wasm.defineElement('reversi', 'reversi-game', class extends HTMLEle
         this.save()
         this.render()
     }
+    boardKey(event) {
+        const cell = event.target.closest('.cell')
+        if (!cell) return
+        const size = 8, index = Number(cell.dataset.index)
+        const row = Math.floor(index / size), column = index % size
+        let next
+        if (event.key === 'ArrowLeft') next = row * size + Math.max(0, column - 1)
+        else if (event.key === 'ArrowRight') next = row * size + Math.min(size - 1, column + 1)
+        else if (event.key === 'ArrowUp') next = Math.max(0, row - 1) * size + column
+        else if (event.key === 'ArrowDown') next = Math.min(size - 1, row + 1) * size + column
+        else if (event.key === 'Home') next = event.ctrlKey ? 0 : row * size
+        else if (event.key === 'End') next = event.ctrlKey ? size * size - 1 : row * size + size - 1
+        else return
+        event.preventDefault()
+        this.shadowRoot.querySelector(`[data-index="${next}"]`).focus()
+    }
+
+    failAI() {
+        this.cancelAI()
+        this.aiError = true
+        this.render()
+    }
+
     requestAI() {
         if (this.state.outcome || this.state.turn !== this.engine.WHITE) return
         this.cancelAI()
+        this.aiError = false
         this.thinking = true
         this.aiStartedAt = performance.now()
         const id = ++this.requestId
-        this.worker = OfflineGames.runtime.createWorker('reversi-worker-payload')
+        try { this.worker = OfflineGames.runtime.createWorker('reversi-worker-payload') }
+        catch (error) { console.error(error); this.failAI(); return }
         this.worker.onmessage = event => {
             if (event.data.id !== id || !this.thinking) return
             const move = event.data.move
-            const valid = Number.isInteger(move) && this.engine.flipsForMove(this.state.board, move, this.engine.WHITE).length
+            const valid = Number.isInteger(move) && move >= 0 && move < 64 && this.engine.flipsForMove(this.state.board, move, this.engine.WHITE).length
             if (this.worker) this.worker.terminate()
             this.worker = null
             const delay = Math.max(0, REVERSI_MIN_AI_TURN_MS - (performance.now() - this.aiStartedAt))
@@ -196,12 +238,12 @@ OfflineGames.wasm.defineElement('reversi', 'reversi-game', class extends HTMLEle
                 this.aiTimer = null
                 if (id !== this.requestId || !this.thinking) return
                 this.thinking = false
-                if (!valid) { this.render(); return }
+                if (!valid) { this.failAI(); return }
                 this.commit(move, this.engine.WHITE)
                 if (!this.state.outcome && this.state.turn === this.engine.WHITE) this.requestAI()
             }, delay)
         }
-        this.worker.onerror = error => { console.error(error); this.cancelAI(false); this.render() }
+        this.worker.onerror = error => { console.error(error); this.failAI() }
         this.worker.postMessage({id, board: this.state.board, side: this.engine.WHITE, difficulty: this.state.difficulty, seed: OfflineGames.runtime.moveSeed(this.state.seed, this.state.history.length)})
         this.render()
     }
@@ -216,6 +258,7 @@ OfflineGames.wasm.defineElement('reversi', 'reversi-game', class extends HTMLEle
     undo() {
         if (!this.state.history.length) return
         this.cancelAI()
+        this.aiError = false
         let move
         do {
             move = this.state.history.pop()
@@ -232,11 +275,13 @@ OfflineGames.wasm.defineElement('reversi', 'reversi-game', class extends HTMLEle
         if (this.state.history.length && !confirm(this.i18n.t('confirmNew'))) return
         const difficulty = this.state.difficulty
         this.cancelAI()
+        this.aiError = false
         this.state = this.fresh(difficulty)
         this.save()
         this.render()
     }
     statusText() {
+        if (this.aiError) return this.i18n.t('aiUnavailable')
         if (this.state.outcome) {
             if (!this.state.outcome.winner) return this.i18n.t('draw')
             return this.i18n.t(this.state.outcome.winner === this.engine.BLACK ? 'youWin' : 'aiWins')
@@ -247,6 +292,8 @@ OfflineGames.wasm.defineElement('reversi', 'reversi-game', class extends HTMLEle
     }
     render() {
         const shadow = this.shadowRoot
+        const focused = shadow.activeElement?.classList.contains('cell')
+        shadow.querySelector('.retry').hidden = !this.aiError
         const lastMove = this.state.history.at(-1)
         const legal = new Set(!this.thinking && !this.state.outcome && this.state.turn === this.engine.BLACK
             ? this.engine.legalMoves(this.state.board, this.engine.BLACK).map(move => move.index) : [])
@@ -260,14 +307,18 @@ OfflineGames.wasm.defineElement('reversi', 'reversi-game', class extends HTMLEle
             const hint = legal.has(index) ? `, ${this.i18n.t('legalMove')}` : ''
             const last = lastMove?.index === index ? `, ${this.i18n.t('lastMove')}` : ''
             const token = disc ? `<span class="disc ${disc === this.engine.BLACK ? 'black' : 'white'}"></span>` : ''
-            return `<button type="button" role="gridcell" class="${classes.join(' ')}" data-index="${index}" aria-label="${name}, ${this.i18n.t('row')} ${this.engine.rowOf(index) + 1}, ${this.i18n.t('column')} ${this.engine.columnOf(index) + 1}${hint}${last}">${token}</button>`
+            return `<button type="button" role="gridcell" class="${classes.join(' ')}" data-index="${index}" tabindex="${index === this.focusIndex ? 0 : -1}" aria-label="${name}, ${this.i18n.t('row')} ${this.engine.rowOf(index) + 1}, ${this.i18n.t('column')} ${this.engine.columnOf(index) + 1}${hint}${last}">${token}</button>`
         }).join('')
         shadow.querySelector('.black-score').textContent = this.engine.count(this.state.board, this.engine.BLACK)
         shadow.querySelector('.white-score').textContent = this.engine.count(this.state.board, this.engine.WHITE)
+        if (focused) shadow.querySelector(`[data-index="${this.focusIndex}"]`)?.focus({preventScroll: true})
         const status = shadow.querySelector('.status')
         status.textContent = this.statusText()
         status.classList.toggle('thinking', this.thinking)
         const board = shadow.querySelector('.board')
+        board.setAttribute('aria-label', this.i18n.t('reversi'))
+        board.setAttribute('aria-rowcount', '8')
+        board.setAttribute('aria-colcount', '8')
         if (this.state.outcome?.winner === this.engine.BLACK) board.dataset.win = status.textContent
         else delete board.dataset.win
         board.setAttribute('aria-disabled', String(this.thinking || Boolean(this.state.outcome)))

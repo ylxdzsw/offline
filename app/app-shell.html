@@ -66,6 +66,7 @@
         }
         .icon-btn[hidden] { display: none; }
         .icon-btn:active { background: var(--bg-fill); }
+        .icon-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
         /* Hamburger lines */
         .hamburger, .hamburger::before, .hamburger::after {
             display: block;
@@ -108,7 +109,9 @@
             min-height: 0;
             padding-top: 12px;
             padding-bottom: max(12px, var(--safe-bottom));
-            overflow: hidden;
+            overflow-x: hidden;
+            overflow-y: auto;
+            overscroll-behavior: contain;
         }
         footer {
             padding: 10px 14px calc(12px + var(--safe-bottom));
@@ -293,11 +296,11 @@ customElements.define('offline-shell', class extends HTMLElement {
         const paddingLeft = parseFloat(mainStyle.paddingLeft) || 0
         const paddingRight = parseFloat(mainStyle.paddingRight) || 0
         const trailingHeight = Math.max(0, gameRect.bottom - surfaceRect.bottom)
-        const availableHeight = mainRect.bottom - paddingBottom - surfaceRect.top - trailingHeight
-        const availableWidth = mainRect.width - paddingLeft - paddingRight
+        const availableHeight = mainRect.bottom - paddingBottom - surfaceRect.top - main.scrollTop - trailingHeight
+        const availableWidth = main.clientWidth - paddingLeft - paddingRight
         const scale = Math.max(0, Math.min(
             1,
-            availableHeight / surfaceRect.height,
+            Math.max(.8, availableHeight / surfaceRect.height),
             availableWidth / surfaceRect.width
         ))
 

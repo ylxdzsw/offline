@@ -114,3 +114,22 @@ test('AI is reproducible, legal, and takes a forced winning capture within budge
     assert(first.score - first.selectedScore <= options.rootBand)
     assert(Date.now() - started < 1200)
 })
+
+test('AI receives repetition history and the forty-move clock through the worker API', () => {
+    const board = empty()
+    board[42] = engine.BLACK_KING
+    board[46] = engine.BLACK_KING
+    board[7] = engine.RED_KING
+    const options = {seed: 3, nodeBudget: 20_000, maxDepth: 4, rootBand: 0, timeBudget: 10_000}
+    const first = ai.search(board, engine.BLACK, 'hard', options)
+    const repeated = engine.applyMove(board, first.move, engine.BLACK)
+    const result = ai.search(board, engine.BLACK, 'hard', {...options, positions: [
+        {board: repeated, side: engine.RED}, {board: repeated, side: engine.RED},
+    ]})
+    assert(!sameMove(first.move, result.move), 'a winning side must avoid a known third repetition')
+    assert(result.selectedScore > 0)
+    assert.equal(ai.search(board, engine.BLACK, 'hard', {...options, halfmove: 79}).score, 0)
+    const ended = ai.search(board, engine.BLACK, 'hard', {...options, halfmove: 80})
+    assert.equal(ended.move, null)
+    assert.equal(ended.score, 0)
+})

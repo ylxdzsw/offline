@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use serde::Deserialize;
 
 use crate::game::{
-    BLACK, BOMB, COLS, ENGINEER, FLAG, MINE, Move, Piece, RED, ROWS, Rng, TYPES, apply_move,
+    BLACK, BOMB, COLS, ENGINEER, FLAG, MINE, Move, Piece, RED, ROWS, Rng, TYPES, apply_legal_move,
     battle, deployment_squares, is_camp, is_hq, is_rail, legal_moves, other, rank, row_of, status,
 };
 
@@ -346,6 +346,18 @@ fn belief(
             set_kind(&mut pieces[index], FLAG);
         }
     }
+    // A continuing game publicly proves that the enemy flag is still alive.
+    // Capturing an unrevealed HQ defender must not create imaginary won boards.
+    let alive: HashSet<_> = public_current
+        .iter()
+        .flatten()
+        .map(|piece| piece.id.as_str())
+        .collect();
+    for piece in &mut pieces {
+        if !alive.contains(piece.id.as_str()) {
+            remove_kinds(piece, &[FLAG]);
+        }
+    }
     (public_current, pieces)
 }
 
@@ -468,6 +480,9 @@ fn evaluate(board: &[Option<Piece>], perspective: &str) -> f64 {
         if !matches!(piece.kind.as_str(), FLAG | MINE) && !is_hq(index) {
             value += progress * 0.35;
         }
+        if is_hq(index) && !matches!(piece.kind.as_str(), FLAG | MINE) {
+            value *= 0.12;
+        }
         if piece.kind == FLAG {
             let row = row_of(index) as isize;
             let column = (index % COLS) as isize;
@@ -506,9 +521,14 @@ fn move_priority(board: &[Option<Piece>], movement: Move, side: &str) -> f64 {
     } else {
         row_of(movement.from) as f64 - row_of(movement.to) as f64
     };
-    let capture = board[movement.to]
-        .as_ref()
-        .map_or(0.0, |target| material(&target.kind) * 2.0);
+    let capture = board[movement.to].as_ref().map_or(0.0, |target| {
+        let exchange = match battle(piece, target) {
+            "attacker" => material(&target.kind),
+            "defender" => -material(&piece.kind),
+            _ => material(&target.kind) - material(&piece.kind),
+        };
+        exchange * 2.0
+    });
     capture
         + progress
         + if is_camp(movement.to) { 2.0 } else { 0.0 }
@@ -527,11 +547,9 @@ fn continuation_score(board: &[Option<Piece>], side: &str, config: Config, ply: 
     moves
         .into_iter()
         .take(config.continuation_width)
-        .filter_map(|movement| {
-            let child = apply_move(board, movement).ok()?.board;
-            let score = terminal(&child, other(side), side, ply + 1)
-                .unwrap_or_else(|| evaluate(&child, side));
-            Some(score)
+        .map(|movement| {
+            let child = apply_legal_move(board, movement).board;
+            terminal(&child, other(side), side, ply + 1).unwrap_or_else(|| evaluate(&child, side))
         })
         .max_by(f64::total_cmp)
         .unwrap_or_else(|| evaluate(board, side))
@@ -539,9 +557,7 @@ fn continuation_score(board: &[Option<Piece>], side: &str, config: Config, ply: 
 
 fn root_score(board: &[Option<Piece>], movement: Move, side: &str, config: Config) -> f64 {
     let enemy = other(side);
-    let Ok(applied) = apply_move(board, movement) else {
-        return -WIN;
-    };
+    let applied = apply_legal_move(board, movement);
     if let Some(score) = terminal(&applied.board, enemy, side, 1) {
         return score;
     }
@@ -556,10 +572,10 @@ fn root_score(board: &[Option<Piece>], movement: Move, side: &str, config: Confi
     replies
         .into_iter()
         .take(config.reply_width)
-        .filter_map(|reply| {
-            let child = apply_move(&applied.board, reply).ok()?.board;
+        .map(|reply| {
+            let child = apply_legal_move(&applied.board, reply).board;
             let score = terminal(&child, side, side, 2).unwrap_or_else(|| evaluate(&child, side));
-            Some((child, score))
+            (child, score)
         })
         .map(|(child, score)| {
             if config.continuation_width == 0 || score.abs() >= WIN - 100.0 {
@@ -570,6 +586,25 @@ fn root_score(board: &[Option<Piece>], movement: Move, side: &str, config: Confi
         })
         .min_by(f64::total_cmp)
         .unwrap_or_else(|| evaluate(&applied.board, side))
+}
+
+fn repetition_cost(input: &SearchInput<'_>, movement: Move) -> f64 {
+    let recent = input.events.iter().rev().take(12);
+    let repeats = recent
+        .clone()
+        .filter(|event| event.side == input.side && event.movement == movement)
+        .count() as f64;
+    let reversal = recent
+        .filter(|event| event.side == input.side)
+        .find(|event| {
+            input.board[movement.from]
+                .as_ref()
+                .is_some_and(|piece| piece.id == event.attacker)
+        })
+        .is_some_and(|event| {
+            event.movement.from == movement.to && event.movement.to == movement.from
+        });
+    repeats * 5.0 + if reversal { 3.0 } else { 0.0 }
 }
 
 /// Searches only public information. Concealed enemy types are discarded before beliefs are built.
@@ -637,7 +672,10 @@ pub fn choose_move(input: SearchInput<'_>, mut stopped: impl FnMut() -> bool) ->
         .map(|(index, movement)| {
             let mean = totals[index] / samples as f64;
             let variance = (squares[index] / samples as f64 - mean * mean).max(0.0);
-            (movement, mean - config.risk * variance.sqrt())
+            (
+                movement,
+                mean - config.risk * variance.sqrt() - repetition_cost(&input, movement),
+            )
         })
         .collect();
     scored.sort_by(|left, right| {
@@ -670,6 +708,108 @@ mod tests {
             side: side.to_owned(),
             kind: kind.to_owned(),
         })
+    }
+
+    #[test]
+    fn a_captured_unknown_headquarters_defender_cannot_be_the_flag() {
+        let initial = initial_board(31);
+        let removed = [at(0, 1), at(0, 3)]
+            .into_iter()
+            .find(|index| initial[*index].as_ref().unwrap().kind != FLAG)
+            .unwrap();
+        let id = initial[removed].as_ref().unwrap().id.clone();
+        let mut current = initial.clone();
+        current[removed] = None;
+        let (_, beliefs) = belief(&current, &initial, &[], RED, &HashSet::new());
+        assert_eq!(
+            beliefs.iter().find(|piece| piece.id == id).unwrap().mask & kind_bit(FLAG),
+            0
+        );
+        for seed in 1..=16 {
+            let assignment = sample(&beliefs, &mut Rng::new(seed)).unwrap();
+            let determined = instantiate(
+                &sanitize_board(&current, RED, &HashSet::new()),
+                RED,
+                &assignment,
+            );
+            assert!(
+                determined
+                    .iter()
+                    .flatten()
+                    .any(|piece| piece.side == BLACK && piece.kind == FLAG)
+            );
+        }
+    }
+
+    #[test]
+    fn headquarters_does_not_make_a_mobile_commander_more_valuable() {
+        let mut board = vec![None; ROWS * COLS];
+        board[at(11, 1)] = token(RED, FLAG, "rf");
+        board[at(0, 1)] = token(BLACK, FLAG, "bf");
+        board[at(10, 3)] = token(RED, "9", "r9");
+        let mobile = evaluate(&board, RED);
+        board[at(11, 3)] = board[at(10, 3)].take();
+        assert!(mobile - evaluate(&board, RED) > 40.0);
+    }
+
+    #[test]
+    fn repeated_reversals_cost_more_than_a_first_retreat() {
+        let mut board = initial_board(11);
+        board[at(5, 0)] = token(RED, "8", "r8");
+        let movement = Move {
+            from: at(5, 0),
+            to: at(6, 0),
+        };
+        let observation = Observation {
+            side: RED.to_owned(),
+            movement: Move {
+                from: movement.to,
+                to: movement.from,
+            },
+            attacker: "r8".to_owned(),
+            defender: None,
+            result: "move".to_owned(),
+            revealed: vec![],
+        };
+        let events = vec![observation];
+        let input = SearchInput {
+            board: &board,
+            initial: &board,
+            events: &events,
+            side: RED,
+            difficulty: "hard",
+            revealed: &[],
+            seed: 1,
+        };
+        assert!(repetition_cost(&input, movement) > 0.0);
+        assert_eq!(
+            repetition_cost(
+                &input,
+                Move {
+                    from: movement.from,
+                    to: at(5, 2)
+                }
+            ),
+            0.0
+        );
+    }
+
+    #[test]
+    fn reply_ordering_prefers_safe_moves_to_losing_attacks() {
+        let mut board = vec![None; ROWS * COLS];
+        board[at(5, 2)] = token(RED, "9", "r9");
+        board[at(6, 2)] = token(BLACK, MINE, "bm");
+        let attack = Move {
+            from: at(5, 2),
+            to: at(6, 2),
+        };
+        let quiet = Move {
+            from: at(5, 2),
+            to: at(5, 1),
+        };
+        assert!(move_priority(&board, quiet, RED) > move_priority(&board, attack, RED));
+        board[at(5, 2)] = token(RED, ENGINEER, "re");
+        assert!(move_priority(&board, attack, RED) > move_priority(&board, quiet, RED));
     }
 
     #[test]

@@ -185,3 +185,33 @@ test('AI search is reproducible, legal, and takes an immediate den entry', () =>
     assert.equal(bounded.depth, 0)
     assert(legal.some(m => m.from === bounded.move.from && m.to === bounded.move.to))
 })
+
+test('AI finds multi-turn den attacks at a small budget without randomizing away a forced win', () => {
+    // Positions from paired matches. Exhaustive legal-reply checks establish
+    // wins within three, five, and seven plies after these attacking moves.
+    const attacks = [
+        {side: engine.RED, plies: 3, move: {from: 5, to: 4}, board: [
+            0,0,0,0,0,7,0, 0,11,0,13,0,0,0, 0,0,12,0,0,0,0,
+            0,0,0,15,0,0,0, 0,0,0,4,0,0,0, 0,0,9,8,0,0,0,
+            0,0,6,2,14,0,0, 0,0,0,5,0,3,0, 0,0,0,0,0,0,0,
+        ]},
+        {side: engine.RED, plies: 5, move: {from: 16, to: 9}, board: [
+            0,0,0,0,0,10,0, 0,0,11,0,14,0,0, 0,0,8,13,0,12,0,
+            0,0,0,0,0,1,0, 0,0,9,15,0,0,0, 0,0,0,6,0,0,0,
+            0,0,7,0,0,0,0, 0,2,0,0,0,3,0, 0,0,0,0,0,0,0,
+        ]},
+        {side: engine.BLACK, plies: 7, move: {from: 46, to: 53}, board: [
+            0,0,0,0,0,0,0, 0,0,0,11,0,0,0, 0,0,0,0,0,14,0,
+            0,0,0,13,0,0,0, 0,0,0,12,0,0,0, 0,9,0,0,0,1,0,
+            8,0,0,16,15,0,0, 0,6,2,3,0,5,0, 0,0,0,0,0,0,0,
+        ]},
+    ]
+    for (const attack of attacks) for (const seed of [1, 7, 19]) {
+        const result = ai.search(attack.board, attack.side, 'hard', {
+            seed, nodeBudget: 12_000, maxDepth: 12, timeBudget: 10_000,
+        })
+        assert.deepEqual(result.move, attack.move)
+        assert.equal(result.score, 1_000_000 - attack.plies)
+        assert.equal(result.selectedScore, result.score)
+    }
+})

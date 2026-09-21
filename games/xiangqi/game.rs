@@ -280,9 +280,76 @@ pub fn is_in_check(state: &State, side: u8) -> bool {
     else {
         return true;
     };
-    pseudo_moves(state, other(side))
+    let row = row_of(king) as i8;
+    let column = column_of(king) as i8;
+    state
+        .board
         .iter()
-        .any(|mv| mv.to as usize == king)
+        .copied()
+        .enumerate()
+        .any(|(from, moving)| {
+            if moving == 0 || side_of(moving) == side {
+                return false;
+            }
+            let enemy = other(side);
+            let from_row = row_of(from) as i8;
+            let from_column = column_of(from) as i8;
+            let dr = row - from_row;
+            let dc = column - from_column;
+            match kind_of(moving) {
+                PAWN => {
+                    (dc == 0 && dr == if enemy == RED { -1 } else { 1 })
+                        || (dr == 0
+                            && dc.abs() == 1
+                            && if enemy == RED {
+                                from_row <= 4
+                            } else {
+                                from_row >= 5
+                            })
+                }
+                HORSE => {
+                    let leg = if dr.abs() == 2 && dc.abs() == 1 {
+                        Some((dr / 2, 0))
+                    } else if dr.abs() == 1 && dc.abs() == 2 {
+                        Some((0, dc / 2))
+                    } else {
+                        None
+                    };
+                    leg.is_some_and(|(lr, lc)| {
+                        state.board[at((from_row + lr) as usize, (from_column + lc) as usize)] == 0
+                    })
+                }
+                ADVISOR => dr.abs() == 1 && dc.abs() == 1 && palace(enemy, row, column),
+                ELEPHANT => {
+                    dr.abs() == 2
+                        && dc.abs() == 2
+                        && (if enemy == RED { row >= 5 } else { row <= 4 })
+                        && state.board[at(
+                            (from_row + dr / 2) as usize,
+                            (from_column + dc / 2) as usize,
+                        )] == 0
+                }
+                KING if dr.abs() + dc.abs() == 1 && palace(enemy, row, column) => true,
+                KING | ROOK | CANNON if dr == 0 || dc == 0 => {
+                    if kind_of(moving) == KING && dc != 0 {
+                        return false;
+                    }
+                    let mut r = from_row + dr.signum();
+                    let mut c = from_column + dc.signum();
+                    let mut screens = 0;
+                    while r != row || c != column {
+                        screens += u8::from(state.board[at(r as usize, c as usize)] != 0);
+                        if screens > 1 {
+                            return false;
+                        }
+                        r += dr.signum();
+                        c += dc.signum();
+                    }
+                    screens == u8::from(kind_of(moving) == CANNON)
+                }
+                _ => false,
+            }
+        })
 }
 
 pub fn legal_moves(state: &State, side: u8) -> Vec<Move> {
@@ -323,6 +390,32 @@ mod tests {
             .into_iter()
             .map(|mv| perft(&apply_move(state, mv), depth - 1))
             .sum()
+    }
+
+    #[test]
+    fn targeted_check_detection_matches_generated_attacks() {
+        let mut state = State::initial();
+        let mut seed = 19_u64;
+        for _ in 0..240 {
+            for side in [RED, BLACK] {
+                let king = state.board.iter().position(|&p| p == piece(side, KING));
+                let generated = king.is_none_or(|king| {
+                    pseudo_moves(&state, other(side))
+                        .iter()
+                        .any(|mv| mv.to as usize == king)
+                });
+                assert_eq!(is_in_check(&state, side), generated);
+            }
+            let moves = legal_moves(&state, state.turn);
+            if moves.is_empty() {
+                state = State::initial();
+                continue;
+            }
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+            state = apply_move(&state, moves[seed as usize % moves.len()]);
+        }
     }
 
     #[test]

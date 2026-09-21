@@ -1,6 +1,7 @@
 pub const EMPTY: u8 = 0;
 pub const BLACK: u8 = 1;
 pub const WHITE: u8 = 2;
+#[cfg(test)]
 pub(crate) const DIRECTIONS: [(i8, i8); 8] = [
     (-1, -1),
     (-1, 0),
@@ -97,61 +98,64 @@ impl Position {
         if index >= 64 || side != BLACK && side != WHITE {
             return 0;
         }
-        let bit = 1_u64 << index;
-        if self.occupied() & bit != 0 {
+        let placed = 1_u64 << index;
+        if self.occupied() & placed != 0 {
             return 0;
         }
-        let row = (index / 8) as i8;
-        let column = (index % 8) as i8;
         let mine = self.pieces(side);
         let theirs = self.pieces(other(side));
-        let mut all = 0;
-        for (dr, dc) in DIRECTIONS {
-            let mut line = 0;
-            let mut next_row = row + dr;
-            let mut next_column = column + dc;
-            while inside(next_row, next_column) {
-                let next = (next_row * 8 + next_column) as u8;
-                let next_bit = 1_u64 << next;
-                if theirs & next_bit != 0 {
-                    line |= next_bit;
-                } else {
-                    if line != 0 && mine & next_bit != 0 {
-                        all |= line;
-                    }
+        let mut flips = 0;
+        for direction in 0..8 {
+            let mut ray = shift(placed, direction) & theirs;
+            let mut captured = ray;
+            while ray != 0 {
+                let next = shift(ray, direction);
+                if next & mine != 0 {
+                    flips |= captured;
                     break;
                 }
-                next_row += dr;
-                next_column += dc;
+                ray = next & theirs;
+                captured |= ray;
             }
         }
-        all
+        flips
+    }
+
+    pub(crate) fn legal_mask(self, side: u8) -> u64 {
+        if side != BLACK && side != WHITE {
+            return 0;
+        }
+        let mine = self.pieces(side);
+        let theirs = self.pieces(other(side));
+        let empty = !self.occupied();
+        let mut moves = 0;
+        for direction in 0..8 {
+            let mut ray = shift(mine, direction) & theirs;
+            for _ in 0..5 {
+                ray |= shift(ray, direction) & theirs;
+            }
+            moves |= shift(ray, direction) & empty;
+        }
+        moves
     }
 
     pub fn legal_moves(self, side: u8) -> Vec<Move> {
-        let mut result = Vec::new();
-        let mut empty = !self.occupied();
-        while empty != 0 {
-            let index = empty.trailing_zeros() as u8;
-            empty &= empty - 1;
-            let flips = self.flips(index, side);
-            if flips != 0 {
-                result.push(Move {
-                    index,
-                    flips: bits(flips),
-                });
-            }
+        let mut legal = self.legal_mask(side);
+        let mut result = Vec::with_capacity(legal.count_ones() as usize);
+        while legal != 0 {
+            let index = legal.trailing_zeros() as u8;
+            legal &= legal - 1;
+            result.push(Move {
+                index,
+                flips: bits(self.flips(index, side)),
+            });
         }
         result
     }
 
-    pub fn apply(self, index: u8, side: u8) -> Option<Self> {
-        let flips = self.flips(index, side);
-        if flips == 0 {
-            return None;
-        }
+    fn apply_flips(self, index: u8, flips: u64, side: u8) -> Self {
         let placed = 1_u64 << index;
-        Some(if side == BLACK {
+        if side == BLACK {
             Self {
                 black: self.black | flips | placed,
                 white: self.white & !flips,
@@ -161,7 +165,20 @@ impl Position {
                 black: self.black & !flips,
                 white: self.white | flips | placed,
             }
-        })
+        }
+    }
+
+    pub(crate) fn apply_legal(self, mv: &Move, side: u8) -> Self {
+        let flips = mv
+            .flips
+            .iter()
+            .fold(0, |mask, index| mask | (1_u64 << index));
+        self.apply_flips(mv.index, flips, side)
+    }
+
+    pub fn apply(self, index: u8, side: u8) -> Option<Self> {
+        let flips = self.flips(index, side);
+        (flips != 0).then(|| self.apply_flips(index, flips, side))
     }
 
     pub fn status(self) -> Status {
@@ -200,8 +217,23 @@ pub const fn other(side: u8) -> u8 {
     if side == BLACK { WHITE } else { BLACK }
 }
 
-pub(crate) const fn inside(row: i8, column: i8) -> bool {
-    row >= 0 && row < 8 && column >= 0 && column < 8
+pub(crate) fn adjacent(bits: u64) -> u64 {
+    (0..8).fold(0, |neighbors, direction| neighbors | shift(bits, direction))
+}
+
+fn shift(bits: u64, direction: usize) -> u64 {
+    const NOT_A: u64 = 0xfefe_fefe_fefe_fefe;
+    const NOT_H: u64 = 0x7f7f_7f7f_7f7f_7f7f;
+    match direction {
+        0 => (bits & NOT_A) >> 9,
+        1 => bits >> 8,
+        2 => (bits & NOT_H) >> 7,
+        3 => (bits & NOT_A) >> 1,
+        4 => (bits & NOT_H) << 1,
+        5 => (bits & NOT_A) << 7,
+        6 => bits << 8,
+        _ => (bits & NOT_H) << 9,
+    }
 }
 
 fn bits(mut value: u64) -> Vec<u8> {
@@ -234,6 +266,62 @@ mod tests {
                 .collect::<Vec<_>>(),
             [19, 26, 37, 44]
         );
+    }
+
+    #[test]
+    fn bitboard_moves_match_independent_rays_through_complete_games() {
+        let reference = |position: Position, index: u8, side: u8| {
+            let board = position.board();
+            if board[index as usize] != EMPTY {
+                return 0;
+            }
+            let mut all = 0;
+            for (dr, dc) in DIRECTIONS {
+                let mut row = (index / 8) as i8 + dr;
+                let mut column = (index % 8) as i8 + dc;
+                let mut line = 0;
+                while (0..8).contains(&row) && (0..8).contains(&column) {
+                    let point = (row * 8 + column) as usize;
+                    if board[point] == other(side) {
+                        line |= 1_u64 << point;
+                    } else {
+                        if board[point] == side {
+                            all |= line;
+                        }
+                        break;
+                    }
+                    row += dr;
+                    column += dc;
+                }
+            }
+            all
+        };
+        let mut seed = 17_u64;
+        for _ in 0..8 {
+            let mut position = Position::initial();
+            let mut side = BLACK;
+            for _ in 0..120 {
+                let mut expected = 0;
+                for index in 0..64 {
+                    let flips = reference(position, index, side);
+                    assert_eq!(position.flips(index, side), flips);
+                    if flips != 0 {
+                        expected |= 1_u64 << index;
+                    }
+                }
+                assert_eq!(position.legal_mask(side), expected);
+                let legal = position.legal_moves(side);
+                if legal.is_empty() {
+                    if position.legal_mask(other(side)) == 0 {
+                        break;
+                    }
+                } else {
+                    seed = seed.wrapping_mul(6364136223846793005).wrapping_add(1);
+                    position = position.apply_legal(&legal[seed as usize % legal.len()], side);
+                }
+                side = other(side);
+            }
+        }
     }
 
     #[test]

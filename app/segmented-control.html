@@ -35,12 +35,17 @@
             border-radius: calc(var(--radius-sm) - 2px);
             background: transparent;
             color: var(--ink-muted);
+            font-family: inherit;
             font-size: .84rem;
             font-weight: 500;
             letter-spacing: -.01em;
             transition: color .15s ease;
         }
         button[aria-pressed="true"] { color: var(--ink); font-weight: 600; }
+        button:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+        @media (prefers-reduced-motion: reduce) {
+            .indicator, button { transition: none; }
+        }
     </style>
     <div class="track" role="group">
         <div class="indicator"></div>
@@ -100,8 +105,7 @@ customElements.define('offline-segmented', class extends HTMLElement {
         const idx = buttons.findIndex(b => b.dataset.value === value)
         if (idx < 0) return
         const indicator = this.shadowRoot.querySelector('.indicator')
-        const w = 100 / buttons.length
-        indicator.style.width = `calc(${w}% - 0px)`
+        indicator.style.width = `calc((100% - 6px) / ${buttons.length})`
         indicator.style.transform = `translateX(${idx * 100}%)`
     }
 

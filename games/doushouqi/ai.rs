@@ -5,11 +5,12 @@ use std::sync::OnceLock;
 use std::time::Instant;
 
 use crate::game::{
-    LION, Move, RAT, TIGER, col_of, den, effective_rank, is_river, legal_moves, moves_for, other,
-    rank_of, row_of, side_of, terminal,
+    ELEPHANT, LION, Move, RAT, TIGER, col_of, den, effective_rank, legal_moves, other, rank_of,
+    row_of, side_of, terminal,
 };
 
 const WIN: i32 = 1_000_000;
+const TACTICAL_EXTENSION_PLIES: u16 = 8;
 
 #[cfg(target_arch = "wasm32")]
 #[link(wasm_import_module = "env")]
@@ -31,7 +32,7 @@ fn clock_ms() -> f64 {
 }
 
 // Material values by rank (index 0 unused)
-const PIECE_VALUE: [i32; 9] = [0, 340, 170, 210, 240, 270, 390, 420, 310];
+const PIECE_VALUE: [i32; 9] = [0, 250, 190, 220, 250, 290, 410, 440, 490];
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct SearchConfig {
@@ -85,72 +86,146 @@ fn den_dist(index: usize, target: usize) -> i32 {
     dr + dc
 }
 
-fn evaluate_with_moves(board: &[u8], side: u8, my_moves: i32) -> i32 {
+// Empty-board routes account for water and jumping, so a lion's river leap costs
+// one move rather than the number of squares crossed.
+const fn river(index: usize) -> bool {
+    let row = index / 7;
+    let column = index % 7;
+    row >= 3 && row <= 5 && (column == 1 || column == 2 || column == 4 || column == 5)
+}
+const fn route_distances() -> [[[u8; 63]; 3]; 2] {
+    let mut result = [[[63u8; 63]; 3]; 2];
+    let mut owner = 0;
+    while owner < 2 {
+        let target = if owner == 0 { 3 } else { 59 };
+        let home = if owner == 0 { 59 } else { 3 };
+        let mut kind = 0;
+        while kind < 3 {
+            let mut queue = [0usize; 63];
+            let mut head = 0;
+            let mut tail = 1;
+            queue[0] = target;
+            result[owner][kind][target] = 0;
+            while head < tail {
+                let from = queue[head];
+                head += 1;
+                let mut direction = 0;
+                while direction < 4 {
+                    let dr = [-1, 1, 0, 0][direction];
+                    let dc = [0, 0, -1, 1][direction];
+                    direction += 1;
+                    let mut row = from as i32 / 7 + dr;
+                    let mut column = from as i32 % 7 + dc;
+                    if row < 0 || row > 8 || column < 0 || column > 6 {
+                        continue;
+                    }
+                    let mut to = (row * 7 + column) as usize;
+                    if river(to) && kind != 0 {
+                        if kind == 1 {
+                            continue;
+                        }
+                        while river(to) {
+                            row += dr;
+                            column += dc;
+                            to = (row * 7 + column) as usize;
+                        }
+                    }
+                    if to == home || result[owner][kind][to] != 63 {
+                        continue;
+                    }
+                    result[owner][kind][to] = result[owner][kind][from] + 1;
+                    queue[tail] = to;
+                    tail += 1;
+                }
+            }
+            kind += 1;
+        }
+        owner += 1;
+    }
+    result
+}
+const ROUTES: [[[u8; 63]; 3]; 2] = route_distances();
+fn route_distance(piece: u8, index: usize) -> i32 {
+    let kind = match rank_of(piece) {
+        RAT => 0,
+        TIGER | LION => 2,
+        _ => 1,
+    };
+    i32::from(ROUTES[usize::from(side_of(piece) - 1)][kind][index])
+}
+fn evaluate_with_moves(board: &[u8], side: u8, my_moves: &[Move]) -> i32 {
     let enemy = other(side);
-    let enemy_den = den(enemy);
-    let my_den = den(side);
-    let mut score = 0i32;
-
+    let enemy_moves = legal_moves(board, enemy);
+    let mut totals = [0; 3];
+    let mut leaders = [[20i32; 2]; 3];
     for (index, &piece) in board.iter().enumerate() {
         if piece == 0 {
             continue;
         }
-        let ps = side_of(piece);
-        let rank = rank_of(piece) as usize;
-        let val = PIECE_VALUE[rank];
-
-        // Material
-        score += if ps == side { val } else { -val };
-
-        // Advancement toward enemy den
-        let target = if ps == side { enemy_den } else { my_den };
-        let dist = den_dist(index, target);
-        let adv = (16 - dist.min(16)) * 5;
-        score += if ps == side { adv } else { -adv };
-
-        // Rat bonus: extra reward for being in river (blocks jumps) or near enemy Elephant
-        if rank == RAT as usize && is_river(index) {
-            let river_bonus = 28;
-            score += if ps == side {
-                river_bonus
-            } else {
-                -river_bonus
-            };
-        }
-
-        // Tiger/Lion: small bonus if jump is available (mobility proxy)
-        if rank == TIGER as usize || rank == LION as usize {
-            let jump_count = moves_for(board, index)
+        let owner = side_of(piece);
+        let rank = rank_of(piece);
+        let mut value = PIECE_VALUE[usize::from(rank)];
+        if rank == RAT
+            && board
                 .iter()
-                .filter(|m| {
-                    (row_of(m.from as usize) as i32 - row_of(m.to as usize) as i32).abs() > 1
-                        || (col_of(m.from as usize) as i32 - col_of(m.to as usize) as i32).abs() > 1
-                })
-                .count() as i32;
-            let jump_bonus = jump_count * 18;
-            score += if ps == side { jump_bonus } else { -jump_bonus };
+                .any(|&p| side_of(p) == other(owner) && rank_of(p) == ELEPHANT)
+        {
+            value += 80;
         }
-
-        // Trap penalty: piece on enemy's trap has reduced effective rank
-        if effective_rank(piece, index) == 0 {
-            let trap_penalty = val / 2;
-            score += if ps == side {
-                -trap_penalty
+        if rank == ELEPHANT
+            && !board
+                .iter()
+                .any(|&p| side_of(p) == other(owner) && rank_of(p) == RAT)
+        {
+            value += 55;
+        }
+        let distance = route_distance(piece, index);
+        value += (14 - distance) * 7;
+        let closest = &mut leaders[usize::from(owner)];
+        if distance < closest[0] {
+            closest[1] = closest[0];
+            closest[0] = distance;
+        } else {
+            closest[1] = closest[1].min(distance);
+        }
+        let threats = if owner == side {
+            &enemy_moves
+        } else {
+            my_moves
+        };
+        if effective_rank(piece, index) == 0 && threats.iter().any(|mv| usize::from(mv.to) == index)
+        {
+            value -= PIECE_VALUE[usize::from(rank)] / 3;
+        }
+        if rank == TIGER || rank == LION {
+            let moves = if owner == side {
+                my_moves
             } else {
-                trap_penalty
+                &enemy_moves
             };
+            value += moves
+                .iter()
+                .filter(|mv| {
+                    usize::from(mv.from) == index
+                        && den_dist(usize::from(mv.from), usize::from(mv.to)) > 1
+                })
+                .count() as i32
+                * 8;
         }
+        totals[usize::from(owner)] += value;
     }
-
-    // Mobility
-    let their_moves = legal_moves(board, enemy).len() as i32;
-    score += (my_moves - their_moves) * 3;
-
-    score
+    for owner in [side, enemy] {
+        let lead = leaders[usize::from(owner)];
+        // A coordinated approach matters much more than advancing all eight animals.
+        totals[usize::from(owner)] +=
+            (10 - lead[0]).max(0).pow(2) * 3 + (8 - lead[1]).max(0).pow(2);
+    }
+    totals[usize::from(side)] - totals[usize::from(enemy)]
+        + (my_moves.len() as i32 - enemy_moves.len() as i32) * 2
 }
 
 pub(crate) fn evaluate(board: &[u8], side: u8) -> i32 {
-    evaluate_with_moves(board, side, legal_moves(board, side).len() as i32)
+    evaluate_with_moves(board, side, &legal_moves(board, side))
 }
 
 fn capture_value(board: &[u8], mv: &Move) -> i32 {
@@ -170,8 +245,7 @@ fn priority(board: &[u8], mv: &Move) -> i32 {
     // MVV-LVA: prefer capturing high-value pieces with low-value pieces
     let mvvlva = cap * 10 - attacker_val / 10;
     // Reward advancing toward enemy den
-    let side = side_of(board[from]);
-    let adv = den_dist(from, den(other(side))) - den_dist(to, den(other(side)));
+    let adv = route_distance(board[from], from) - route_distance(board[from], to);
     mvvlva + adv * 4
 }
 
@@ -287,8 +361,6 @@ impl Searcher {
         }
 
         let key = board_key(board, side, ply, self.repetition_hash);
-        let original_alpha = alpha;
-        let original_beta = beta;
         let cached = self.table.get(&key).cloned();
         if let Some(entry) = cached.as_ref().filter(|e| e.depth >= depth) {
             match entry.bound {
@@ -301,28 +373,70 @@ impl Searcher {
             }
         }
 
+        let original_alpha = alpha;
+        let original_beta = beta;
         let moves = legal_moves(board, side);
         let repetitions = self.repetition_count(position_key(board, side));
         if let Some((winner, _)) = terminal(board, side, repetitions, !moves.is_empty()) {
             return Ok(outcome_score(winner, side, ply));
         }
 
-        if depth == 0 {
-            return Ok(evaluate_with_moves(board, side, moves.len() as i32));
+        if depth == 0 && ply >= u16::from(self.config.max_depth) + TACTICAL_EXTENSION_PLIES {
+            return Ok(evaluate_with_moves(board, side, &moves));
         }
-
-        let moves = ordered(board, moves, cached.as_ref().and_then(|e| e.best.as_ref()));
-
         let mut score = i32::MIN / 2;
+        let moves = if depth == 0 {
+            let den_threat = legal_moves(board, other(side))
+                .iter()
+                .any(|mv| mv.to as usize == den(side));
+            if den_threat {
+                moves
+            } else {
+                score = evaluate_with_moves(board, side, &moves);
+                if score >= beta {
+                    return Ok(score);
+                }
+                alpha = alpha.max(score);
+                moves
+                    .into_iter()
+                    .filter(|mv| board[mv.to as usize] != 0 || mv.to as usize == den(other(side)))
+                    .collect()
+            }
+        } else {
+            moves
+        };
+        let moves = ordered(board, moves, cached.as_ref().and_then(|e| e.best.as_ref()));
         let mut best = None;
-        for mv in moves {
+        for (index, mv) in moves.into_iter().enumerate() {
             let mut next = board.to_vec();
             next[mv.to as usize] = next[mv.from as usize];
             next[mv.from as usize] = 0;
             let next_side = other(side);
             let next_key = position_key(&next, next_side);
             self.record(next_key);
-            let result = self.negamax(&next, next_side, depth - 1, -beta, -alpha, ply + 1);
+            let result = self
+                .negamax(
+                    &next,
+                    next_side,
+                    depth.saturating_sub(1),
+                    if index == 0 { -beta } else { -alpha - 1 },
+                    -alpha,
+                    ply + 1,
+                )
+                .and_then(|value| {
+                    if index > 0 && -value > alpha && -value < beta {
+                        self.negamax(
+                            &next,
+                            next_side,
+                            depth.saturating_sub(1),
+                            -beta,
+                            -alpha,
+                            ply + 1,
+                        )
+                    } else {
+                        Ok(value)
+                    }
+                });
             self.unrecord(next_key);
             let value = -result?;
             if value > score {
@@ -419,7 +533,7 @@ pub(crate) fn search(
         } else {
             let replies = legal_moves(&child, enemy);
             terminal(&child, enemy, repetitions, !replies.is_empty()).map_or_else(
-                || evaluate_with_moves(&child, enemy, replies.len() as i32),
+                || evaluate_with_moves(&child, enemy, &replies),
                 |(winner, _)| outcome_score(winner, enemy, 1),
             )
         };
@@ -444,7 +558,8 @@ pub(crate) fn search(
         let roots = ordered(board, initial.clone(), Some(&selected));
         let mut scores = Vec::with_capacity(roots.len());
         let mut interrupted = false;
-        for mv in roots {
+        let mut iteration_best = -WIN * 2;
+        for (index, mv) in roots.into_iter().enumerate() {
             if clock_ms() >= deadline_ms {
                 interrupted = true;
                 break;
@@ -455,11 +570,31 @@ pub(crate) fn search(
             let next_side = other(side);
             let child_key = position_key(&child, next_side);
             searcher.record(child_key);
-            let result =
-                searcher.negamax(&child, next_side, depth - 1, i32::MIN / 2, i32::MAX / 2, 1);
+            let threshold = iteration_best
+                - if iteration_best.abs() >= WIN / 2 {
+                    0
+                } else {
+                    config.root_band
+                };
+            let result = if index == 0 {
+                searcher.negamax(&child, next_side, depth - 1, -WIN * 2, WIN * 2, 1)
+            } else {
+                searcher
+                    .negamax(&child, next_side, depth - 1, -threshold, -threshold + 1, 1)
+                    .and_then(|value| {
+                        if -value >= threshold {
+                            searcher.negamax(&child, next_side, depth - 1, -WIN * 2, WIN * 2, 1)
+                        } else {
+                            Ok(value)
+                        }
+                    })
+            };
             searcher.unrecord(child_key);
             match result {
-                Ok(score) => scores.push((mv, -score)),
+                Ok(score) => {
+                    iteration_best = iteration_best.max(-score);
+                    scores.push((mv, -score));
+                }
                 Err(()) => {
                     interrupted = true;
                     break;
@@ -470,7 +605,7 @@ pub(crate) fn search(
             break;
         }
         (selected, best_score, selected_score) =
-            select_root(&scores, config.root_band, config.seed ^ depth as u64);
+            select_root(&scores, config.root_band, config.seed);
         completed_depth = depth;
         if best_score >= WIN - 1 {
             break;
@@ -501,6 +636,25 @@ mod tests {
             seed,
             time_budget_ms: 10_000.0,
         }
+    }
+
+    #[test]
+    fn horizon_resolves_capture_of_a_den_attacker() {
+        let mut board = vec![EMPTY; 63];
+        board[at(1, 3)] = piece_for(RED, WOLF);
+        board[at(1, 2)] = piece_for(BLACK, ELEPHANT);
+        let mut searcher = Searcher {
+            config: config(7),
+            deadline_ms: clock_ms() + 10_000.0,
+            nodes: 0,
+            table: HashMap::new(),
+            repetitions: HashMap::new(),
+            repetition_hash: 0,
+        };
+        let score = searcher
+            .negamax(&board, BLACK, 0, -WIN * 2, WIN * 2, 0)
+            .unwrap();
+        assert_eq!(score, WIN - 1);
     }
 
     #[test]
@@ -595,5 +749,22 @@ mod tests {
         second[0] = piece_for(RED, WOLF);
 
         assert_ne!(board_key(&first, RED, 4, 0), board_key(&second, RED, 4, 0));
+    }
+
+    #[test]
+    fn den_routes_value_a_lions_jump_as_one_move() {
+        assert_eq!(route_distance(piece_for(BLACK, LION), at(2, 1)), 5);
+        assert_eq!(route_distance(piece_for(BLACK, WOLF), at(2, 1)), 8);
+    }
+
+    #[test]
+    fn unguarded_trap_is_an_attacking_square_not_a_material_loss() {
+        let mut board = vec![EMPTY; 63];
+        board[at(2, 3)] = piece_for(RED, ELEPHANT);
+        board[at(8, 0)] = piece_for(BLACK, RAT);
+        let before = evaluate(&board, RED);
+        board[at(2, 3)] = EMPTY;
+        board[at(1, 3)] = piece_for(RED, ELEPHANT);
+        assert!(evaluate(&board, RED) > before);
     }
 }

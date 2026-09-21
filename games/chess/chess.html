@@ -1,11 +1,12 @@
 <template id="chess-game-template">
     <style>
+        *, *::before, *::after { box-sizing: border-box; }
         :host { display:block; color:var(--ink); }
         .toolbar{display:grid;grid-template-columns:1fr auto auto;gap:8px;align-items:end;margin-bottom:10px}
         label{display:grid;gap:3px;color:var(--ink-muted);font-size:.7rem;font-weight:600;letter-spacing:.02em}
         select,.action{min-height:var(--control-h,42px);border:1px solid var(--border-strong);border-radius:var(--radius-sm);color:var(--ink);background:var(--bg-surface)}
         select{min-width:96px;padding:0 28px 0 10px}.action{padding:0 12px;font-weight:650}.action:disabled{opacity:.42}
-        .status{display:flex;min-height:38px;align-items:center;justify-content:center;margin:0 0 9px;border-radius:var(--radius-sm);color:var(--status-ink);font-size:.93rem;font-weight:700;background:var(--status-bg)}
+        .status{display:flex;min-height:38px;align-items:center;justify-content:center;padding:4px 10px;text-align:center;margin:0 0 9px;border-radius:var(--radius-sm);color:var(--status-ink);font-size:.93rem;font-weight:700;background:var(--status-bg)}
         .status.thinking::after{width:5px;height:5px;margin-left:7px;border-radius:50%;content:"";background:currentColor;animation:pulse .8s ease-in-out infinite alternate}
         @keyframes pulse{to{opacity:.2;transform:scale(.7)}}
         .warning{margin:0 0 9px;color:var(--danger);font-size:.77rem;text-align:center}.warning[hidden]{display:none}
@@ -13,6 +14,7 @@
         .board{position:relative;display:grid;width:100%;aspect-ratio:1;grid-template:repeat(8,1fr)/repeat(8,1fr);overflow:hidden;border:2px solid var(--border-strong);border-radius:var(--radius-sm);box-shadow:var(--shadow-soft);user-select:none;touch-action:manipulation}
         .board[data-win]::after{position:absolute;z-index:4;top:50%;left:50%;width:46%;padding:10px 8px;border:3px double var(--piece-outline);border-radius:3px;content:attr(data-win);color:var(--piece-black);background:color-mix(in srgb,var(--piece-white) 91%,transparent);box-shadow:0 5px 16px rgba(0,0,0,.28);font-family:var(--font-display);font-size:clamp(.8rem,4vw,1.08rem);font-weight:850;text-align:center;transform:translate(-50%,-50%);pointer-events:none}
         .square{position:relative;display:grid;min-width:0;min-height:0;padding:0;border:0;border-radius:0;place-items:center;color:var(--ink)}
+        .square:focus-visible{outline:3px solid var(--selected);outline-offset:-3px;z-index:3}
         .square.light{background:var(--board-light)}.square.dark{background:var(--board-dark)}
         .square.last.light{background:var(--board-last-light)}.square.last.dark{background:var(--board-last-dark)}
         .square.selected{box-shadow:inset 0 0 0 3px var(--selected)}
@@ -38,10 +40,12 @@
         .files{display:grid;grid-template-columns:repeat(8,1fr);padding:4px 3px 0;color:var(--ink-faint);font-size:.62rem;text-align:center}
         @media(prefers-reduced-motion:reduce){.status.thinking::after,.square.last-to .piece{animation:none}}
         @media(max-width:340px){.toolbar{gap:4px}.action{padding-inline:8px;font-size:.82rem}select{min-width:88px}}
+        .retry { width: 100%; min-height: var(--control-h,42px); margin: 0 0 9px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); color: var(--ink); background: var(--bg-surface); font-weight: 650; }
+        .retry[hidden] { display: none; }
     </style>
     <div class="toolbar"><label><span class="difficulty-label"></span><select class="difficulty"><option value="easy"></option><option value="medium"></option><option value="hard"></option></select></label><button class="action undo" type="button"></button><button class="action new" type="button"></button></div>
-    <p class="warning" hidden></p><div class="status" role="status" aria-live="polite"></div>
-    <div class="board-wrap"><div class="board" role="grid"></div><div class="promotion" hidden><div class="promotion-card"><p></p><div class="choices"></div></div></div></div>
+    <p class="warning" hidden></p><div class="status" role="status" aria-live="polite"></div><button class="retry" type="button" hidden></button>
+    <div class="board-wrap"><div class="board" role="grid"></div><div class="promotion" hidden><div class="promotion-card" role="dialog" aria-modal="true" aria-labelledby="promotion-title"><p id="promotion-title"></p><div class="choices"></div></div></div></div>
     <div class="files" aria-hidden="true"><span>a</span><span>b</span><span>c</span><span>d</span><span>e</span><span>f</span><span>g</span><span>h</span></div>
 </template>
 
@@ -56,40 +60,74 @@ OfflineGames.wasm.defineElement('chess','chess-game',class extends HTMLElement{
     valid(saved){return saved&&Array.isArray(saved.board)&&saved.board.length===64&&[this.engine.WHITE,this.engine.BLACK].includes(saved.turn)&&saved.castling&&['easy','medium','hard'].includes(saved.difficulty)&&Array.isArray(saved.history)&&Array.isArray(saved.keys)}
     load(){const saved=this.storage.read('chess');this.state=this.valid(saved)?saved:this.fresh();if(!Number.isInteger(this.state.seed))this.state.seed=OfflineGames.runtime.randomSeed()}
     position(){return{board:this.state.board,turn:this.state.turn,castling:this.state.castling,enPassant:this.state.enPassant,halfmove:this.state.halfmove,fullmove:this.state.fullmove}}
-    bind(){const s=this.shadowRoot;s.querySelector('.board').addEventListener('click',event=>{const square=event.target.closest('.square');if(square)this.tap(Number(square.dataset.index))});s.querySelector('.choices').addEventListener('click',event=>{const choice=event.target.closest('.choice');if(choice)this.promote(choice.dataset.type)});s.querySelector('.undo').addEventListener('click',()=>this.undo());s.querySelector('.new').addEventListener('click',()=>this.newGame());s.querySelector('.difficulty').addEventListener('change',event=>{this.state.difficulty=event.target.value;this.save()})}
+    bind(){this.bindBoardKeys();const s=this.shadowRoot;s.querySelector('.board').addEventListener('click',event=>{const square=event.target.closest('.square');if(square)this.tap(Number(square.dataset.index))});s.querySelector('.promotion').addEventListener('keydown',event=>{const choices=[...s.querySelectorAll('.choice')],index=choices.indexOf(s.activeElement);if(event.key==='Escape'){event.preventDefault();this.clearSelection();this.render();s.querySelector(`.square[data-index="${this.focusIndex}"]`).focus()}else if(['Tab','ArrowLeft','ArrowRight'].includes(event.key)){event.preventDefault();const step=event.key==='ArrowLeft'||event.key==='Tab'&&event.shiftKey?-1:1;choices[(index+step+choices.length)%choices.length].focus()}});s.querySelector('.choices').addEventListener('click',event=>{const choice=event.target.closest('.choice');if(choice)this.promote(choice.dataset.type)});s.querySelector('.undo').addEventListener('click',()=>this.undo());s.querySelector('.new').addEventListener('click',()=>this.newGame());s.querySelector('.difficulty').addEventListener('change',event=>{this.state.difficulty=event.target.value;this.save()})}
     localize(){const s=this.shadowRoot,t=key=>this.i18n.t(key);s.querySelector('.difficulty-label').textContent=t('difficulty');for(const option of s.querySelectorAll('option'))option.textContent=t(option.value);s.querySelector('.undo').textContent=t('undo');s.querySelector('.new').textContent=t('newGame');s.querySelector('.warning').textContent=t('storageWarning');s.querySelector('.promotion p').textContent=t('choosePromotion')}
     repetitions(){return this.state.keys.reduce((counts,key)=>{counts[key]=(counts[key]||0)+1;return counts},{})}
     save(){if(!this.storage.write('chess',this.state))this.shadowRoot.querySelector('.warning').hidden=false}
-    tap(index){if(this.thinking||this.state.outcome||this.state.turn!==this.engine.WHITE||this.promotionMoves)return;const piece=this.state.board[index];if(this.engine.sideOf(piece)===this.engine.WHITE){this.select(index);return}if(this.selected==null)return;const moves=this.legal.filter(move=>move.to===index);if(!moves.length){this.clearSelection();this.render();return}if(moves.length>1){this.promotionMoves=moves;this.render();return}this.commit(moves[0],this.engine.WHITE)}
+    tap(index){if(this.thinking||this.state.outcome||this.state.turn!==this.engine.WHITE||this.promotionMoves)return;const piece=this.state.board[index];if(this.engine.sideOf(piece)===this.engine.WHITE){if(this.selected===index){this.clearSelection();this.render()}else this.select(index);return}if(this.selected==null)return;const moves=this.legal.filter(move=>move.to===index);if(!moves.length){this.clearSelection();this.render();return}if(moves.length>1){this.promotionMoves=moves;this.render();return}this.commit(moves[0],this.engine.WHITE)}
     select(index){this.selected=index;this.legal=this.engine.legalMoves(this.position(),this.engine.WHITE).filter(move=>move.from===index);this.render()}
     clearSelection(){this.selected=null;this.legal=[];this.promotionMoves=null}
-    promote(type){const move=this.promotionMoves?.find(candidate=>candidate.promotion===type);if(move)this.commit(move,this.engine.WHITE)}
+    promote(type){const move=this.promotionMoves?.find(candidate=>candidate.promotion===type);if(move){this.focusIndex=move.to;this.commit(move,this.engine.WHITE);this.shadowRoot.querySelector(`.square[data-index="${move.to}"]`).focus({preventScroll:true})}}
     snapshot(side){return{side,position:this.position(),outcome:this.state.outcome,keysLength:this.state.keys.length}}
     commit(move,side){this.state.history.push(this.snapshot(side));const next=this.engine.applyMove(this.position(),move);Object.assign(this.state,next);this.state.keys.push(this.engine.positionKey(next));const outcome=this.engine.status(next,this.repetitions());this.state.outcome=outcome.ended?outcome:null;this.clearSelection();this.save();this.render();if(!this.state.outcome&&this.state.turn===this.engine.BLACK)this.requestAI()}
     requestAI(){
         this.cancelAI();this.thinking=true;this.aiStartedAt=performance.now();const id=++this.requestId
-        this.worker=OfflineGames.runtime.createWorker('chess-worker-payload')
+        try{this.worker=OfflineGames.runtime.createWorker('chess-worker-payload')}catch(error){this.failAI(error);return}
         this.worker.onmessage=event=>{
             if(event.data.id!==id||!this.thinking)return
             const found=this.engine.legalMoves(this.position(),this.engine.BLACK).find(move=>move.from===event.data.move?.from&&move.to===event.data.move?.to&&move.promotion===event.data.move?.promotion)
             if(this.worker)this.worker.terminate();this.worker=null
             const delay=Math.max(0,CHESS_MIN_AI_TURN_MS-(performance.now()-this.aiStartedAt))
-            this.aiTimer=setTimeout(()=>{this.aiTimer=null;if(id!==this.requestId||!this.thinking)return;this.thinking=false;if(found)this.commit(found,this.engine.BLACK);else this.render()},delay)
+            this.aiTimer=setTimeout(()=>{this.aiTimer=null;if(id!==this.requestId||!this.thinking)return;this.thinking=false;if(found)this.commit(found,this.engine.BLACK);else this.failAI()},delay)
         }
-        this.worker.onerror=error=>{console.error(error);this.cancelAI(false);this.render()}
-        this.worker.postMessage({id,state:this.position(),difficulty:this.state.difficulty,seed:OfflineGames.runtime.moveSeed(this.state.seed,this.state.history.length)});this.render()
+        this.worker.onerror=error=>this.failAI(error)
+        this.worker.postMessage({id,state:this.position(),positions:[...this.state.history.map(snapshot=>snapshot.position),this.position()],difficulty:this.state.difficulty,seed:OfflineGames.runtime.moveSeed(this.state.seed,this.state.history.length)});this.render()
     }
-    cancelAI(invalidate=true){if(invalidate)this.requestId++;if(this.worker)this.worker.terminate();if(this.aiTimer)clearTimeout(this.aiTimer);this.worker=null;this.aiTimer=null;this.thinking=false}
+    cancelAI(invalidate=true){this.aiFailed=false;if(invalidate)this.requestId++;if(this.worker)this.worker.terminate();if(this.aiTimer)clearTimeout(this.aiTimer);this.worker=null;this.aiTimer=null;this.thinking=false}
     undo(){if(!this.state.history.length)return;const wasThinking=this.thinking;this.cancelAI();let count=wasThinking||this.state.history.at(-1).side===this.engine.WHITE?1:2,previous;while(count-->0&&this.state.history.length)previous=this.state.history.pop();if(previous){Object.assign(this.state,previous.position);this.state.outcome=previous.outcome;this.state.keys=this.state.keys.slice(0,previous.keysLength)}this.clearSelection();this.save();this.render()}
     newGame(){if(this.state.history.length&&!confirm(this.i18n.t('confirmNew')))return;const difficulty=this.state.difficulty;this.cancelAI();this.state=this.fresh(difficulty);this.clearSelection();this.save();this.render()}
-    statusText(){if(this.state.outcome){if(!this.state.outcome.winner)return this.i18n.t('draw');return this.i18n.t(this.state.outcome.winner===this.engine.WHITE?'youWin':'aiWins')}if(this.thinking||this.state.turn===this.engine.BLACK)return this.i18n.t('aiThinking');return this.i18n.t(this.engine.isInCheck(this.position(),this.engine.WHITE)?'check':'yourTurn')}
+    statusText(){if(this.aiFailed)return this.i18n.t('aiUnavailable');if(this.state.outcome){if(!this.state.outcome.winner)return this.i18n.t('draw');return this.i18n.t(this.state.outcome.winner===this.engine.WHITE?'youWin':'aiWins')}if(this.thinking||this.state.turn===this.engine.BLACK)return this.i18n.t('aiThinking');return this.i18n.t(this.engine.isInCheck(this.position(),this.engine.WHITE)?'check':'yourTurn')}
     pieceName(piece){if(!piece)return this.i18n.t('empty');const color=this.engine.sideOf(piece)===this.engine.WHITE?'White':'Black';return this.i18n.t('chessPiece'+this.engine.typeOf(piece)+color)}
     pieceSvg(type,side){const shapes={K:'<path d="M21 5h6v6h6v6h-6v6h-6v-6h-6v-6h6z"/><path d="M15 38h18l-3-15H18z"/><path d="M11 43h26l-2-6H13z"/>',Q:'<circle cx="10" cy="10" r="3"/><circle cx="24" cy="6" r="3"/><circle cx="38" cy="10" r="3"/><path d="M10 13l6 19h16l6-19-9 10-5-14-5 14z"/><path d="M12 42h24l-3-10H15z"/>',R:'<path d="M10 7h7v6h5V7h7v6h5V7h5v14H9V7z"/><path d="M14 20h20l-2 17H16z"/><path d="M10 43h28l-4-7H14z"/>',B:'<path d="M24 5c8 7 10 14 2 21l-5-5 5-6-3-3-5 8 4 7c-7 4-8 10-8 10h20s-1-7-7-10c8-8 5-16-3-22z"/><path d="M10 43h28l-4-7H14z"/>',N:'<path d="M13 37c0-13 5-18 13-25l-3-6c11 2 17 11 15 22l-8-5-8 5 9 4 3 5z"/><circle cx="29" cy="13" r="1.7" style="fill:var(--outline);stroke:none"/><path d="M10 43h28l-4-7H14z"/>',P:'<circle cx="24" cy="13" r="8"/><path d="M17 34c1-8 4-12 7-12s6 4 7 12z"/><path d="M11 43h26l-4-9H15z"/>'};return`<svg class="piece ${side===this.engine.WHITE?'white':'black'}" viewBox="0 0 48 48" aria-hidden="true">${shapes[type]}</svg>`}
-    render(){const s=this.shadowRoot,legalTargets=new Map(this.legal.map(move=>[move.to,Boolean(move.captured)])),whiteCheck=this.engine.isInCheck(this.position(),this.engine.WHITE),blackCheck=this.engine.isInCheck(this.position(),this.engine.BLACK)
+    failAI(error) {
+        if (error) console.error(error)
+        this.cancelAI(); this.aiFailed = true; this.render()
+    }
+    bindBoardKeys() {
+        this.shadowRoot.querySelector('.retry').addEventListener('click', () => this.requestAI())
+        const board = this.shadowRoot.querySelector('.board')
+        board.addEventListener('focusin', event => {
+            const cell = event.target.closest('.square')
+            if (!cell) return
+            this.focusIndex = Number(cell.dataset.index)
+            for (const button of board.querySelectorAll('.square')) button.tabIndex = button === cell ? 0 : -1
+        })
+        board.addEventListener('keydown', event => {
+            const cell = event.target.closest('.square')
+            if (!cell) return
+            const index = Number(cell.dataset.index), row = Math.floor(index / 8), column = index % 8, direction = 1
+            const step = {ArrowUp: [-direction, 0], ArrowDown: [direction, 0], ArrowLeft: [0, -direction], ArrowRight: [0, direction]}[event.key]
+            if (event.key === 'Escape') { event.preventDefault(); this.clearSelection(); this.render(); return }
+            if (!step) return
+            event.preventDefault()
+            const nextRow = Math.max(0, Math.min(7, row + step[0])), nextColumn = Math.max(0, Math.min(7, column + step[1]))
+            board.querySelector(`[data-index="${nextRow * 8 + nextColumn}"]`).focus()
+        })
+    }
+    restoreBoardFocus(focused) {
+        const retry = this.shadowRoot.querySelector('.retry')
+        retry.hidden = !this.aiFailed; retry.textContent = this.i18n.t('retry')
+        this.focusIndex ??= 52
+        for (const button of this.shadowRoot.querySelectorAll('.square')) button.tabIndex = Number(button.dataset.index) === this.focusIndex ? 0 : -1
+        if (focused != null) this.shadowRoot.querySelector(`.square[data-index="${focused}"]`)?.focus({preventScroll: true})
+    }
+    render(){const focused = this.shadowRoot.activeElement?.dataset.index
+        const s=this.shadowRoot,legalTargets=new Map(this.legal.map(move=>[move.to,Boolean(move.captured)])),whiteCheck=this.engine.isInCheck(this.position(),this.engine.WHITE),blackCheck=this.engine.isInCheck(this.position(),this.engine.BLACK)
         const actualLast=this.state.keys.length>1?this.state.history.at(-1):null
-        s.querySelector('.board').innerHTML=this.state.board.map((piece,index)=>{const row=this.engine.rowOf(index),column=this.engine.columnOf(index),classes=['square',(row+column)%2?'dark':'light'];if(index===this.selected)classes.push('selected');if(legalTargets.has(index))classes.push(legalTargets.get(index)?'capture':'legal');const prior=actualLast?.position.board,changed=prior&&(prior[index]!==piece)&&(piece||prior[index]);if(changed)classes.push('last');if(changed&&piece&&this.engine.sideOf(piece)===actualLast.side)classes.push('last-to');if(piece==='wK'&&whiteCheck||piece==='bK'&&blackCheck)classes.push('check');const token=piece?this.pieceSvg(this.engine.typeOf(piece),this.engine.sideOf(piece)):'';const rank=column===0?`<span class="coord rank">${8-row}</span>`:'';const last=changed?`, ${this.i18n.t('lastMove')}`:'';return`<button type="button" role="gridcell" class="${classes.join(' ')}" data-index="${index}" aria-label="${this.pieceName(piece)}, ${'abcdefgh'[column]}${8-row}${last}">${rank}${token}</button>`}).join('')
+        s.querySelector('.board').innerHTML=this.state.board.map((piece,index)=>{const row=this.engine.rowOf(index),column=this.engine.columnOf(index),classes=['square',(row+column)%2?'dark':'light'];if(index===this.selected)classes.push('selected');if(legalTargets.has(index))classes.push(legalTargets.get(index)?'capture':'legal');const prior=actualLast?.position.board,changed=prior&&(prior[index]!==piece)&&(piece||prior[index]);if(changed)classes.push('last');if(changed&&piece&&this.engine.sideOf(piece)===actualLast.side)classes.push('last-to');if(piece==='wK'&&whiteCheck||piece==='bK'&&blackCheck)classes.push('check');const token=piece?this.pieceSvg(this.engine.typeOf(piece),this.engine.sideOf(piece)):'';const rank=column===0?`<span class="coord rank">${8-row}</span>`:'';const last=changed?`, ${this.i18n.t('lastMove')}`:'';return`<button type="button" role="gridcell" class="${classes.join(' ')}" data-index="${index}" aria-label="${this.pieceName(piece)}, ${'abcdefgh'[column]}${8-row}${last}${index===this.selected?', '+this.i18n.t('selected'):''}${legalTargets.has(index)?', '+this.i18n.t('legalMove'):''}">${rank}${token}</button>`}).join('')
         const status=s.querySelector('.status');status.textContent=this.statusText();status.classList.toggle('thinking',this.thinking);s.querySelector('.difficulty').value=this.state.difficulty;s.querySelector('.undo').disabled=!this.state.history.length;const board=s.querySelector('.board');if(this.state.outcome?.winner===this.engine.WHITE)board.dataset.win=status.textContent;else delete board.dataset.win;board.setAttribute('aria-disabled',String(this.thinking||Boolean(this.state.outcome)||Boolean(this.promotionMoves)))
         const promotion=s.querySelector('.promotion');promotion.hidden=!this.promotionMoves;s.querySelector('.choices').innerHTML=this.promotionMoves?['Q','R','B','N'].map(type=>`<button type="button" class="choice" data-type="${type}" aria-label="${this.i18n.t('chessPiece'+type+'White')}">${this.pieceSvg(type,this.engine.WHITE)}</button>`).join(''):''
+        board.inert=Boolean(this.promotionMoves);this.restoreBoardFocus(focused);if(this.promotionMoves)s.querySelector('.choice').focus()
     }
 })
 </script>

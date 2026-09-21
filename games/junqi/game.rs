@@ -357,6 +357,11 @@ pub fn apply_move(board: &[Option<Piece>], movement: Move) -> Result<ApplyResult
     if !moves_for(board, movement.from).contains(&movement) {
         return Err("illegal move".to_owned());
     }
+    Ok(apply_legal_move(board, movement))
+}
+
+/// Search moves come directly from the legal move generator.
+pub(crate) fn apply_legal_move(board: &[Option<Piece>], movement: Move) -> ApplyResult {
     let mut next = board.to_vec();
     let attacker = next[movement.from].take().expect("legal move has attacker");
     let defender = next[movement.to].take();
@@ -384,13 +389,13 @@ pub fn apply_move(board: &[Option<Piece>], movement: Move) -> Result<ApplyResult
             }
         }
     }
-    Ok(ApplyResult {
+    ApplyResult {
         board: next,
         result: result.to_owned(),
         attacker,
         defender,
         revealed,
-    })
+    }
 }
 
 pub fn status(board: &[Option<Piece>], turn: &str) -> Status {

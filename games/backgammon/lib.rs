@@ -9,6 +9,25 @@ use game::{Position, RequestedStep};
 use serde_json::{Value, json};
 use wasm_abi::{DispatchError, DispatchResult};
 
+#[cfg(target_arch = "wasm32")]
+#[link(wasm_import_module = "env")]
+unsafe extern "C" {
+    fn now_ms() -> f64;
+}
+
+pub(crate) fn clock_ms() -> f64 {
+    #[cfg(target_arch = "wasm32")]
+    {
+        unsafe { now_ms() }
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        use std::{sync::OnceLock, time::Instant};
+        static START: OnceLock<Instant> = OnceLock::new();
+        START.get_or_init(Instant::now).elapsed().as_secs_f64() * 1000.0
+    }
+}
+
 fn field<'a>(request: &'a Value, name: &str) -> Result<&'a Value, DispatchError> {
     request
         .get(name)
@@ -118,6 +137,11 @@ fn dispatch(request: Value) -> DispatchResult {
                     .and_then(Value::as_i64)
                     .unwrap_or(30)
                     .clamp(0, i32::MAX as i64) as i32,
+                time_budget: request
+                    .get("timeBudget")
+                    .and_then(Value::as_f64)
+                    .unwrap_or(1200.0)
+                    .clamp(1.0, 10_000.0),
                 seed: request.get("seed").and_then(Value::as_u64).unwrap_or(0),
             };
             Ok(search_json(

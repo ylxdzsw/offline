@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::game::{DIRECTIONS, Move, Position, inside, other};
+use crate::game::{Move, Position, adjacent, other};
 
 const WIN: i32 = 1_000_000;
 const POSITION: [i16; 64] = [
@@ -76,42 +76,58 @@ fn edge_stability(position: Position, side: u8) -> i32 {
 
 pub(crate) fn evaluate(position: Position, side: u8) -> i32 {
     let opponent = other(side);
-    let occupied = position.occupied().count_ones() as i32;
-    let empties = 64 - occupied;
+    let empty = !position.occupied();
+    let empties = empty.count_ones() as i32;
     let mine = position.pieces(side);
     let theirs = position.pieces(opponent);
-    let mut positional = 0;
-    let mut frontier = 0;
-    for (index, weight) in POSITION.iter().enumerate() {
-        let bit = 1_u64 << index;
-        if position.occupied() & bit == 0 {
-            continue;
-        }
-        let sign = if mine & bit != 0 { 1 } else { -1 };
-        positional += sign * *weight as i32;
-        let row = (index / 8) as i8;
-        let column = (index % 8) as i8;
-        if DIRECTIONS.iter().any(|(dr, dc)| {
-            let nr = row + dr;
-            let nc = column + dc;
-            inside(nr, nc) && position.occupied() & (1_u64 << (nr * 8 + nc)) == 0
-        }) {
-            frontier -= sign;
+    let mut weights = POSITION;
+    for (corner, neighbors) in [
+        (0, [1, 8, 9]),
+        (7, [6, 15, 14]),
+        (56, [48, 57, 49]),
+        (63, [55, 62, 54]),
+    ] {
+        if position.occupied() & (1_u64 << corner) != 0 {
+            for neighbor in neighbors {
+                weights[neighbor] = 8;
+            }
         }
     }
-    let discs = mine.count_ones() as i32 - theirs.count_ones() as i32;
-    let mobility =
-        position.legal_moves(side).len() as i32 - position.legal_moves(opponent).len() as i32;
+    let positional: i32 = weights
+        .iter()
+        .enumerate()
+        .map(|(index, weight)| {
+            let bit = 1_u64 << index;
+            if mine & bit != 0 {
+                i32::from(*weight)
+            } else if theirs & bit != 0 {
+                -i32::from(*weight)
+            } else {
+                0
+            }
+        })
+        .sum();
+    let mobility = position.legal_mask(side).count_ones() as i32
+        - position.legal_mask(opponent).count_ones() as i32;
+    let potential = (adjacent(theirs) & empty).count_ones() as i32
+        - (adjacent(mine) & empty).count_ones() as i32;
+    let frontier = (theirs & adjacent(empty)).count_ones() as i32
+        - (mine & adjacent(empty)).count_ones() as i32;
     let stability = edge_stability(position, side) - edge_stability(position, opponent);
-    let parity = if empties % 2 == 1 { 1 } else { -1 };
-    let disc_weight = if empties <= 10 {
-        32
-    } else if empties <= 22 {
-        8
+    let discs = mine.count_ones() as i32 - theirs.count_ones() as i32;
+    let disc_weight = if empties <= 12 {
+        24
+    } else if empties <= 24 {
+        3
     } else {
-        1
+        -2
     };
-    positional * 5 + mobility * 18 + frontier * 9 + stability * 34 + discs * disc_weight + parity
+    positional * 4
+        + mobility * if empties > 20 { 48 } else { 24 }
+        + potential * 8
+        + frontier * 14
+        + stability * 60
+        + discs * disc_weight
 }
 
 fn terminal(position: Position, side: u8) -> i32 {
@@ -188,7 +204,7 @@ impl<F: FnMut(u32) -> bool> Searcher<F> {
         let mut score = i32::MIN / 2;
         let mut best = None;
         for mv in moves {
-            let child = position.apply(mv.index, side).expect("legal move");
+            let child = position.apply_legal(&mv, side);
             let value = -self.negamax(child, other(side), depth - 1, -beta, -alpha, false)?;
             if value > score {
                 score = value;
@@ -236,19 +252,12 @@ pub(crate) fn search<F: FnMut(u32) -> bool>(
     seed: u64,
     stopped: F,
 ) -> SearchResult {
-    let initial = ordered(position.legal_moves(side), None);
+    let mut initial = ordered(position.legal_moves(side), None);
     if initial.is_empty() {
         return SearchResult {
             selected: None,
             depth: 0,
             nodes: 0,
-        };
-    }
-    if let Some(corner) = initial.iter().find(|mv| [0, 7, 56, 63].contains(&mv.index)) {
-        return SearchResult {
-            selected: Some(corner.index),
-            depth: 1,
-            nodes: initial.len() as u32,
         };
     }
     let empties = 64 - position.occupied().count_ones() as u8;
@@ -268,17 +277,55 @@ pub(crate) fn search<F: FnMut(u32) -> bool>(
     for depth in 1..=target_depth {
         let mut scores = Vec::with_capacity(initial.len());
         let mut interrupted = false;
-        for mv in &initial {
-            let child = position.apply(mv.index, side).expect("legal move");
-            match searcher.negamax(
-                child,
-                other(side),
-                depth - 1,
-                i32::MIN / 2,
-                i32::MAX / 2,
-                false,
-            ) {
-                Ok(score) => scores.push((mv.index, -score)),
+        let mut best_score = i32::MIN / 2;
+        let band = if empties <= 14 { 0 } else { config.root_band };
+        for (ordinal, mv) in initial.iter().enumerate() {
+            let child = position.apply_legal(mv, side);
+            let result = if ordinal == 0 {
+                searcher
+                    .negamax(
+                        child,
+                        other(side),
+                        depth - 1,
+                        i32::MIN / 2,
+                        i32::MAX / 2,
+                        false,
+                    )
+                    .map(|score| -score)
+            } else {
+                let threshold = best_score - band;
+                searcher
+                    .negamax(
+                        child,
+                        other(side),
+                        depth - 1,
+                        -threshold,
+                        -threshold + 1,
+                        false,
+                    )
+                    .map(|score| -score)
+                    .and_then(|score| {
+                        if score >= threshold {
+                            searcher
+                                .negamax(
+                                    child,
+                                    other(side),
+                                    depth - 1,
+                                    i32::MIN / 2,
+                                    i32::MAX / 2,
+                                    false,
+                                )
+                                .map(|score| -score)
+                        } else {
+                            Ok(score)
+                        }
+                    })
+            };
+            match result {
+                Ok(score) => {
+                    best_score = best_score.max(score);
+                    scores.push((mv.index, score));
+                }
                 Err(()) => {
                     interrupted = true;
                     break;
@@ -288,7 +335,20 @@ pub(crate) fn search<F: FnMut(u32) -> bool>(
         if interrupted || scores.len() != initial.len() {
             break;
         }
-        selected = select_root(&scores, config.root_band, seed ^ depth as u64);
+        selected = select_root(
+            &scores,
+            if best_score.abs() >= WIN { 0 } else { band },
+            seed ^ depth as u64,
+        );
+        initial.sort_by_key(|mv| {
+            std::cmp::Reverse(
+                scores
+                    .iter()
+                    .find(|(index, _)| *index == mv.index)
+                    .unwrap()
+                    .1,
+            )
+        });
         completed_depth = depth;
     }
     SearchResult {
@@ -303,20 +363,20 @@ pub(crate) fn config(difficulty: &str) -> SearchConfig {
         "easy" => SearchConfig {
             max_depth: 2,
             node_limit: 35_000,
-            root_band: 180,
+            root_band: 100,
             exact_empties: 0,
         },
         "hard" => SearchConfig {
             max_depth: 9,
             node_limit: 2_500_000,
-            root_band: 4,
-            exact_empties: 13,
+            root_band: 28,
+            exact_empties: 15,
         },
         _ => SearchConfig {
             max_depth: 6,
             node_limit: 450_000,
-            root_band: 28,
-            exact_empties: 8,
+            root_band: 60,
+            exact_empties: 11,
         },
     }
 }
@@ -359,6 +419,19 @@ mod tests {
             .collect();
         assert!(selected.len() > 1);
         assert!(selected.iter().all(|mv| legal.contains(mv)));
+    }
+
+    #[test]
+    fn exact_endgame_prefers_a_win_over_a_losing_corner() {
+        let board = [
+            0, 1, 0, 1, 1, 1, 1, 2, 2, 0, 1, 2, 2, 2, 2, 0, 2, 2, 2, 1, 2, 2, 2, 1, 2, 2, 1, 2, 1,
+            2, 2, 2, 2, 1, 2, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 2, 2, 1, 2, 2, 1, 1, 2, 2,
+            2, 2, 2, 2, 2, 2,
+        ];
+        let position = Position::from_board(&board).unwrap();
+        let result = search(position, BLACK, config("hard"), 7, |_| false);
+        assert_eq!(result.selected, Some(15));
+        assert_eq!(result.depth, 4);
     }
 
     #[test]

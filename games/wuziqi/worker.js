@@ -3,9 +3,9 @@
 
     const wasm = root.OfflineGames?.wasm || (typeof require === 'function' ? require('../../app/wasm.js') : null)
     const limits = {
-        easy: {time: 100, depth: 1, candidates: 8},
-        medium: {time: 500, depth: 3, candidates: 12},
-        hard: {time: 1500, depth: 5, candidates: 16},
+        easy: {time: 100, depth: 2, candidates: 10},
+        medium: {time: 500, depth: 5, candidates: 16},
+        hard: {time: 1500, depth: 8, candidates: 20},
     }
     const randomSeed = () => {
         if (typeof crypto === 'object' && typeof crypto.getRandomValues === 'function') return crypto.getRandomValues(new Uint32Array(1))[0]

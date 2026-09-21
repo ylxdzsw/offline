@@ -8,12 +8,36 @@ const TABLE_SIZE: usize = 1 << 15;
 const PHASE_MAX: i32 = 24;
 const QUIESCENCE_DEPTH: u8 = 4;
 
+#[cfg(target_arch = "wasm32")]
+#[link(wasm_import_module = "env")]
+unsafe extern "C" {
+    fn now_ms() -> f64;
+}
+
+fn clock_ms() -> f64 {
+    #[cfg(target_arch = "wasm32")]
+    // SAFETY: the browser and Node loaders supply env.now_ms.
+    unsafe {
+        now_ms()
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        static START: std::sync::OnceLock<std::time::Instant> = std::sync::OnceLock::new();
+        START
+            .get_or_init(std::time::Instant::now)
+            .elapsed()
+            .as_secs_f64()
+            * 1_000.0
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub struct SearchConfig {
     pub node_budget: u32,
     pub max_depth: u8,
     pub seed: u64,
     pub root_band: i32,
+    pub time_budget_ms: f64,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -43,6 +67,7 @@ struct Entry {
 
 struct Searcher {
     budget: u32,
+    deadline_ms: f64,
     nodes: u32,
     table: Vec<Option<Entry>>,
     killers: [[Option<Move>; 2]; MAX_PLY],
@@ -119,6 +144,64 @@ fn is_passed_pawn(state: &State, side: u8, index: usize) -> bool {
         })
 }
 
+fn mobility(state: &State, index: usize, enemy_pawns: u64, enemy_king: usize) -> (i32, i32) {
+    let moving = state.board[index];
+    let side = game::side_of(moving);
+    let kind = game::kind_of(moving);
+    let directions: &[(i32, i32)] = match kind {
+        KNIGHT => &[
+            (-2, -1),
+            (-2, 1),
+            (-1, -2),
+            (-1, 2),
+            (1, -2),
+            (1, 2),
+            (2, -1),
+            (2, 1),
+        ],
+        BISHOP => &[(-1, -1), (-1, 1), (1, -1), (1, 1)],
+        ROOK => &[(-1, 0), (1, 0), (0, -1), (0, 1)],
+        QUEEN => &[
+            (-1, -1),
+            (-1, 1),
+            (1, -1),
+            (1, 1),
+            (-1, 0),
+            (1, 0),
+            (0, -1),
+            (0, 1),
+        ],
+        _ => return (0, 0),
+    };
+    let mut mobility = 0;
+    let mut pressure = 0;
+    for &(dr, dc) in directions {
+        let mut row = game::row_of(index) as i32 + dr;
+        let mut column = game::column_of(index) as i32 + dc;
+        while (0..8).contains(&row) && (0..8).contains(&column) {
+            let target = game::at(row as usize, column as usize);
+            let occupant = state.board[target];
+            if occupant != 0 && game::side_of(occupant) == side {
+                break;
+            }
+            if enemy_pawns & (1_u64 << target) == 0 {
+                mobility += 1;
+            }
+            if game::row_of(target).abs_diff(game::row_of(enemy_king)) <= 1
+                && game::column_of(target).abs_diff(game::column_of(enemy_king)) <= 1
+            {
+                pressure += 1;
+            }
+            if occupant != 0 || kind == KNIGHT {
+                break;
+            }
+            row += dr;
+            column += dc;
+        }
+    }
+    (mobility, pressure)
+}
+
 pub fn evaluate(state: &State, side: u8) -> i32 {
     let mut middlegame = [0; 2];
     let mut endgame = [0; 2];
@@ -128,6 +211,8 @@ pub fn evaluate(state: &State, side: u8) -> i32 {
     let mut kings = [0_usize; 2];
     let mut has_major = [false; 2];
     let mut phase = 0;
+    let mut pawn_attacks = [0_u64; 2];
+    let mut undeveloped = [0; 2];
 
     for (index, piece) in state.board.iter().copied().enumerate() {
         if piece == 0 {
@@ -142,10 +227,24 @@ pub fn evaluate(state: &State, side: u8) -> i32 {
             PAWN => {
                 pawn_files[piece_side][column] += 1;
                 let progress = pawn_progress(piece_side as u8, row);
+                let attack_row = row as i32 + if piece_side == WHITE as usize { -1 } else { 1 };
+                for dc in [-1, 1] {
+                    let target_file = column as i32 + dc;
+                    if (0..8).contains(&attack_row) && (0..8).contains(&target_file) {
+                        pawn_attacks[piece_side] |=
+                            1_u64 << game::at(attack_row as usize, target_file as usize);
+                    }
+                }
+                let central_advance = progress.min(2)
+                    * match column {
+                        3 | 4 => 16,
+                        2 | 5 => 8,
+                        _ => 0,
+                    };
                 (
                     100,
                     120,
-                    progress * 6 + i32::from((2..=5).contains(&column)) * 4,
+                    progress * 6 + central_advance + i32::from((2..=5).contains(&column)) * 4,
                     progress * 11 + i32::from((2..=5).contains(&column)) * 3,
                 )
             }
@@ -168,6 +267,12 @@ pub fn evaluate(state: &State, side: u8) -> i32 {
             }
             _ => (0, 0, 0, 0),
         };
+        if matches!(kind, KNIGHT | BISHOP)
+            && row == if piece_side == WHITE as usize { 7 } else { 0 }
+        {
+            undeveloped[piece_side] += 1;
+            middlegame[piece_side] -= 12;
+        }
         middlegame[piece_side] += base_mg + positional_mg;
         endgame[piece_side] += base_eg + positional_eg;
         if kind != KING {
@@ -206,6 +311,27 @@ pub fn evaluate(state: &State, side: u8) -> i32 {
         let piece_side = game::side_of(piece) as usize;
         let kind = game::kind_of(piece);
         let file = game::column_of(index);
+        let enemy = piece_side ^ 1;
+        let (freedom, pressure) = mobility(state, index, pawn_attacks[enemy], kings[enemy]);
+        let mobility_weight = match kind {
+            KNIGHT => 4,
+            BISHOP => 5,
+            ROOK => 2,
+            QUEEN => 1,
+            _ => 0,
+        };
+        middlegame[piece_side] += freedom * mobility_weight + pressure * 5;
+        endgame[piece_side] += freedom * mobility_weight;
+        if kind == QUEEN
+            && undeveloped[piece_side] > 1
+            && index != game::at(if piece_side == WHITE as usize { 7 } else { 0 }, 3)
+        {
+            middlegame[piece_side] -= undeveloped[piece_side] * 12;
+        }
+        if kind == PAWN && pawn_attacks[piece_side] & (1_u64 << index) != 0 {
+            middlegame[piece_side] += 8;
+            endgame[piece_side] += 12;
+        }
         if kind == PAWN && is_passed_pawn(state, piece_side as u8, index) {
             let progress = pawn_progress(piece_side as u8, game::row_of(index));
             middlegame[piece_side] += 14 + progress * 9;
@@ -288,6 +414,13 @@ fn position_key(state: &State) -> u64 {
     hash
 }
 
+fn repetition_key(state: &State) -> u64 {
+    let mut identity = state.clone();
+    identity.halfmove = 0;
+    identity.en_passant = game::effective_en_passant(state);
+    position_key(&identity)
+}
+
 fn is_capture(state: &State, mv: Move) -> bool {
     state.board[mv.to as usize] != 0 || mv.flags & game::FLAG_EN_PASSANT != 0
 }
@@ -361,7 +494,9 @@ fn tt_score(score: i32, ply: u8, storing: bool) -> i32 {
 
 impl Searcher {
     fn enter(&mut self) -> Result<(), ()> {
-        if self.nodes >= self.budget {
+        if self.nodes >= self.budget
+            || (self.nodes.is_multiple_of(256) && clock_ms() >= self.deadline_ms)
+        {
             return Err(());
         }
         self.nodes += 1;
@@ -415,7 +550,7 @@ impl Searcher {
         }
 
         let checked = game::is_in_check(state, state.turn);
-        if remaining == 0 {
+        if (remaining == 0 && !checked) || usize::from(ply) >= MAX_PLY - 1 {
             return Ok(evaluate(state, state.turn) - i32::from(checked) * 24);
         }
         if !checked {
@@ -441,7 +576,7 @@ impl Searcher {
                 -beta,
                 -alpha,
                 ply + 1,
-                remaining - 1,
+                remaining.saturating_sub(1),
             )?;
             if score >= beta {
                 return Ok(score);
@@ -500,15 +635,31 @@ impl Searcher {
             &self.history,
         );
 
+        let checked = game::is_in_check(state, state.turn);
         let mut best_score = -INF;
         let mut best_move = moves[0];
         for (index, mv) in moves.into_iter().enumerate() {
             let next = game::apply_move(state, mv);
+            let reduced = depth >= 3
+                && index >= 4
+                && !checked
+                && !is_capture(state, mv)
+                && mv.promotion == 0
+                && !game::is_in_check(&next, next.turn);
             let mut score = if index == 0 {
                 -self.negamax(&next, depth - 1, -beta, -alpha, ply + 1)?
             } else {
-                -self.negamax(&next, depth - 1, -alpha - 1, -alpha, ply + 1)?
+                -self.negamax(
+                    &next,
+                    depth - 1 - u8::from(reduced),
+                    -alpha - 1,
+                    -alpha,
+                    ply + 1,
+                )?
             };
+            if reduced && score > alpha {
+                score = -self.negamax(&next, depth - 1, -alpha - 1, -alpha, ply + 1)?;
+            }
             if index != 0 && score > alpha && score < beta {
                 score = -self.negamax(&next, depth - 1, -beta, -alpha, ply + 1)?;
             }
@@ -543,7 +694,22 @@ impl Searcher {
     }
 }
 
-pub fn search(state: &State, config: SearchConfig) -> SearchResult {
+pub fn search(state: &State, config: SearchConfig, positions: &[State]) -> SearchResult {
+    // Once only the defending king remains, precise progress matters more than
+    // opening variety: small random detours can waste the fifty-move allowance.
+    let bare_king = state.board.iter().copied().all(|piece| {
+        piece == 0 || game::side_of(piece) == state.turn || game::kind_of(piece) == KING
+    });
+    let mating_major = state.board.iter().copied().any(|piece| {
+        piece != 0
+            && game::side_of(piece) == state.turn
+            && matches!(game::kind_of(piece), ROOK | QUEEN)
+    });
+    let root_band = if bare_king && mating_major {
+        0
+    } else {
+        config.root_band.max(0)
+    };
     let mut root = ordered(
         state,
         game::legal_moves(state, state.turn),
@@ -573,8 +739,34 @@ pub fn search(state: &State, config: SearchConfig) -> SearchResult {
         }
     }
 
+    let mut counts = std::collections::HashMap::<u64, usize>::new();
+    for previous in positions {
+        *counts.entry(repetition_key(previous)).or_default() += 1;
+    }
+    let repeated: std::collections::HashMap<Move, usize> = root
+        .iter()
+        .map(|&mv| {
+            let next = game::apply_move(state, mv);
+            (mv, counts.get(&repetition_key(&next)).copied().unwrap_or(0))
+        })
+        .collect();
+    let root_score = |mv: Move, score: i32| {
+        if repeated[&mv] >= 2 {
+            0
+        } else if score.abs() >= MATE_BOUND {
+            score
+        } else {
+            score - if repeated[&mv] > 0 { 12 } else { 0 }
+        }
+    };
+
     let mut searcher = Searcher {
         budget: config.node_budget.max(root.len() as u32),
+        deadline_ms: if config.time_budget_ms > 0.0 {
+            clock_ms() + config.time_budget_ms
+        } else {
+            f64::INFINITY
+        },
         nodes: 0,
         table: vec![None; TABLE_SIZE],
         killers: [[None; 2]; MAX_PLY],
@@ -586,7 +778,7 @@ pub fn search(state: &State, config: SearchConfig) -> SearchResult {
         .copied()
         .map(|mv| {
             let next = game::apply_move(state, mv);
-            (mv, -evaluate(&next, next.turn))
+            (mv, root_score(mv, -evaluate(&next, next.turn)))
         })
         .collect();
 
@@ -596,12 +788,15 @@ pub fn search(state: &State, config: SearchConfig) -> SearchResult {
         let mut root_alpha = -INF;
         for (index, &mv) in root.iter().enumerate() {
             let next = game::apply_move(state, mv);
-            let result = if index == 0 {
+            let penalty = if repeated[&mv] > 0 { 12 } else { 0 };
+            let result = if repeated[&mv] >= 2 {
+                Ok(0)
+            } else if index == 0 {
                 searcher
                     .negamax(&next, depth - 1, -INF, INF, 1)
                     .map(|score| -score)
             } else {
-                let threshold = root_alpha.saturating_sub(config.root_band.max(0));
+                let threshold = root_alpha.saturating_sub(root_band) + penalty;
                 searcher
                     .negamax(&next, depth - 1, -threshold, -threshold + 1, 1)
                     .map(|score| -score)
@@ -617,6 +812,7 @@ pub fn search(state: &State, config: SearchConfig) -> SearchResult {
             };
             match result {
                 Ok(score) => {
+                    let score = root_score(mv, score);
                     root_alpha = root_alpha.max(score);
                     iteration.push((mv, score));
                 }
@@ -643,7 +839,7 @@ pub fn search(state: &State, config: SearchConfig) -> SearchResult {
     let effective_band = if best.abs() >= MATE_BOUND {
         0
     } else {
-        config.root_band.max(0)
+        root_band
     };
     let eligible: Vec<_> = scores
         .iter()
@@ -653,7 +849,22 @@ pub fn search(state: &State, config: SearchConfig) -> SearchResult {
         eligible[0]
     } else {
         let mut random = SplitMix64(config.seed);
-        eligible[(random.next() as usize) % eligible.len()]
+        let weight = |score: i32| u64::from((effective_band - (best - score) + 1) as u32).pow(2);
+        let total: u64 = eligible.iter().map(|entry| weight(entry.1)).sum();
+        let mut ticket = random.next() % total;
+        eligible
+            .iter()
+            .copied()
+            .find(|entry| {
+                let tickets = weight(entry.1);
+                if ticket < tickets {
+                    true
+                } else {
+                    ticket -= tickets;
+                    false
+                }
+            })
+            .unwrap()
     };
     SearchResult {
         selected: Some(selected.0),
@@ -668,6 +879,10 @@ pub fn search(state: &State, config: SearchConfig) -> SearchResult {
 mod tests {
     use super::*;
 
+    fn search(state: &State, config: SearchConfig) -> SearchResult {
+        super::search(state, config, &[])
+    }
+
     fn bare() -> State {
         State {
             board: [0; 64],
@@ -680,6 +895,28 @@ mod tests {
     }
 
     #[test]
+    fn checked_horizon_searches_the_evasion_before_evaluating() {
+        let mut state = bare();
+        state.board[game::at(7, 4)] = game::piece(WHITE, KING);
+        state.board[game::at(0, 4)] = game::piece(game::BLACK, KING);
+        state.board[game::at(6, 4)] = game::piece(game::BLACK, ROOK);
+        let mut searcher = Searcher {
+            budget: 1_000,
+            deadline_ms: f64::INFINITY,
+            nodes: 0,
+            table: vec![None; TABLE_SIZE],
+            killers: [[None; 2]; MAX_PLY],
+            history: [0; 64 * 64],
+        };
+        assert!(evaluate(&state, state.turn) < -400);
+        let score = searcher.quiescence(&state, -INF, INF, 1, 0).unwrap();
+        assert!(
+            score >= -50,
+            "the unprotected checking rook can be captured: {score}"
+        );
+    }
+
+    #[test]
     fn seeded_selection_is_reproducible_and_bounded() {
         let state = State::initial();
         let config = SearchConfig {
@@ -687,6 +924,7 @@ mod tests {
             max_depth: 2,
             seed: 7,
             root_band: 80,
+            time_budget_ms: 0.0,
         };
         let first = search(&state, config);
         let second = search(&state, config);
@@ -729,6 +967,7 @@ mod tests {
         state.board[game::at(1, 1)] = game::piece(WHITE, QUEEN);
         let mut searcher = Searcher {
             budget: 1_000,
+            deadline_ms: f64::INFINITY,
             nodes: 0,
             table: vec![None; TABLE_SIZE],
             killers: [[None; 2]; MAX_PLY],
@@ -750,6 +989,7 @@ mod tests {
                 max_depth: 3,
                 seed: 1,
                 root_band: 500,
+                time_budget_ms: 0.0,
             },
         );
         let b = search(
@@ -759,6 +999,7 @@ mod tests {
                 max_depth: 3,
                 seed: 99,
                 root_band: 500,
+                time_budget_ms: 0.0,
             },
         );
         assert_eq!(a.selected, b.selected);

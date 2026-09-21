@@ -46,6 +46,7 @@
         .cell.same { background: var(--accent-soft); }
         .cell.selected { background: color-mix(in srgb, var(--selected) 18%, var(--board-paper)); box-shadow: inset 0 0 0 2px var(--selected); }
         .cell.conflict { color: var(--danger); background: var(--danger-soft); }
+        .cell:focus-visible { z-index: 2; outline: 3px solid var(--focus); outline-offset: -3px; }
         .entry { display: grid; width: 100%; height: 100%; place-items: center; }
         .cell.changed { animation: sudoku-cell .2s ease-out; }
         .cell.changed > .entry, .cell.changed > .notes { animation: sudoku-entry .2s ease-out; }
@@ -80,7 +81,7 @@
     <p class="warning" hidden></p>
     <div class="status" role="status" aria-live="polite"></div>
     <div class="board" role="grid"></div>
-    <div class="pad" aria-label="Number pad"></div>
+    <div class="pad" role="group"></div>
     <div class="tools">
         <button class="tool erase" type="button"></button>
     </div>
@@ -118,7 +119,14 @@ customElements.define('sudoku-game', class extends HTMLElement {
     load() { const saved = this.storage.read('sudoku'); this.state = this.valid(saved) ? saved : this.fresh(); if (!Number.isInteger(this.state.seed)) this.state.seed = OfflineGames.runtime.randomSeed() }
     bind() {
         const shadow = this.shadowRoot
-        shadow.querySelector('.board').addEventListener('click', event => { const cell = event.target.closest('.cell'); if (cell) { this.selected = Number(cell.dataset.index); this.render() } })
+        shadow.querySelector('.board').addEventListener('click', event => {
+            const cell = event.target.closest('.cell')
+            if (cell) {
+                this.selected = Number(cell.dataset.index)
+                this.render()
+                shadow.querySelector(`.cell[data-index="${this.selected}"]`).focus({preventScroll: true})
+            }
+        })
         const pad = shadow.querySelector('.pad')
         const beginPress = digit => {
             clearTimeout(this.longPressTimer)
@@ -136,6 +144,7 @@ customElements.define('sudoku-game', class extends HTMLElement {
         })
         pad.addEventListener('pointerup', endPress)
         pad.addEventListener('pointercancel', endPress)
+        pad.addEventListener('pointerleave', endPress)
         pad.addEventListener('touchstart', event => {
             const digit = event.target.closest('.digit')
             if (!digit) return
@@ -174,15 +183,42 @@ customElements.define('sudoku-game', class extends HTMLElement {
         shadow.querySelector('.erase').addEventListener('click', () => this.enter(0))
         shadow.querySelector('.undo').addEventListener('click', () => this.undo())
         shadow.querySelector('.new').addEventListener('click', () => this.newGame())
-        shadow.querySelector('.difficulty').addEventListener('change', event => this.newGame(event.target.value, true))
+        shadow.querySelector('.difficulty').addEventListener('change', event => {
+            this.newGame(event.target.value)
+            event.target.value = this.state.difficulty
+        })
         this.addEventListener('keydown', event => {
-            const digit = event.code?.match(/^Digit([1-9])$/)?.[1]
-            if (digit) this.enter(Number(digit), event.shiftKey)
-            else if (event.key === 'Backspace' || event.key === 'Delete') this.enter(0)
+            if (event.ctrlKey || event.metaKey || event.altKey || event.composedPath()[0].matches('select')) return
+            const cell = event.composedPath()[0].closest('.cell')
+            if (cell) {
+                const index = Number(cell.dataset.index), row = Math.floor(index / 9), column = index % 9
+                const next = {
+                    ArrowUp: Math.max(0, row - 1) * 9 + column,
+                    ArrowDown: Math.min(8, row + 1) * 9 + column,
+                    ArrowLeft: row * 9 + Math.max(0, column - 1),
+                    ArrowRight: row * 9 + Math.min(8, column + 1),
+                    Home: row * 9,
+                    End: row * 9 + 8,
+                }[event.key]
+                if (next != null) {
+                    event.preventDefault()
+                    this.selected = next
+                    this.render()
+                    shadow.querySelector(`.cell[data-index="${next}"]`).focus()
+                    return
+                }
+                this.selected = index
+            }
+            const digit = event.code?.match(/^(?:Digit|Numpad)([1-9])$/)?.[1]
+            if (digit || ['Backspace', 'Delete', '0'].includes(event.key)) {
+                event.preventDefault()
+                this.enter(Number(digit || 0), event.shiftKey)
+            }
         })
     }
     localize() {
         const s = this.shadowRoot, t = key => this.i18n.t(key)
+        s.querySelector('.pad').setAttribute('aria-label', t('sudokuNumberPad'))
         s.querySelector('.difficulty-label').textContent = t('difficulty')
         for (const option of s.querySelectorAll('.difficulty option')) option.textContent = t(option.value)
         s.querySelector('.undo').textContent = t('undo'); s.querySelector('.new').textContent = t('newGame')
@@ -202,7 +238,8 @@ customElements.define('sudoku-game', class extends HTMLElement {
             this.state.notes[index] = 0
             if (digit) for (const peer of this.engine.peers(index)) if (this.state.notes[peer] & (1 << digit)) { before.peerNotes.push([peer, this.state.notes[peer]]); this.state.notes[peer] &= ~(1 << digit) }
         }
-        if (before.value === this.state.board[index] && before.notes === this.state.notes[index]) return
+        if (before.value === this.state.board[index] && before.notes === this.state.notes[index]
+            && !before.peerNotes.length) return
         this.state.history.push(before)
         this.changedIndex = index
         if (this.engine.isComplete(this.state.board, this.state.solution)) this.state.outcome = {ended: true, reason: 'solved'}
@@ -220,6 +257,9 @@ customElements.define('sudoku-game', class extends HTMLElement {
     }
     render() {
         const s = this.shadowRoot, selectedValue = this.selected == null ? 0 : this.state.board[this.selected], changedIndex = this.changedIndex
+        const focused = s.activeElement
+        const focusSelector = focused?.matches('.cell') ? `.cell[data-index="${focused.dataset.index}"]`
+            : focused?.matches('.digit') ? `.digit[data-digit="${focused.dataset.digit}"]` : null
         s.querySelector('.board').innerHTML = this.state.board.map((value, index) => {
             const classes = ['cell']; const row = this.engine.rowOf(index), column = this.engine.columnOf(index)
             if (column === 2 || column === 5) classes.push('box-right'); if (row === 2 || row === 5) classes.push('box-bottom')
@@ -231,11 +271,13 @@ customElements.define('sudoku-game', class extends HTMLElement {
             if (index === changedIndex) classes.push('changed')
             const notes = !value ? `<span class="notes">${this.engine.DIGITS.map(digit => `<i>${this.state.notes[index] & (1 << digit) ? digit : ''}</i>`).join('')}</span>` : ''
             const content = value ? (this.state.puzzle[index] ? value : `<span class="entry">${value}</span>`) : notes
-            return `<button type="button" role="gridcell" class="${classes.join(' ')}" data-index="${index}" aria-selected="${index === this.selected}" aria-label="${this.i18n.t('row')} ${row + 1}, ${this.i18n.t('column')} ${column + 1}, ${value || this.i18n.t('empty')}">${content}</button>`
+            return `<button type="button" role="gridcell" class="${classes.join(' ')}" data-index="${index}" tabindex="${index === (this.selected ?? 0) ? 0 : -1}" aria-selected="${index === this.selected}" aria-readonly="${Boolean(this.state.puzzle[index])}" aria-label="${this.i18n.t('row')} ${row + 1}, ${this.i18n.t('column')} ${column + 1}, ${value || this.i18n.t('empty')}">${content}</button>`
         }).join('')
         this.changedIndex = null
         const counts = this.engine.DIGITS.map(digit => this.state.board.filter(value => value === digit).length)
-        s.querySelector('.pad').innerHTML = this.engine.DIGITS.map((digit, index) => `<button type="button" class="digit${counts[index] >= 9 ? ' complete' : ''}" data-digit="${digit}" aria-label="${digit}; ${this.i18n.t('longPressNote')}" ${counts[index] >= 9 ? 'disabled' : ''}>${digit}</button>`).join('')
+        const complete = this.engine.DIGITS.filter((digit, index) => counts[index] === 9
+            && this.state.board.every((value, cell) => value !== digit || !this.engine.conflicts(this.state.board, cell).length))
+        s.querySelector('.pad').innerHTML = this.engine.DIGITS.map(digit => `<button type="button" class="digit${complete.includes(digit) ? ' complete' : ''}" data-digit="${digit}" aria-label="${digit}; ${this.i18n.t('longPressNote')}">${digit}</button>`).join('')
         const statusText = this.i18n.t(this.state.outcome ? 'sudokuSolved' : 'sudokuPrompt')
         s.querySelector('.status').textContent = statusText
         const board = s.querySelector('.board')
@@ -243,6 +285,10 @@ customElements.define('sudoku-game', class extends HTMLElement {
         else delete board.dataset.win
         s.querySelector('.difficulty').value = this.state.difficulty
         s.querySelector('.undo').disabled = !this.state.history.length
+        s.querySelector('.erase').disabled = this.selected == null || Boolean(this.state.outcome)
+            || Boolean(this.state.puzzle[this.selected])
+            || (!this.state.board[this.selected] && !this.state.notes[this.selected])
+        if (focusSelector) s.querySelector(focusSelector)?.focus({preventScroll: true})
     }
     disconnectedCallback() { clearTimeout(this.longPressTimer) }
 })

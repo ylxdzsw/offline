@@ -1,5 +1,6 @@
 <template id="backgammon-game-template">
     <style>
+        *, *::before, *::after { box-sizing: border-box; }
         :host { display: block; color: var(--ink); }
         .toolbar {
             display: grid; grid-template-columns: 1fr auto auto; gap: 8px;
@@ -243,6 +244,8 @@
             .pip { width: 3px; height: 3px; }
             .turn-action { padding-inline: 8px; font-size: .82rem; }
         }
+        .retry { width: 100%; margin: 0 0 9px; }
+        .retry[hidden] { display: none; }
     </style>
     <div class="toolbar">
         <label><span class="difficulty-label"></span><select class="difficulty"><option value="easy"></option><option value="medium"></option><option value="hard"></option></select></label>
@@ -265,7 +268,7 @@
             <strong class="score-number computer-score">0</strong>
         </div>
     </div>
-    <div class="status" role="status" aria-live="polite"></div>
+    <div class="status" role="status" aria-live="polite"></div><button class="action retry" type="button" hidden></button>
     <div class="board" role="grid">
         <div class="bar-rail" aria-hidden="true"></div>
         <div class="cube" aria-hidden="true">1</div>
@@ -509,7 +512,35 @@ OfflineGames.wasm.defineElement('backgammon', 'backgammon-game', class extends H
         }
     }
 
+    bindBoardKeys() {
+        const board = this.shadowRoot.querySelector('.board')
+        for (const button of board.querySelectorAll('.target')) button.tabIndex = button.matches('[data-location="23"]') ? 0 : -1
+        board.addEventListener('focusin', event => {
+            const cell = event.target.closest('.target')
+            if (cell) for (const button of board.querySelectorAll('.target')) button.tabIndex = button === cell ? 0 : -1
+        })
+        board.addEventListener('keydown', event => {
+            const cell = event.target.closest('.target')
+            if (!cell) return
+            if (event.key === 'Escape') { event.preventDefault(); this.clearSelection();this.notice=null; this.render(); return }
+            const direction = {ArrowUp: [0,-1], ArrowDown: [0,1], ArrowLeft: [-1,0], ArrowRight: [1,0]}[event.key]
+            if (!direction) return
+            event.preventDefault()
+            const origin = cell.getBoundingClientRect(), x = origin.x + origin.width / 2, y = origin.y + origin.height / 2
+            const candidates = [...board.querySelectorAll('.target')].filter(button => !button.disabled && button !== cell).map(button => {
+                const rect = button.getBoundingClientRect(), dx = rect.x + rect.width / 2 - x, dy = rect.y + rect.height / 2 - y
+                return {button, forward: dx * direction[0] + dy * direction[1], cross: Math.abs(dx * direction[1] - dy * direction[0])}
+            }).filter(candidate => candidate.forward > 1).sort((a,b) => a.forward - b.forward || a.cross - b.cross)
+            candidates[0]?.button.focus()
+        })
+        this.shadowRoot.querySelector('.retry').addEventListener('click', () => this.requestAI())
+    }
+    failAI(error) {
+        if (error) console.error(error)
+        this.cancelAI(); this.aiFailed = true; this.render()
+    }
     bind() {
+        this.bindBoardKeys()
         const shadow = this.shadowRoot
         shadow.querySelector('.board').addEventListener('click', event => {
             const target = event.target.closest('.target')
@@ -591,11 +622,11 @@ OfflineGames.wasm.defineElement('backgammon', 'backgammon-game', class extends H
             return step?.from === this.selectedFrom && step.to === location
         })
         if (!matching.length) {
-            if (sources.has(location)) {
-                this.selectedFrom = location
-                this.notice = null
-            } else if (location === this.selectedFrom) {
+            if (location === this.selectedFrom) {
                 this.selectedFrom = null
+                this.notice = null
+            } else if (sources.has(location)) {
+                this.selectedFrom = location
                 this.notice = null
             } else {
                 this.notice = 'backgammonChooseDestination'
@@ -866,7 +897,7 @@ OfflineGames.wasm.defineElement('backgammon', 'backgammon-game', class extends H
         const requestedAt = performance.now()
         const position = this.engine.clonePosition(this.state.position)
         const dice = this.state.dice.slice()
-        this.worker = OfflineGames.runtime.createWorker('backgammon-worker-payload')
+        try { this.worker = OfflineGames.runtime.createWorker('backgammon-worker-payload') } catch (error) { this.failAI(error); return }
         this.worker.onmessage = event => {
             if (event.data.id !== id || !this.thinking) return
             if (event.data.error) {
@@ -894,12 +925,7 @@ OfflineGames.wasm.defineElement('backgammon', 'backgammon-game', class extends H
             if (delay) this.moveTimer = setTimeout(begin, delay)
             else begin()
         }
-        this.worker.onerror = error => {
-            console.error(error)
-            this.cancelAI(false)
-            this.aiFailed = true
-            this.render()
-        }
+        this.worker.onerror = error => this.failAI(error)
         this.worker.postMessage({
             id,
             position,
@@ -989,7 +1015,7 @@ OfflineGames.wasm.defineElement('backgammon', 'backgammon-game', class extends H
                 ? this.format('backgammonAiOffers', {value: this.state.cube * 2})
                 : this.format('backgammonYouOffer', {value: this.state.cube * 2})
         }
-        if (this.aiFailed) return this.i18n.t('backgammonAiUnavailable')
+        if (this.aiFailed) return this.i18n.t('aiUnavailable')
         if (this.thinking) return this.i18n.t('aiThinking')
         if (this.state.phase === 'pass') return this.i18n.t(this.notice || 'backgammonYouBlocked')
         if (this.notice) return this.i18n.t(this.notice)
@@ -1049,7 +1075,7 @@ OfflineGames.wasm.defineElement('backgammon', 'backgammon-game', class extends H
         const lastTurnSide = this.aiPath.length ? this.engine.AI : this.state.lastTurn?.side
         const lastSteps = this.aiPath.length ? [activeStep] : this.state.lastTurn?.steps || []
         const lastLocations = new Set(lastSteps.flatMap(step => [step.from, step.to]))
-        const current = this.path.at(-1)?.to ?? this.selectedFrom
+        const current = this.selectedFrom ?? this.path.at(-1)?.to
 
         for (const target of this.shadowRoot.querySelectorAll('.target')) {
             const location = Number(target.dataset.location)
@@ -1067,7 +1093,7 @@ OfflineGames.wasm.defineElement('backgammon', 'backgammon-game', class extends H
             target.classList.toggle('destination', destination)
             target.classList.toggle('last', last)
             target.classList.toggle('arrival', arrival)
-            target.setAttribute('aria-selected', String(current === location))
+            target.setAttribute('aria-selected', String(current === location && (restrictedSide == null || restrictedSide === this.engine.HUMAN)))
             target.setAttribute('aria-disabled', String(this.thinking || this.state.phase !== 'move'))
             if (location < 24) {
                 target.setAttribute('aria-label', this.pointLabel(location, display, side, count, {movable, destination, last}))
@@ -1099,7 +1125,7 @@ OfflineGames.wasm.defineElement('backgammon', 'backgammon-game', class extends H
         const faces = this.state.dice[0] === this.state.dice[1]
             ? Array(4).fill(this.state.dice[0]) : this.state.dice.slice()
         const consumed = new Map()
-        for (const step of this.path) consumed.set(step.die, (consumed.get(step.die) || 0) + 1)
+        for (const step of this.aiPath.length ? this.aiPath : this.path) consumed.set(step.die, (consumed.get(step.die) || 0) + 1)
         const used = new Map()
         const pips = {
             1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8],
@@ -1161,6 +1187,8 @@ OfflineGames.wasm.defineElement('backgammon', 'backgammon-game', class extends H
     }
 
     render() {
+        const retry = this.shadowRoot.querySelector('.retry')
+        retry.hidden = !this.aiFailed; retry.textContent = this.i18n.t('retry')
         this.renderScore()
         this.renderBoard()
         this.renderDice()
@@ -1176,7 +1204,7 @@ OfflineGames.wasm.defineElement('backgammon', 'backgammon-game', class extends H
         else delete board.dataset.win
         board.classList.toggle('match-win', humanWin && this.state.phase === 'match-over')
         const aiTurn = this.state.turn === this.engine.AI && ['roll', 'move'].includes(this.state.phase)
-        status.classList.toggle('thinking', this.thinking || aiTurn || this.state.offeredBy === this.engine.HUMAN)
+        status.classList.toggle('thinking', !this.aiFailed && (this.thinking || aiTurn || this.state.offeredBy === this.engine.HUMAN))
         const cube = shadow.querySelector('.cube')
         cube.textContent = String(this.state.cube)
         cube.className = 'cube'

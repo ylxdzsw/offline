@@ -3,9 +3,9 @@
 
     const wasm = root.OfflineGames?.wasm || (typeof require === 'function' ? require('../../app/wasm.js') : null)
     const limits = {
-        easy:   {time: 90,   depth: 3, nodes: 15_000,  rootBand: 120},
-        medium: {time: 420,  depth: 7, nodes: 200_000,  rootBand: 28},
-        hard:   {time: 1200, depth: 11, nodes: 1_600_000, rootBand: 4},
+        easy:   {time: 100,  depth: 4, nodes: 20_000, rootBand: 45},
+        medium: {time: 450,  depth: 9, nodes: 300_000, rootBand: 24},
+        hard:   {time: 1400, depth: 13, nodes: 2_000_000, rootBand: 12},
     }
     const now = () => typeof performance === 'object' ? performance.now() : Date.now()
     const hash = (board, side) => {

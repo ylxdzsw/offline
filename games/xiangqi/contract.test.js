@@ -117,3 +117,20 @@ test('seeded variation is reproducible, bounded, and forced king capture is inva
     assert.deepEqual(moves,[moves[0],moves[0],moves[0]])
     assert.deepEqual(moves[0],{from:engine.at(9,4),to:engine.at(0,4),piece:'rK',captured:'bK'})
 })
+
+test('easy AI finds quiet cannon preparations for forced mate across seeds', () => {
+    const fixtures = [
+        {pieces: {4:'bK',18:'rR',49:'rP',79:'rC',82:'bH',85:'rK'}, from:79, to:76},
+        {pieces: {4:'bK',20:'rR',35:'bH',49:'rP',59:'rC',85:'rK'}, from:59, to:58},
+    ]
+    for (const fixture of fixtures) {
+        const board = emptyBoard()
+        for (const [index,piece] of Object.entries(fixture.pieces)) board[index]=piece
+        for (const seed of [1,7,42]) {
+            const result = ai.search(board,engine.RED,'easy',{seed,nodeBudget:9000})
+            assert.equal(result.move.from,fixture.from)
+            assert.equal(result.move.to,fixture.to)
+            assert(result.selectedScore>990000,'variation must preserve the forced mate')
+        }
+    }
+})

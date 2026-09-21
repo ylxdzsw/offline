@@ -3,9 +3,9 @@
 
     const wasm = root.OfflineGames?.wasm || (typeof require === 'function' ? require('../../app/wasm.js') : null)
     const limits = {
-        easy: {nodes: 12000, depth: 2, branches: 3, rootBand: 180},
-        medium: {nodes: 50000, depth: 2, branches: 8, rootBand: 35},
-        hard: {nodes: 120000, depth: 2, branches: 16, rootBand: 0},
+        easy: {nodes: 12000, depth: 2, branches: 6, rootBand: 45, time: 250},
+        medium: {nodes: 50000, depth: 2, branches: 12, rootBand: 14, time: 700},
+        hard: {nodes: 120000, depth: 2, branches: 24, rootBand: 6, time: 1500},
     }
     const now = () => typeof performance === 'object' ? performance.now() : Date.now()
     const hash = (position, side, dice) => {
@@ -24,6 +24,7 @@
             side,
             dice,
             seed: (Number(options.seed) >>> 0) ^ hash(position, side, dice),
+            timeBudget: options.timeBudget ?? limit.time,
             nodeBudget: options.nodeBudget ?? limit.nodes,
             maxDepth: options.maxDepth ?? limit.depth,
             branchLimit: options.branchLimit ?? limit.branches,
@@ -36,6 +37,7 @@
     if (typeof module === 'object' && module.exports) module.exports = api
     if (typeof root.addEventListener === 'function' && typeof root.postMessage === 'function') {
         root.addEventListener('message', event => {
+            if (event.data?.__offlineWasmModule) return
             const {id, position, side, dice, difficulty, seed} = event.data
             try {
                 root.postMessage({id, ...search(position, side, dice, difficulty, {seed})})

@@ -281,8 +281,18 @@ fn dispatch(request: Value) -> DispatchResult {
                 max_depth: request.get("maxDepth").and_then(Value::as_u64).unwrap_or(4) as u8,
                 seed: request.get("seed").and_then(Value::as_u64).unwrap_or(0),
                 root_band: request.get("rootBand").and_then(Value::as_i64).unwrap_or(0) as i32,
+                time_budget_ms: request
+                    .get("timeBudget")
+                    .and_then(Value::as_f64)
+                    .unwrap_or(0.0),
             };
-            let result = ai::search(&state, config);
+            let positions = request
+                .get("positions")
+                .and_then(Value::as_array)
+                .map(|values| values.iter().map(state_from).collect::<Result<Vec<_>, _>>())
+                .transpose()?
+                .unwrap_or_default();
+            let result = ai::search(&state, config, &positions);
             Ok(json!({
                 "move": result.selected.map(|mv| move_to(&state,mv)).unwrap_or(Value::Null),
                 "score": result.score, "selectedScore":result.selected_score,

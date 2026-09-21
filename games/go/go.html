@@ -33,7 +33,8 @@
         .mini.white { border: 1px solid var(--stone-white-edge); background: radial-gradient(circle at 35% 28%, #fff, var(--stone-white) 72%); }
         .resign { color: var(--danger); }
         .warning { margin: 0 0 8px; color: var(--danger); font-size: .75rem; text-align: center; }
-        .warning[hidden] { display: none; }
+        .warning[hidden], .retry[hidden] { display: none; }
+        .retry { display: block; margin: 0 auto 9px; min-height: 40px; padding: 0 14px; }
         .status {
             display: flex; min-height: 38px; align-items: center; justify-content: center;
             margin: 0 0 8px; padding: 5px 9px; border-radius: var(--radius-sm);
@@ -48,7 +49,7 @@
         .board {
             --edge: clamp(14px, 4.6vw, 22px);
             --segments: 12;
-            position: relative; width: min(100%, 414px); aspect-ratio: 1; margin: 0 auto;
+            position: relative; box-sizing: border-box; width: min(100%, 414px); aspect-ratio: 1; margin: 0 auto;
             overflow: hidden; border: 2px solid var(--board-wood-edge); border-radius: var(--radius-sm);
             background:
                 radial-gradient(circle at 28% 18%, color-mix(in srgb, var(--board-wood-deep) 35%, transparent), transparent 54%),
@@ -80,7 +81,7 @@
             position: absolute; z-index: 1; display: grid;
             width: calc(100% / var(--segments)); aspect-ratio: 1; min-width: 0; min-height: 0;
             padding: 0; border: 0; border-radius: 50%; place-items: center;
-            background: transparent; transform: translate(-50%, -50%); pointer-events: none;
+            background: transparent; transform: translate(-50%, -50%);
         }
         .spot.legal:active::after {
             width: 28%; height: 28%; border-radius: 50%; content: "";
@@ -139,6 +140,7 @@
     </div>
     <p class="warning" hidden></p>
     <div class="status" role="status" aria-live="polite"></div>
+    <button class="action retry" type="button" hidden></button>
     <div class="board" role="grid">
         <div class="field"><div class="stars"></div><div class="spots"></div></div>
     </div>
@@ -157,6 +159,8 @@ OfflineGames.wasm.defineElement('go', 'go-game', class extends HTMLElement {
         this.aiTimer = null
         this.aiStartedAt = 0
         this.requestId = 0
+        this.aiError = false
+        this.focusIndex = 84
         this.notice = null
         this.captureFlash = new Map()
         this.captureTimer = null
@@ -214,7 +218,15 @@ OfflineGames.wasm.defineElement('go', 'go-game', class extends HTMLElement {
 
     bind() {
         const s = this.shadowRoot
-        s.querySelector('.field').addEventListener('click', event => this.boardClick(event))
+        s.querySelector('.retry').addEventListener('click', () => this.requestAI())
+        s.querySelector('.board').addEventListener('keydown', event => this.boardKey(event))
+        s.querySelector('.board').addEventListener('focusin', event => {
+            const cell = event.target.closest('.spot')
+            if (!cell) return
+            this.focusIndex = Number(cell.dataset.index)
+            for (const spot of s.querySelectorAll('.spot')) spot.tabIndex = spot === cell ? 0 : -1
+        })
+        s.querySelector('.board').addEventListener('click', event => this.boardClick(event))
         s.querySelector('.undo').addEventListener('click', () => this.undo())
         s.querySelector('.pass').addEventListener('click', () => this.pass())
         s.querySelector('.resign').addEventListener('click', () => this.resign())
@@ -231,6 +243,7 @@ OfflineGames.wasm.defineElement('go', 'go-game', class extends HTMLElement {
 
     localize() {
         const s = this.shadowRoot, t = key => this.i18n.t(key)
+        s.querySelector('.retry').textContent = this.i18n.t('retry')
         s.querySelector('.size-label').textContent = t('goBoardSize')
         s.querySelector('.difficulty-label').textContent = t('difficulty')
         s.querySelector('.new').textContent = t('newGame')
@@ -331,17 +344,42 @@ OfflineGames.wasm.defineElement('go', 'go-game', class extends HTMLElement {
         }, GO_CAPTURE_MS)
     }
 
+    boardKey(event) {
+        const cell = event.target.closest('.spot')
+        if (!cell) return
+        const size = this.state.size, index = Number(cell.dataset.index)
+        const row = Math.floor(index / size), column = index % size
+        let next
+        if (event.key === 'ArrowLeft') next = row * size + Math.max(0, column - 1)
+        else if (event.key === 'ArrowRight') next = row * size + Math.min(size - 1, column + 1)
+        else if (event.key === 'ArrowUp') next = Math.max(0, row - 1) * size + column
+        else if (event.key === 'ArrowDown') next = Math.min(size - 1, row + 1) * size + column
+        else if (event.key === 'Home') next = event.ctrlKey ? 0 : row * size
+        else if (event.key === 'End') next = event.ctrlKey ? size * size - 1 : row * size + size - 1
+        else return
+        event.preventDefault()
+        this.shadowRoot.querySelector(`[data-index="${next}"]`).focus()
+    }
+
+    failAI() {
+        this.cancelAI()
+        this.aiError = true
+        this.render()
+    }
+
     requestAI() {
         if (this.position.outcome.ended || this.position.turn !== this.engine.WHITE) return
         this.cancelAI()
+        this.aiError = false
         this.thinking = true
         this.aiStartedAt = performance.now()
         const id = ++this.requestId
-        this.worker = OfflineGames.runtime.createWorker('go-worker-payload')
+        try { this.worker = OfflineGames.runtime.createWorker('go-worker-payload') }
+        catch (error) { console.error(error); this.failAI(); return }
         this.worker.onmessage = event => {
             if (event.data.id !== id || !this.thinking) return
             const move = event.data.move
-            const valid = move == null || Number.isInteger(move) && this.position.legal.includes(move)
+            const valid = move === null || Number.isInteger(move) && this.position.legal.includes(move)
             if (this.worker) this.worker.terminate()
             this.worker = null
             const delay = Math.max(0, GO_MIN_AI_TURN_MS - (performance.now() - this.aiStartedAt))
@@ -350,15 +388,10 @@ OfflineGames.wasm.defineElement('go', 'go-game', class extends HTMLElement {
                 if (id !== this.requestId || !this.thinking) return
                 this.thinking = false
                 if (valid) this.commit(move == null ? 'pass' : 'play', move)
-                else this.render()
+                else this.failAI()
             }, delay)
         }
-        this.worker.onerror = error => {
-            console.error(error)
-            this.cancelAI(false)
-            this.notice = 'goAiUnavailable'
-            this.render()
-        }
+        this.worker.onerror = error => { console.error(error); this.failAI() }
         this.worker.postMessage({
             id,
             size: this.state.size,
@@ -382,6 +415,7 @@ OfflineGames.wasm.defineElement('go', 'go-game', class extends HTMLElement {
         if (!this.state.history.length) return
         const wasThinking = this.thinking
         this.cancelAI()
+        this.aiError = false
         const last = this.state.history.at(-1)
         let count = wasThinking || this.state.history.length % 2 === 1 || last.kind === 'resign' ? 1 : 2
         while (count-- > 0 && this.state.history.length) this.state.history.pop()
@@ -396,6 +430,7 @@ OfflineGames.wasm.defineElement('go', 'go-game', class extends HTMLElement {
         if (this.state.history.length && !confirm(this.i18n.t('confirmNew'))) return false
         const difficulty = this.state.difficulty
         this.cancelAI()
+        this.aiError = false
         this.state = this.fresh(size, difficulty)
         this.position = this.engine.state(size, [])
         this.notice = null
@@ -416,6 +451,7 @@ OfflineGames.wasm.defineElement('go', 'go-game', class extends HTMLElement {
     }
 
     statusText() {
+        if (this.aiError) return this.i18n.t('aiUnavailable')
         const outcome = this.position.outcome
         if (outcome.ended) {
             if (outcome.reason === 'resign') return this.i18n.t('goResigned')
@@ -450,7 +486,10 @@ OfflineGames.wasm.defineElement('go', 'go-game', class extends HTMLElement {
 
     render() {
         const s = this.shadowRoot
+        const focused = s.activeElement?.classList.contains('spot')
+        s.querySelector('.retry').hidden = !this.aiError
         const size = this.state.size
+        if (this.focusIndex >= size * size) this.focusIndex = Math.floor(size * size / 2)
         const segments = size - 1
         const board = s.querySelector('.board')
         const field = s.querySelector('.field')
@@ -480,9 +519,10 @@ OfflineGames.wasm.defineElement('go', 'go-game', class extends HTMLElement {
             const name = visible === this.engine.BLACK ? this.i18n.t('blackStone')
                 : visible === this.engine.WHITE ? this.i18n.t('whiteStone') : this.i18n.t('empty')
             const state = index === lastPlay && stone ? `, ${this.i18n.t('lastMove')}` : ''
-            return `<button type="button" role="gridcell" class="${classes.join(' ')}" data-index="${index}" aria-rowindex="${row + 1}" aria-colindex="${column + 1}" aria-label="${name}, ${this.i18n.t('row')} ${row + 1}, ${this.i18n.t('column')} ${column + 1}${state}" style="left:${column / segments * 100}%;top:${row / segments * 100}%">${token}</button>`
+            return `<button type="button" role="gridcell" class="${classes.join(' ')}" data-index="${index}" tabindex="${index === this.focusIndex ? 0 : -1}" aria-rowindex="${row + 1}" aria-colindex="${column + 1}" aria-label="${name}, ${this.i18n.t('row')} ${row + 1}, ${this.i18n.t('column')} ${column + 1}${state}" style="left:${column / segments * 100}%;top:${row / segments * 100}%">${token}</button>`
         }).join('')
 
+        if (focused) s.querySelector(`[data-index="${this.focusIndex}"]`)?.focus({preventScroll: true})
         const status = s.querySelector('.status')
         status.textContent = this.statusText()
         status.classList.toggle('thinking', this.thinking)

@@ -1,5 +1,6 @@
 <template id="junqi-game-template">
     <style>
+        *, *::before, *::after { box-sizing: border-box; }
         :host { display: block; color: var(--ink); }
         .toolbar { display: grid; grid-template-columns: 1fr auto auto; gap: 8px; align-items: end; margin-bottom: 10px; }
         label { display: grid; gap: 3px; color: var(--ink-muted); font-size: .7rem; font-weight: 600; letter-spacing: .02em; }
@@ -44,21 +45,22 @@
             font-weight: 850; text-align: center; transform: translate(-50%, -50%); pointer-events: none;
         }
         .square { position: relative; display: grid; min-width: 0; min-height: 0; padding: 3px; border: 0; border-radius: 0; place-items: center; background: transparent; }
-        .square::before, .square::after { position: absolute; z-index: 0; content: ""; background: color-mix(in srgb, var(--board-wood-line) 55%, transparent); }
-        .square::before { width: 100%; height: 1px; }
-        .square::after { width: 1px; height: 100%; }
-        .square.rail-h::before { height: 5px; border-block: 1px solid var(--board-wood-line); background: transparent; }
-        .square.rail-v::after { width: 5px; border-inline: 1px solid var(--board-wood-line); background: transparent; }
+        .routes { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+        .routes path { fill: none; stroke: var(--board-wood-line); stroke-width: 1; vector-effect: non-scaling-stroke; }
+        .routes .rail { stroke-width: 5; }
+        .routes .rail-inner { stroke: var(--board-wood); stroke-width: 2; }
+        .square::before { position: absolute; z-index: 0; }
+        .square.camp::before, .square.hq::before, .square.legal::before, .square.capture::before { content: ""; }
+        .square.swap .piece { outline: 2px dashed var(--legal); outline-offset: 2px; }
+        .square:focus-visible { outline: 3px solid var(--selected); outline-offset: -3px; z-index: 4; }
         .square.camp::before {
             width: 54%; height: 54%; border: 1px solid var(--board-wood-line); transform: rotate(45deg);
             background: color-mix(in srgb, var(--piece-face) 70%, var(--board-wood));
         }
-        .square.camp::after { display: none; }
         .square.hq::before {
             width: 72%; height: 62%; border: 2px double var(--board-wood-line);
             background: color-mix(in srgb, var(--piece-face) 75%, transparent);
         }
-        .square.hq::after { display: none; }
         .square.legal::before { width: 15px; height: 15px; border: 0; border-radius: 50%; background: var(--legal); }
         .square.capture::before { z-index: 3; width: 94%; height: 86%; border: 3px solid var(--capture); border-radius: 10px; background: transparent; pointer-events: none; }
         .piece {
@@ -80,7 +82,6 @@
         .square.last-to .piece { animation: junqi-piece .22s ease-out; }
         @keyframes junqi-target { from { box-shadow: inset 0 0 0 4px var(--selected); } }
         @keyframes junqi-piece { from { opacity: .4; transform: scale(.72); } }
-        .river { position: absolute; z-index: 1; top: 50%; left: 20%; width: 60%; border-top: 2px dashed color-mix(in srgb, var(--board-wood-line) 60%, transparent); pointer-events: none; }
         .legend { display: flex; justify-content: center; gap: 18px; margin-top: 8px; color: var(--ink-muted); font-size: .7rem; }
         .legend span::before { display: inline-block; width: 9px; height: 9px; margin-right: 4px; border-radius: 50%; content: ""; background: var(--piece-red); }
         .legend span:last-child::before { background: var(--piece-black); }
@@ -88,15 +89,17 @@
             .status.thinking::after, .square.last-to, .square.last-to .piece { animation: none; }
         }
         @media (max-width: 340px) { .toolbar { gap: 4px; } button { padding-inline: 8px; font-size: .82rem; } select { min-width: 86px; } .piece { border-width: 1px; } }
+        .retry { width: 100%; min-height: var(--control-h,42px); margin: 0 0 9px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); color: var(--ink); background: var(--bg-surface); font-weight: 650; }
+        .retry[hidden] { display: none; }
     </style>
     <div class="toolbar">
         <label><span class="difficulty-label"></span><select class="difficulty"><option value="easy"></option><option value="medium"></option><option value="hard"></option></select></label>
         <button class="undo" type="button"></button><button class="new" type="button"></button>
     </div>
     <p class="warning" hidden></p>
-    <div class="status" role="status" aria-live="polite"></div>
+    <div class="status" role="status" aria-live="polite"></div><button class="retry" type="button" hidden></button>
     <p class="placement-note" hidden></p>
-    <div class="board" role="grid"><i class="river"></i></div>
+    <div class="board" role="grid"></div>
     <div class="legend"><span class="your-side"></span><span class="enemy-side"></span></div>
 </template>
 
@@ -110,7 +113,7 @@ OfflineGames.wasm.defineElement('junqi', 'junqi-game', class extends HTMLElement
     }
     connectedCallback() {
         this.engine = OfflineGames.Junqi; this.i18n = OfflineGames.i18n; this.storage = OfflineGames.storage
-        this.load(); this.bind(); this.localize(); this.render()
+        this.routes = this.boardRoutes(); this.load(); this.bind(); this.localize(); this.render()
         if (this.state.phase === 'playing' && this.state.turn === this.engine.BLACK && !this.state.outcome) this.requestAI()
     }
     disconnectedCallback() { this.cancelAI() }
@@ -120,6 +123,7 @@ OfflineGames.wasm.defineElement('junqi', 'junqi-game', class extends HTMLElement
     normalizeReveals(state) { state.revealed=this.publicReveals(state.board,state.revealed);for(const snapshot of state.history)if(Array.isArray(snapshot.board)&&Array.isArray(snapshot.revealed))snapshot.revealed=this.publicReveals(snapshot.board,snapshot.revealed) }
     load() { const saved = this.storage.read('junqi'); this.state = this.valid(saved) ? saved : this.fresh();this.normalizeReveals(this.state);if(!this.state.phase)this.state.phase='playing';if(!Number.isInteger(this.state.seed))this.state.seed=OfflineGames.runtime.randomSeed() }
     bind() {
+        this.bindBoardKeys()
         const s = this.shadowRoot
         s.querySelector('.board').addEventListener('click', event => { const square = event.target.closest('.square'); if (square) this.tap(Number(square.dataset.index)) })
         s.querySelector('.undo').addEventListener('click', () => this.state.phase === 'placement' ? this.shuffleSetup() : this.undo())
@@ -137,7 +141,7 @@ OfflineGames.wasm.defineElement('junqi', 'junqi-game', class extends HTMLElement
         if (this.thinking || this.state.outcome || this.state.turn !== this.engine.RED) return
         if (this.state.phase === 'placement') { this.place(index); return }
         const value = this.state.board[index]
-        if (value?.side === this.engine.RED) { this.selected = this.engine.movesFor(this.state.board,index).length ? index : null; this.render(); return }
+        if (value?.side === this.engine.RED) { this.selected = this.selected !== index && this.engine.movesFor(this.state.board,index).length ? index : null; this.render(); return }
         if (this.selected != null && this.engine.movesFor(this.state.board,this.selected).some(move => move.to === index)) this.commit({from:this.selected,to:index}, this.engine.RED)
         else { this.selected = null; this.render() }
     }
@@ -207,11 +211,11 @@ OfflineGames.wasm.defineElement('junqi', 'junqi-game', class extends HTMLElement
     }
     requestAI() {
         this.cancelAI(); this.thinking = true; this.aiStartedAt = performance.now(); const id = ++this.requestId
-        this.worker = OfflineGames.runtime.createWorker('junqi-worker-payload')
+        try { this.worker = OfflineGames.runtime.createWorker('junqi-worker-payload') } catch (error) { this.failAI(error); return }
         this.worker.onmessage = event => {
             if (event.data.id !== id || !this.thinking) return
             const move = event.data.move
-            const valid = move && this.engine.movesFor(this.state.board,move.from).some(candidate => candidate.to === move.to)
+            const valid = move && this.engine.legalMoves(this.state.board,this.engine.BLACK).some(candidate => candidate.from === move.from && candidate.to === move.to)
             if (this.worker) this.worker.terminate()
             this.worker = null
             const delay = Math.max(0, JUNQI_MIN_AI_TURN_MS - (performance.now() - this.aiStartedAt))
@@ -220,13 +224,13 @@ OfflineGames.wasm.defineElement('junqi', 'junqi-game', class extends HTMLElement
                 if (id !== this.requestId || !this.thinking) return
                 this.thinking = false
                 if (valid) this.commit(move,this.engine.BLACK)
-                else this.render()
+                else this.failAI()
             }, delay)
         }
-        this.worker.onerror = error => { console.error(error); this.cancelAI(false); this.render() }
+        this.worker.onerror = error => this.failAI(error)
         this.worker.postMessage({id,...this.aiKnowledge(this.engine.BLACK),side:this.engine.BLACK,difficulty:this.state.difficulty,seed:OfflineGames.runtime.moveSeed(this.state.seed,this.state.history.length)}); this.render()
     }
-    cancelAI(invalidate=true) { if (invalidate) this.requestId++; if (this.worker) this.worker.terminate(); if (this.aiTimer) clearTimeout(this.aiTimer); this.worker=null; this.aiTimer=null; this.thinking=false }
+    cancelAI(invalidate=true) { this.aiFailed=false; if (invalidate) this.requestId++; if (this.worker) this.worker.terminate(); if (this.aiTimer) clearTimeout(this.aiTimer); this.worker=null; this.aiTimer=null; this.thinking=false }
     undo() {
         if (!this.state.history.length) return
         const wasThinking = this.thinking; this.cancelAI(); let count = wasThinking || this.state.history.at(-1).mover === this.engine.RED ? 1 : 2; let previous
@@ -237,6 +241,7 @@ OfflineGames.wasm.defineElement('junqi', 'junqi-game', class extends HTMLElement
     newGame() { if (this.state.history.length && !confirm(this.i18n.t('confirmNew'))) return; const difficulty=this.state.difficulty; this.cancelAI(); this.state=this.fresh(difficulty); this.selected=null; this.setupError=false; this.save(); this.render() }
     pieceLabel(value, visible) { return visible ? this.i18n.t('junqiPiece'+value.type) : '◆' }
     statusText() {
+        if (this.aiFailed) return this.i18n.t('aiUnavailable')
         if (this.state.phase === 'placement') {
             if (this.setupError) return this.i18n.t('junqiInvalidSwap')
             return this.i18n.t(this.selected == null ? 'junqiArrange' : 'junqiChooseSwap')
@@ -246,26 +251,81 @@ OfflineGames.wasm.defineElement('junqi', 'junqi-game', class extends HTMLElement
         if (this.state.message) return this.i18n.t('junqiBattle'+this.state.message[0].toUpperCase()+this.state.message.slice(1))
         return this.i18n.t('yourTurn')
     }
+    boardRoutes() {
+        const roads = [], rails = [], e = this.engine
+        for (let from = 0; from < 60; from++) {
+            const railway = e.isRail(from) ? new Set(e.railwayNeighbors(from)) : new Set()
+            for (const to of e.roadNeighbors(from)) {
+                if (to <= from) continue
+                const path = `M${e.columnOf(from)+.5} ${e.rowOf(from)+.5}L${e.columnOf(to)+.5} ${e.rowOf(to)+.5}`
+                ;(railway.has(to) ? rails : roads).push(path)
+            }
+        }
+        return `<svg class="routes" viewBox="0 0 5 12" preserveAspectRatio="none" aria-hidden="true"><path d="${roads.join(' ')}"/><path class="rail" d="${rails.join(' ')}"/><path class="rail-inner" d="${rails.join(' ')}"/></svg>`
+    }
+    setupTargets() {
+        if (this.selected == null) return []
+        return this.state.board.flatMap((piece, index) => {
+            if (index === this.selected || piece?.side !== this.engine.RED) return []
+            const board = this.state.board.slice()
+            ;[board[this.selected], board[index]] = [board[index], board[this.selected]]
+            return this.engine.validateSetup(board, this.engine.RED) ? [{to: index}] : []
+        })
+    }
+    failAI(error) {
+        if (error) console.error(error)
+        this.cancelAI(); this.aiFailed = true; this.render()
+    }
+    bindBoardKeys() {
+        this.shadowRoot.querySelector('.retry').addEventListener('click', () => this.requestAI())
+        const board = this.shadowRoot.querySelector('.board')
+        board.addEventListener('focusin', event => {
+            const cell = event.target.closest('.square')
+            if (!cell) return
+            this.focusIndex = Number(cell.dataset.index)
+            for (const button of board.querySelectorAll('.square')) button.tabIndex = button === cell ? 0 : -1
+        })
+        board.addEventListener('keydown', event => {
+            const cell = event.target.closest('.square')
+            if (!cell) return
+            const index = Number(cell.dataset.index), row = Math.floor(index / 5), column = index % 5, direction = 1
+            const step = {ArrowUp: [-direction, 0], ArrowDown: [direction, 0], ArrowLeft: [0, -direction], ArrowRight: [0, direction]}[event.key]
+            if (event.key === 'Escape') { event.preventDefault(); this.selected=null;this.setupError=false; this.render(); return }
+            if (!step) return
+            event.preventDefault()
+            const nextRow = Math.max(0, Math.min(11, row + step[0])), nextColumn = Math.max(0, Math.min(4, column + step[1]))
+            board.querySelector(`[data-index="${nextRow * 5 + nextColumn}"]`).focus()
+        })
+    }
+    restoreBoardFocus(focused) {
+        const retry = this.shadowRoot.querySelector('.retry')
+        retry.hidden = !this.aiFailed; retry.textContent = this.i18n.t('retry')
+        this.focusIndex ??= 30
+        for (const button of this.shadowRoot.querySelectorAll('.square')) button.tabIndex = Number(button.dataset.index) === this.focusIndex ? 0 : -1
+        if (focused != null) this.shadowRoot.querySelector(`.square[data-index="${focused}"]`)?.focus({preventScroll: true})
+    }
     render() {
-        const s=this.shadowRoot, legal=this.selected==null?[]:this.engine.movesFor(this.state.board,this.selected), targets=new Map(legal.map(move=>[move.to,Boolean(this.state.board[move.to])])), revealed=new Set(this.state.revealed)
+        const focused = this.shadowRoot.activeElement?.dataset.index
+        const s=this.shadowRoot, legal=this.state.phase==='placement'?this.setupTargets():this.selected==null?[]:this.engine.movesFor(this.state.board,this.selected), targets=new Map(legal.map(move=>[move.to,Boolean(this.state.board[move.to])])), revealed=new Set(this.state.revealed)
         const squares=this.state.board.map((value,index)=>{
             const row=this.engine.rowOf(index), column=this.engine.columnOf(index), classes=['square']
-            if ([1,5,6,10].includes(row)) classes.push('rail-h'); if ([0,4].includes(column)&&row>=1&&row<=10) classes.push('rail-v')
             if (this.engine.isCamp(index)) classes.push('camp'); if (this.engine.isHQ(index)) classes.push('hq'); if (index===this.selected) classes.push('selected')
             if (this.state.phase==='placement'&&value?.side===this.engine.RED) classes.push('setup-zone')
-            if (targets.has(index)) classes.push(targets.get(index)?'capture':'legal'); if (this.state.lastMove&&(index===this.state.lastMove.from||index===this.state.lastMove.to)) classes.push('last'); if (this.state.lastMove?.to===index) classes.push('last-to')
+            if (targets.has(index)) classes.push(this.state.phase==='placement'?'swap':targets.get(index)?'capture':'legal'); if (this.state.lastMove&&(index===this.state.lastMove.from||index===this.state.lastMove.to)) classes.push('last'); if (this.state.lastMove?.to===index) classes.push('last-to')
             const visible=value&&(value.side===this.engine.RED||revealed.has(value.id)||this.state.outcome)
             const token=value?`<span class="piece ${value.side===this.engine.RED?'red':'black'} ${visible?'':'hidden'}">${this.pieceLabel(value,visible)}</span>`:''
-            const name=value?(visible?this.i18n.t('junqiPiece'+value.type):this.i18n.t('hiddenPiece')):this.i18n.t('empty')
+            const name=value?(visible?`${this.i18n.t(value.side===this.engine.RED?'red':'black')} ${this.i18n.t('junqiPiece'+value.type)}`:this.i18n.t('hiddenPiece')):this.i18n.t('empty')
             const last=this.state.lastMove&&(index===this.state.lastMove.from||index===this.state.lastMove.to)?`, ${this.i18n.t('lastMove')}`:''
-            return `<button type="button" role="gridcell" class="${classes.join(' ')}" data-index="${index}" aria-label="${name}, ${this.i18n.t('row')} ${row+1}, ${this.i18n.t('column')} ${column+1}${last}">${token}</button>`
+            return `<button type="button" role="gridcell" class="${classes.join(' ')}" data-index="${index}" aria-label="${name}, ${this.i18n.t('row')} ${row+1}, ${this.i18n.t('column')} ${column+1}${last}${index===this.selected?', '+this.i18n.t('selected'):''}${targets.has(index)?', '+this.i18n.t('legalMove'):''}">${token}</button>`
         }).join('')
-        const board=s.querySelector('.board'); board.innerHTML=squares+'<i class="river"></i>'; const status=s.querySelector('.status'); status.textContent=this.statusText(); status.classList.toggle('thinking',this.thinking)
+        const board=s.querySelector('.board'); board.innerHTML=this.routes+squares; const status=s.querySelector('.status'); status.textContent=this.statusText(); status.classList.toggle('thinking',this.thinking)
         if(this.state.outcome?.winner===this.engine.RED)board.dataset.win=this.i18n.t('youWin');else delete board.dataset.win
+        board.setAttribute('aria-disabled', String(this.thinking || this.state.turn !== this.engine.RED || Boolean(this.state.outcome)))
         const placement=this.state.phase==='placement', undo=s.querySelector('.undo'), next=s.querySelector('.new')
         s.querySelector('.placement-note').hidden=!placement; s.querySelector('.difficulty').value=this.state.difficulty
         undo.textContent=this.i18n.t(placement?'junqiShuffle':'undo'); undo.disabled=!placement&&!this.state.history.length
         next.textContent=this.i18n.t(placement?'junqiStartBattle':'newGame')
+        this.restoreBoardFocus(focused)
     }
 })
 </script>

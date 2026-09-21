@@ -1,5 +1,6 @@
 <template id="doushouqi-game-template">
     <style>
+        *, *::before, *::after { box-sizing: border-box; }
         :host { display: block; color: var(--ink); }
         .toolbar {
             display: grid; grid-template-columns: 1fr auto auto; gap: 8px;
@@ -106,13 +107,13 @@
             box-shadow: 0 0 0 4px var(--selected), 0 5px 8px rgba(0,0,0,.38);
         }
         .cell.destination::after {
-            z-index: 1; width: 22%; aspect-ratio: 1; border-radius: 50%; content: "";
+            position: absolute; z-index: 1; width: 22%; aspect-ratio: 1; border-radius: 50%; content: "";
             background: color-mix(in srgb, var(--legal) 80%, transparent);
             box-shadow: 0 0 0 4px color-mix(in srgb, var(--legal) 22%, transparent);
             pointer-events: none;
         }
         .cell.capture::after {
-            width: 64%; border: 4px solid var(--capture, #e05555); border-radius: 50%;
+            z-index: 3; width: 82%; border: 3px solid var(--capture, #e05555); border-radius: 50%;
             background: transparent;
             box-shadow: inset 0 0 0 3px rgba(255,255,255,.28);
         }
@@ -126,9 +127,10 @@
             width: 80%; aspect-ratio: 1; border-radius: 50%;
             align-items: center; justify-content: center;
             z-index: 2; pointer-events: none;
-            font-size: clamp(.45rem, 1.6vw, .75rem); font-weight: 800; line-height: 1;
+            font-size: clamp(.75rem, 3vw, 1rem); font-weight: 800; line-height: 1;
             letter-spacing: -.01em;
         }
+        :host(:lang(zh)) .piece { font-size: clamp(1rem, 4.3vw, 1.25rem); }
         .piece.red {
             border: 1px solid #75241f;
             background: radial-gradient(circle at 35% 27%, #ed8b7f 0 8%, #c64b43 38%, #902c27 78%);
@@ -151,6 +153,8 @@
             .mini-piece { width: 23px; height: 23px; }
             .score-label { font-size: .7rem; }
         }
+        .retry { width: 100%; margin: 0 0 9px; }
+        .retry[hidden] { display: none; }
     </style>
     <div class="toolbar">
         <label><span class="difficulty-label"></span><select class="difficulty"><option value="easy"></option><option value="medium"></option><option value="hard"></option></select></label>
@@ -171,7 +175,7 @@
             <span class="mini-piece black" aria-hidden="true"></span>
         </div>
     </div>
-    <div class="status" role="status" aria-live="polite"></div>
+    <div class="status" role="status" aria-live="polite"></div><button class="action retry" type="button" hidden></button>
     <div class="board" role="grid"></div>
 </template>
 
@@ -261,7 +265,35 @@ OfflineGames.wasm.defineElement('doushouqi', 'doushouqi-game', class extends HTM
         }))
     }
 
+    bindBoardKeys() {
+        const board = this.shadowRoot.querySelector('.board')
+        for (const button of board.querySelectorAll('.cell')) button.tabIndex = button.matches('[data-index="42"]') ? 0 : -1
+        board.addEventListener('focusin', event => {
+            const cell = event.target.closest('.cell')
+            if (cell) for (const button of board.querySelectorAll('.cell')) button.tabIndex = button === cell ? 0 : -1
+        })
+        board.addEventListener('keydown', event => {
+            const cell = event.target.closest('.cell')
+            if (!cell) return
+            if (event.key === 'Escape') { event.preventDefault(); this.selectedFrom=null;this.notice=null; this.render(); return }
+            const direction = {ArrowUp: [0,-1], ArrowDown: [0,1], ArrowLeft: [-1,0], ArrowRight: [1,0]}[event.key]
+            if (!direction) return
+            event.preventDefault()
+            const origin = cell.getBoundingClientRect(), x = origin.x + origin.width / 2, y = origin.y + origin.height / 2
+            const candidates = [...board.querySelectorAll('.cell')].filter(button => !button.disabled && button !== cell).map(button => {
+                const rect = button.getBoundingClientRect(), dx = rect.x + rect.width / 2 - x, dy = rect.y + rect.height / 2 - y
+                return {button, forward: dx * direction[0] + dy * direction[1], cross: Math.abs(dx * direction[1] - dy * direction[0])}
+            }).filter(candidate => candidate.forward > 1).sort((a,b) => a.forward - b.forward || a.cross - b.cross)
+            candidates[0]?.button.focus()
+        })
+        this.shadowRoot.querySelector('.retry').addEventListener('click', () => this.requestAI())
+    }
+    failAI(error) {
+        if (error) console.error(error)
+        this.cancelAI(); this.aiFailed = true; this.render()
+    }
     bind() {
+        this.bindBoardKeys()
         const shadow = this.shadowRoot
         shadow.querySelector('.board').addEventListener('click', event => {
             const cell = event.target.closest('.cell')
@@ -366,7 +398,7 @@ OfflineGames.wasm.defineElement('doushouqi', 'doushouqi-game', class extends HTM
         this.aiFailed = false
         this.aiStartedAt = performance.now()
         const id = ++this.requestId
-        this.worker = OfflineGames.runtime.createWorker('doushouqi-worker-payload')
+        try { this.worker = OfflineGames.runtime.createWorker('doushouqi-worker-payload') } catch (error) { this.failAI(error); return }
         this.worker.onmessage = event => {
             if (event.data.id !== id || !this.thinking) return
             const candidate = event.data.move
@@ -382,12 +414,7 @@ OfflineGames.wasm.defineElement('doushouqi', 'doushouqi-game', class extends HTM
                 else { this.aiFailed = true; this.render() }
             }, delay)
         }
-        this.worker.onerror = error => {
-            console.error(error)
-            this.cancelAI(false)
-            this.aiFailed = true
-            this.render()
-        }
+        this.worker.onerror = error => this.failAI(error)
         this.worker.postMessage({
             id, board: this.state.board, side: this.engine.BLACK,
             difficulty: this.state.difficulty,
@@ -456,7 +483,7 @@ OfflineGames.wasm.defineElement('doushouqi', 'doushouqi-game', class extends HTM
             if (this.state.outcome.winner === this.engine.BLACK) return this.i18n.t('aiWins')
             return this.i18n.t('doushouqiDraw')
         }
-        if (this.aiFailed) return this.i18n.t('doushouqiAiUnavailable')
+        if (this.aiFailed) return this.i18n.t('aiUnavailable')
         if (this.thinking || this.state.turn === this.engine.BLACK) return this.i18n.t('aiThinking')
         if (this.notice) return this.i18n.t(this.notice)
         if (this.selectedFrom != null) return this.i18n.t('doushouqiChooseDestination')
@@ -464,6 +491,8 @@ OfflineGames.wasm.defineElement('doushouqi', 'doushouqi-game', class extends HTM
     }
 
     render() {
+        const retry = this.shadowRoot.querySelector('.retry')
+        retry.hidden = !this.aiFailed; retry.textContent = this.i18n.t('retry')
         this.legal = this.state.outcome ? [] : this.engine.legalMoves(this.state.board, this.state.turn)
         const destinations = new Set(this.selectedFrom == null ? [] : this.legal.filter(m => m.from === this.selectedFrom).map(m => m.to))
         const captures = new Set(this.selectedFrom == null ? [] : this.legal.filter(m => m.from === this.selectedFrom && this.state.board[m.to] !== this.engine.EMPTY).map(m => m.to))

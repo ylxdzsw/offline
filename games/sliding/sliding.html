@@ -16,6 +16,7 @@
             color: var(--ink); background: var(--bg-surface); font-weight: 650;
         }
         button:disabled { opacity: .42; }
+        .controls { margin: 9px 0 0; color: var(--ink-muted); font-size: .75rem; line-height: 1.4; text-align: center; }
         .warning { margin: 0 0 9px; color: var(--danger); font-size: .77rem; text-align: center; }
         .warning[hidden] { display: none; }
         .dashboard {
@@ -83,6 +84,10 @@
             transition: left .18s ease, top .18s ease;
         }
         .tile.movable { cursor: pointer; }
+        .tile:focus-visible { z-index: 2; outline: 3px solid var(--focus); outline-offset: -3px; }
+        @media (hover: hover) {
+            .tile.movable:hover { box-shadow: inset 0 0 0 2px var(--selected), 0 1px 3px color-mix(in srgb, var(--ink) 14%, transparent); }
+        }
         .tile.movable:active { filter: brightness(.94); transform: scale(.97); }
         .tile.solved {
             color: var(--accent);
@@ -112,7 +117,8 @@
         <div class="meter"><span class="time-label"></span><strong class="timer">00:00</strong></div>
     </div>
     <div class="status" role="status" aria-live="polite"></div>
-    <div class="board" role="grid" tabindex="0"><div class="well"></div></div>
+    <div class="board" role="grid" tabindex="0" aria-describedby="controls"><div class="well"></div></div>
+    <p class="controls" id="controls"></p>
 </template>
 
 <script>
@@ -227,6 +233,7 @@ customElements.define('sliding-puzzle', class extends HTMLElement {
         segmented.setAttribute('options', JSON.stringify(options))
         segmented.setAttribute('value', String(this.state.size))
         segmented.setAttribute('aria-label', t('slidingSize'))
+        s.querySelector('.controls').textContent = t('slidingControls')
         s.querySelector('.size-label').textContent = t('slidingSize')
         s.querySelector('.undo').textContent = t('undo')
         s.querySelector('.new').textContent = t('newGame')
@@ -238,7 +245,7 @@ customElements.define('sliding-puzzle', class extends HTMLElement {
 
     beginSwipe(event) {
         const tile = event.target.closest('.tile')
-        if (!tile || event.button !== 0 || this.state.outcome) return
+        if (!tile || event.button !== 0 || event.isPrimary === false || this.state.outcome) return
         this.pointer = {
             id: event.pointerId,
             index: Number(tile.dataset.index),

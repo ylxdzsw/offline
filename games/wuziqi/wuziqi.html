@@ -12,7 +12,7 @@
         .action:disabled { opacity: .42; }
         .status {
             display: flex; min-height: 38px; align-items: center; justify-content: center;
-            margin: 0 0 9px; border-radius: var(--radius-sm);
+            margin: 0 0 9px; padding: 6px 10px; text-align: center; border-radius: var(--radius-sm);
             color: var(--status-ink); font-size: .92rem; font-weight: 700; background: var(--status-bg);
         }
         .status.thinking::after {
@@ -21,10 +21,12 @@
         }
         @keyframes pulse { to { opacity: .2; transform: scale(.7); } }
         .warning { margin: 0 0 9px; color: var(--danger); font-size: .77rem; text-align: center; }
-        .warning[hidden] { display: none; }
+        .warning[hidden], .retry[hidden] { display: none; }
+        .retry { display: block; margin: 0 auto 9px; min-height: 40px; padding: 0 14px; }
+        .spot:focus-visible { z-index: 4; outline: 3px solid var(--focus); outline-offset: -3px; }
         .board {
             --edge: clamp(12px, 4.5vw, 22px);
-            position: relative; width: 100%; aspect-ratio: 1; overflow: hidden;
+            position: relative; box-sizing: border-box; width: 100%; aspect-ratio: 1; overflow: hidden;
             border: 2px solid var(--board-wood-edge); border-radius: var(--radius-sm);
             background:
                 radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--board-wood-deep) 35%, transparent), transparent 55%),
@@ -51,7 +53,7 @@
         .star { position: absolute; width: 6px; height: 6px; border-radius: 50%; background: var(--board-wood-line); transform: translate(-50%, -50%); }
         .spot {
             position: absolute; display: grid;
-            width: clamp(18px, 6.3vw, 30px); height: clamp(18px, 6.3vw, 30px);
+            width: calc(100% / 14); aspect-ratio: 1;
             padding: 0; border: 0; border-radius: 50%; place-items: center;
             background: transparent; transform: translate(-50%, -50%);
         }
@@ -86,6 +88,7 @@
     </div>
     <p class="warning" hidden></p>
     <div class="status" role="status" aria-live="polite"></div>
+    <button class="action retry" type="button" hidden></button>
     <div class="board" role="grid">
         <div class="field">
             <i class="star" style="left:21.4286%;top:21.4286%"></i>
@@ -110,6 +113,8 @@ OfflineGames.wasm.defineElement('wuziqi', 'wuziqi-game', class extends HTMLEleme
         this.aiTimer = null
         this.aiStartedAt = 0
         this.requestId = 0
+        this.aiError = false
+        this.focusIndex = 112
     }
 
     connectedCallback() {
@@ -140,9 +145,12 @@ OfflineGames.wasm.defineElement('wuziqi', 'wuziqi-game', class extends HTMLEleme
 
     valid(saved) {
         return saved && Array.isArray(saved.board) && saved.board.length === 225
+            && saved.board.every(value => [this.engine.EMPTY, this.engine.BLACK, this.engine.WHITE].includes(value))
             && [this.engine.BLACK, this.engine.WHITE].includes(saved.turn)
             && ['easy', 'medium', 'hard'].includes(saved.difficulty)
             && Array.isArray(saved.history)
+            && saved.history.every(move => move && Number.isInteger(move.index) && move.index >= 0 && move.index < 225
+                && [this.engine.BLACK, this.engine.WHITE].includes(move.side))
     }
 
     load() {
@@ -153,10 +161,15 @@ OfflineGames.wasm.defineElement('wuziqi', 'wuziqi-game', class extends HTMLEleme
 
     bind() {
         const shadow = this.shadowRoot
-        shadow.querySelector('.spots').addEventListener('click', event => {
-            const button = event.target.closest('.spot')
-            if (button) this.tap(Number(button.dataset.index))
+        shadow.querySelector('.retry').addEventListener('click', () => this.requestAI())
+        shadow.querySelector('.board').addEventListener('keydown', event => this.boardKey(event))
+        shadow.querySelector('.board').addEventListener('focusin', event => {
+            const cell = event.target.closest('.spot')
+            if (!cell) return
+            this.focusIndex = Number(cell.dataset.index)
+            for (const spot of shadow.querySelectorAll('.spot')) spot.tabIndex = spot === cell ? 0 : -1
         })
+        shadow.querySelector('.board').addEventListener('click', event => this.boardClick(event))
         shadow.querySelector('.undo').addEventListener('click', () => this.undo())
         shadow.querySelector('.new').addEventListener('click', () => this.newGame())
         shadow.querySelector('.difficulty').addEventListener('change', event => {
@@ -167,6 +180,7 @@ OfflineGames.wasm.defineElement('wuziqi', 'wuziqi-game', class extends HTMLEleme
 
     localize() {
         const shadow = this.shadowRoot
+        shadow.querySelector('.retry').textContent = this.i18n.t('retry')
         shadow.querySelector('.difficulty-label').textContent = this.i18n.t('difficulty')
         for (const option of shadow.querySelectorAll('.difficulty option')) option.textContent = this.i18n.t(option.value)
         shadow.querySelector('.undo').textContent = this.i18n.t('undo')
@@ -194,13 +208,47 @@ OfflineGames.wasm.defineElement('wuziqi', 'wuziqi-game', class extends HTMLEleme
         this.render()
     }
 
+    boardKey(event) {
+        const cell = event.target.closest('.spot')
+        if (!cell) return
+        const size = 15, index = Number(cell.dataset.index)
+        const row = Math.floor(index / size), column = index % size
+        let next
+        if (event.key === 'ArrowLeft') next = row * size + Math.max(0, column - 1)
+        else if (event.key === 'ArrowRight') next = row * size + Math.min(size - 1, column + 1)
+        else if (event.key === 'ArrowUp') next = Math.max(0, row - 1) * size + column
+        else if (event.key === 'ArrowDown') next = Math.min(size - 1, row + 1) * size + column
+        else if (event.key === 'Home') next = event.ctrlKey ? 0 : row * size
+        else if (event.key === 'End') next = event.ctrlKey ? size * size - 1 : row * size + size - 1
+        else return
+        event.preventDefault()
+        this.shadowRoot.querySelector(`[data-index="${next}"]`).focus()
+    }
+
+    failAI() {
+        this.cancelAI()
+        this.aiError = true
+        this.render()
+    }
+
+    boardClick(event) {
+        const direct = event.target.closest('.spot')
+        if (direct) { this.tap(Number(direct.dataset.index)); return }
+        const rect = this.shadowRoot.querySelector('.field').getBoundingClientRect()
+        const column = Math.max(0, Math.min(14, Math.round((event.clientX - rect.left) / rect.width * 14)))
+        const row = Math.max(0, Math.min(14, Math.round((event.clientY - rect.top) / rect.height * 14)))
+        this.tap(this.engine.at(row, column))
+    }
+
     requestAI() {
         if (this.state.outcome || this.state.turn !== this.engine.WHITE) return
         this.cancelAI()
+        this.aiError = false
         this.thinking = true
         this.aiStartedAt = performance.now()
         const id = ++this.requestId
-        this.worker = OfflineGames.runtime.createWorker('wuziqi-worker-payload')
+        try { this.worker = OfflineGames.runtime.createWorker('wuziqi-worker-payload') }
+        catch (error) { console.error(error); this.failAI(); return }
         this.worker.onmessage = event => {
             if (event.data.id !== id || !this.thinking) return
             const move = event.data.move
@@ -213,14 +261,10 @@ OfflineGames.wasm.defineElement('wuziqi', 'wuziqi-game', class extends HTMLEleme
                 if (id !== this.requestId || !this.thinking) return
                 this.thinking = false
                 if (valid) this.commit(move, this.engine.WHITE)
-                else this.render()
+                else this.failAI()
             }, delay)
         }
-        this.worker.onerror = error => {
-            console.error(error)
-            this.cancelAI(false)
-            this.render()
-        }
+        this.worker.onerror = error => { console.error(error); this.failAI() }
         this.worker.postMessage({id, board: this.state.board, side: this.engine.WHITE, difficulty: this.state.difficulty, seed: OfflineGames.runtime.moveSeed(this.state.seed, this.state.history.length)})
         this.render()
     }
@@ -238,6 +282,7 @@ OfflineGames.wasm.defineElement('wuziqi', 'wuziqi-game', class extends HTMLEleme
         if (!this.state.history.length) return
         const wasThinking = this.thinking
         this.cancelAI()
+        this.aiError = false
         let count = wasThinking || this.state.history.at(-1).side === this.engine.BLACK ? 1 : 2
         while (count-- > 0 && this.state.history.length) {
             const move = this.state.history.pop()
@@ -253,12 +298,14 @@ OfflineGames.wasm.defineElement('wuziqi', 'wuziqi-game', class extends HTMLEleme
         if (this.state.history.length && !confirm(this.i18n.t('confirmNew'))) return
         const difficulty = this.state.difficulty
         this.cancelAI()
+        this.aiError = false
         this.state = this.fresh(difficulty)
         this.save()
         this.render()
     }
 
     statusText() {
+        if (this.aiError) return this.i18n.t('aiUnavailable')
         if (this.state.outcome) {
             if (!this.state.outcome.winner) return this.i18n.t('draw')
             return this.i18n.t(this.state.outcome.winner === this.engine.BLACK ? 'youWin' : 'aiWins')
@@ -268,6 +315,8 @@ OfflineGames.wasm.defineElement('wuziqi', 'wuziqi-game', class extends HTMLEleme
 
     render() {
         const shadow = this.shadowRoot
+        const focused = shadow.activeElement?.classList.contains('spot')
+        shadow.querySelector('.retry').hidden = !this.aiError
         const last = this.state.history.at(-1)?.index
         shadow.querySelector('.spots').innerHTML = this.state.board.map((stone, index) => {
             const row = this.engine.rowOf(index)
@@ -277,12 +326,16 @@ OfflineGames.wasm.defineElement('wuziqi', 'wuziqi-game', class extends HTMLEleme
             const name = stone === this.engine.BLACK ? this.i18n.t('blackStone') : stone === this.engine.WHITE ? this.i18n.t('whiteStone') : this.i18n.t('empty')
             const state = index === last ? `, ${this.i18n.t('lastMove')}` : ''
             const token = stone ? `<span class="stone ${stone === this.engine.BLACK ? 'black' : 'white'}"></span>` : ''
-            return `<button type="button" role="gridcell" class="${classes.join(' ')}" data-index="${index}" aria-label="${name}, ${this.i18n.t('row')} ${row + 1}, ${this.i18n.t('column')} ${column + 1}${state}" style="left:${column / 14 * 100}%;top:${row / 14 * 100}%">${token}</button>`
+            return `<button type="button" role="gridcell" class="${classes.join(' ')}" data-index="${index}" tabindex="${index === this.focusIndex ? 0 : -1}" aria-label="${name}, ${this.i18n.t('row')} ${row + 1}, ${this.i18n.t('column')} ${column + 1}${state}" style="left:${column / 14 * 100}%;top:${row / 14 * 100}%">${token}</button>`
         }).join('')
+        if (focused) shadow.querySelector(`[data-index="${this.focusIndex}"]`)?.focus({preventScroll: true})
         const status = shadow.querySelector('.status')
         status.textContent = this.statusText()
         status.classList.toggle('thinking', this.thinking)
         const board = shadow.querySelector('.board')
+        board.setAttribute('aria-label', this.i18n.t('wuziqi'))
+        board.setAttribute('aria-rowcount', '15')
+        board.setAttribute('aria-colcount', '15')
         if (this.state.outcome?.winner === this.engine.BLACK) board.dataset.win = status.textContent
         else delete board.dataset.win
         board.setAttribute('aria-disabled', String(this.thinking || Boolean(this.state.outcome)))

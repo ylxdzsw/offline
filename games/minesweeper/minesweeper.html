@@ -163,9 +163,10 @@ customElements.define('minesweeper-game', class extends HTMLElement {
             document.getElementById('minesweeper-game-template').content.cloneNode(true)
         )
         this.selected = null
+        this.focusIndex = 0
         this.notice = null
         this.hold = null
-        this.ignoreClick = false
+        this.ignoreClickUntil = 0
         this.suppressContextUntil = 0
         this.timerOrigin = null
         this.timerInterval = null
@@ -228,8 +229,8 @@ customElements.define('minesweeper-game', class extends HTMLElement {
         board.addEventListener('click', event => {
             const cell = event.target.closest('.cell')
             if (!cell) return
-            if (this.ignoreClick) {
-                this.ignoreClick = false
+            if (performance.now() < this.ignoreClickUntil) {
+                this.ignoreClickUntil = 0
                 return
             }
             this.select(Number(cell.dataset.index), true)
@@ -240,7 +241,7 @@ customElements.define('minesweeper-game', class extends HTMLElement {
             event.preventDefault()
             if (performance.now() < this.suppressContextUntil) return
             if (this.hold) {
-                this.ignoreClick = true
+                this.ignoreClickUntil = performance.now() + 1000
                 this.cancelHold()
             }
             this.toggleFlag(Number(cell.dataset.index), true)
@@ -256,7 +257,8 @@ customElements.define('minesweeper-game', class extends HTMLElement {
         })
         s.querySelector('.new').addEventListener('click', () => this.newGame())
         s.querySelector('.difficulty').addEventListener('change', event => {
-            this.newGame(event.target.value, true)
+            this.newGame(event.target.value)
+            event.target.value = this.state.difficulty
         })
     }
 
@@ -287,7 +289,7 @@ customElements.define('minesweeper-game', class extends HTMLElement {
             y: event.clientY,
             timer: setTimeout(() => {
                 if (!this.hold) return
-                this.ignoreClick = true
+                this.ignoreClickUntil = performance.now() + 1000
                 this.suppressContextUntil = performance.now() + 1000
                 this.toggleFlag(index, true)
                 this.cancelHold()
@@ -336,13 +338,18 @@ customElements.define('minesweeper-game', class extends HTMLElement {
             || (event.key === 'ArrowRight' && column === this.state.board.width - 1)) return
         const next = index + directions[event.key]
         if (next < 0 || next >= this.state.board.width * this.state.board.height) return
-        this.select(next, true)
+        this.focusIndex = next
+        this.selected = this.state.board.revealed[next] && this.state.board.cells[next] === 0 ? null : next
+        this.notice = null
+        this.render()
+        this.shadowRoot.querySelector(`.cell[data-index="${next}"]`).focus()
     }
 
     select(index, focus = false) {
         if (this.state.outcome) return
         const board = this.state.board
         if (board.revealed[index] && board.cells[index] === 0) return
+        this.focusIndex = index
         this.notice = null
         if (this.selected === index) {
             this.confirmSelection()
@@ -377,6 +384,7 @@ customElements.define('minesweeper-game', class extends HTMLElement {
 
     toggleFlag(index, focus = false) {
         if (this.state.outcome || this.state.board.revealed[index]) return
+        this.focusIndex = index
         this.selected = index
         this.notice = null
         this.apply(this.engine.toggleFlag(this.state.board, index), {keepSelection: true, motion: 'flag'})
@@ -408,6 +416,7 @@ customElements.define('minesweeper-game', class extends HTMLElement {
         this.pauseTimer(false)
         this.state = this.fresh(difficulty)
         this.selected = null
+        this.focusIndex = 0
         this.notice = null
         this.motion = null
         this.save()
@@ -503,10 +512,13 @@ customElements.define('minesweeper-game', class extends HTMLElement {
 
     render() {
         const s = this.shadowRoot, boardElement = s.querySelector('.board')
+        const focusedIndex = s.activeElement?.matches('.cell') ? Number(s.activeElement.dataset.index) : null
         const board = this.state.board
         const fragment = document.createDocumentFragment()
         boardElement.style.setProperty('--columns', board.width)
         boardElement.style.maxWidth = board.width === 9 ? '360px' : '420px'
+        boardElement.setAttribute('aria-rowcount', board.height)
+        boardElement.setAttribute('aria-colcount', board.width)
         for (let index = 0; index < board.width * board.height; index++) {
             const cell = document.createElement('button')
             cell.type = 'button'
@@ -514,7 +526,7 @@ customElements.define('minesweeper-game', class extends HTMLElement {
             cell.dataset.index = index
             cell.setAttribute('role', 'gridcell')
             cell.setAttribute('aria-selected', String(index === this.selected))
-            cell.tabIndex = index === (this.selected ?? 0) ? 0 : -1
+            cell.tabIndex = index === this.focusIndex ? 0 : -1
 
             const isMine = board.started && board.cells[index] === this.engine.MINE
             const shownMine = isMine && board.outcome === 'lost'
@@ -542,6 +554,7 @@ customElements.define('minesweeper-game', class extends HTMLElement {
             fragment.append(cell)
         }
         boardElement.replaceChildren(fragment)
+        if (focusedIndex != null) boardElement.children[focusedIndex]?.focus({preventScroll: true})
         this.motion = null
         s.querySelector('.difficulty').value = this.state.difficulty
         const flagCount = board.flagged.filter(Boolean).length
